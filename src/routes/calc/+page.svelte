@@ -1,12 +1,18 @@
 <script lang="ts">
 	import { xpStore } from '$lib/stores/xp';
+	import { t } from '$lib/i18n';
+	import { isPro, limits } from '$lib/stores/pro';
 	import { getAllFeedLines, getFeedLine } from '$lib/calc/feedlines/registry';
 	import type { FeedLine } from '$lib/calc/feedlines/types';
 	import { getWochenForPhase } from '$lib/calc/feedlines/types';
 	import { calculate } from '$lib/calc/nutrients';
 	import type { CalcResult } from '$lib/calc/nutrients';
 
-	const feedlines = getAllFeedLines();
+	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
+	let userIsPro = $derived.by(() => { let v = false; isPro.subscribe(x => v = x)(); return v; });
+	let lim = $derived.by(() => { let v: any = {}; limits.subscribe(x => v = x)(); return v; });
+	const allFeedlines = getAllFeedLines();
+	let feedlines = $derived(userIsPro ? allFeedlines : allFeedlines.slice(0, lim.max_feedlines ?? 2));
 
 	let feedlineId = $state('athena-pro');
 	let phase = $state('Veg');
@@ -57,24 +63,29 @@
 
 <div class="px-4 pt-6 max-w-lg mx-auto space-y-5">
 	<div>
-		<h1 class="text-xl font-bold">Düngerrechner</h1>
-		<p class="text-gb-text-muted text-sm">Präzise Nährstoff-Berechnung</p>
+		<h1 class="text-xl font-bold">{tr('calc.title')}</h1>
+		<p class="text-gb-text-muted text-sm">{tr('calc.subtitle')}</p>
 	</div>
 
 	<!-- Feedline Auswahl -->
 	<div>
-		<label class="block text-xs text-gb-text-muted mb-1">Düngerlinie</label>
+		<label class="block text-xs text-gb-text-muted mb-1">{tr('calc.feedline')}</label>
 		<select bind:value={feedlineId} class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm">
 			{#each feedlines as fl}
 				<option value={fl.id}>{fl.name} ({fl.hersteller})</option>
 			{/each}
 		</select>
+		{#if !userIsPro && allFeedlines.length > feedlines.length}
+			<a href="/pro" class="block mt-2 text-xs text-gb-accent hover:underline">
+				🔒 +{allFeedlines.length - feedlines.length} {tr('pro.feat_feedlines')} — {tr('grow.unlock_pro')}
+			</a>
+		{/if}
 	</div>
 
 	<!-- Phase / Woche / Tag -->
 	<div class="grid grid-cols-3 gap-3">
 		<div>
-			<label class="block text-xs text-gb-text-muted mb-1">Phase</label>
+			<label class="block text-xs text-gb-text-muted mb-1">{tr('calc.phase')}</label>
 			<select bind:value={phase} class="w-full bg-gb-surface border border-gb-border rounded-lg px-2 py-2.5 text-sm">
 				{#each phasen as p}
 					<option value={p}>{p}</option>
@@ -82,7 +93,7 @@
 			</select>
 		</div>
 		<div>
-			<label class="block text-xs text-gb-text-muted mb-1">Woche</label>
+			<label class="block text-xs text-gb-text-muted mb-1">{tr('calc.week')}</label>
 			<select bind:value={woche} class="w-full bg-gb-surface border border-gb-border rounded-lg px-2 py-2.5 text-sm">
 				{#each wochen as w}
 					<option value={w}>{w}</option>
@@ -90,7 +101,7 @@
 			</select>
 		</div>
 		<div>
-			<label class="block text-xs text-gb-text-muted mb-1">Tag</label>
+			<label class="block text-xs text-gb-text-muted mb-1">{tr('calc.day')}</label>
 			<select bind:value={tag} class="w-full bg-gb-surface border border-gb-border rounded-lg px-2 py-2.5 text-sm">
 				{#each [1,2,3,4,5,6,7] as d}
 					<option value={d}>{d}</option>
@@ -102,16 +113,16 @@
 	<!-- Reservoir + Medium -->
 	<div class="grid grid-cols-2 gap-3">
 		<div>
-			<label class="block text-xs text-gb-text-muted mb-1">Reservoir (L)</label>
+			<label class="block text-xs text-gb-text-muted mb-1">{tr('calc.reservoir')}</label>
 			<input type="number" bind:value={reservoir} min="1" max="1000" step="1"
 				class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm" />
 		</div>
 		<div>
-			<label class="block text-xs text-gb-text-muted mb-1">Medium</label>
+			<label class="block text-xs text-gb-text-muted mb-1">{tr('calc.medium')}</label>
 			<select bind:value={medium} class="w-full bg-gb-surface border border-gb-border rounded-lg px-2 py-2.5 text-sm">
-				<option value="coco">Kokos</option>
-				<option value="hydro">Hydro</option>
-				<option value="erde">Erde</option>
+				<option value="coco">{tr('grow.medium_coco')}</option>
+				<option value="hydro">{tr('grow.medium_hydro')}</option>
+				<option value="erde">{tr('grow.medium_soil')}</option>
 			</select>
 		</div>
 	</div>
@@ -119,18 +130,18 @@
 	<!-- RO Toggle -->
 	<label class="flex items-center gap-3 bg-gb-surface rounded-lg px-3 py-3">
 		<input type="checkbox" bind:checked={hatRo} class="accent-gb-green w-4 h-4" />
-		<span class="text-sm">Osmose-Wasser vorhanden</span>
+		<span class="text-sm">{tr('calc.ro_water')}</span>
 	</label>
 
 	<!-- Faktor -->
 	<div>
 		<div class="flex items-center gap-3 mb-2">
-			<label class="text-xs text-gb-text-muted">Faktor</label>
+			<label class="text-xs text-gb-text-muted">{tr('calc.factor_label')}</label>
 			<button
 				onclick={() => faktorModus = faktorModus === 'Auto' ? 'Manuell' : 'Auto'}
 				class="text-xs px-2 py-0.5 rounded {faktorModus === 'Auto' ? 'bg-gb-green/20 text-gb-green' : 'bg-gb-surface-2 text-gb-text-muted'}"
 			>
-				{faktorModus}
+				{faktorModus === 'Auto' ? tr('calc.auto') : tr('calc.manual')}
 			</button>
 		</div>
 		{#if faktorModus === 'Manuell'}
@@ -152,19 +163,19 @@
 		<!-- EC / pH Header -->
 		<div class="grid grid-cols-2 gap-3">
 			<div class="bg-gb-surface rounded-xl p-4 text-center">
-				<p class="text-xs text-gb-text-muted">EC Soll</p>
+				<p class="text-xs text-gb-text-muted">{tr('calc.ec_target')}</p>
 				<p class="text-2xl font-bold text-gb-green">{result.ec_soll}</p>
 				<p class="text-xs text-gb-text-muted">{ecEinheit}</p>
 			</div>
 			<div class="bg-gb-surface rounded-xl p-4 text-center">
-				<p class="text-xs text-gb-text-muted">pH Ziel</p>
+				<p class="text-xs text-gb-text-muted">{tr('calc.ph_target')}</p>
 				<p class="text-2xl font-bold text-gb-accent">{result.ph_ziel}</p>
 			</div>
 		</div>
 
 		<!-- Faktor Info -->
 		<div class="bg-gb-surface rounded-xl p-3 flex justify-between text-sm">
-			<span class="text-gb-text-muted">Faktor</span>
+			<span class="text-gb-text-muted">{tr('calc.factor_label')}</span>
 			<span class="font-medium">{result.faktor_aktiv}%</span>
 		</div>
 
@@ -177,7 +188,7 @@
 
 		<!-- Dosierungen -->
 		<div class="space-y-2">
-			<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">Dosierungen</h2>
+			<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">{tr('calc.dosages')}</h2>
 			{#each result.dosierungen as d}
 				<div class="bg-gb-surface rounded-xl p-3 flex justify-between items-center">
 					<div>
@@ -213,7 +224,7 @@
 
 		<!-- Mix Steps -->
 		<div class="space-y-2">
-			<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">Mischreihenfolge</h2>
+			<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">{tr('calc.mix_order')}</h2>
 			{#each result.mix_steps as step}
 				<div class="bg-gb-surface rounded-xl p-3 flex items-start gap-3">
 					<span class="bg-gb-green/20 text-gb-green text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shrink-0">{step.nr}</span>

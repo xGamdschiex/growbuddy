@@ -1,11 +1,13 @@
 <script lang="ts">
+	import { t } from '$lib/i18n';
+	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
 	let tab = $state<'impressum' | 'datenschutz'>('impressum');
 </script>
 
 <div class="px-4 pt-6 max-w-lg mx-auto space-y-6 pb-24">
 	<div>
-		<a href="/profile" class="text-gb-text-muted text-sm hover:text-gb-text">&larr; Zurück</a>
-		<h1 class="text-xl font-bold mt-2">Rechtliches</h1>
+		<a href="/profile" class="text-gb-text-muted text-sm hover:text-gb-text">&larr; {tr('general.back')}</a>
+		<h1 class="text-xl font-bold mt-2">{tr('legal.title')}</h1>
 	</div>
 
 	<!-- Tabs -->
@@ -13,12 +15,12 @@
 		<button onclick={() => tab = 'impressum'}
 			class="flex-1 py-2.5 rounded-lg text-sm font-medium transition-colors
 				{tab === 'impressum' ? 'bg-gb-green text-black' : 'text-gb-text-muted'}">
-			Impressum
+			{tr('legal.impressum')}
 		</button>
 		<button onclick={() => tab = 'datenschutz'}
 			class="flex-1 py-2.5 rounded-lg text-sm font-medium transition-colors
 				{tab === 'datenschutz' ? 'bg-gb-green text-black' : 'text-gb-text-muted'}">
-			Datenschutz
+			{tr('legal.privacy')}
 		</button>
 	</div>
 

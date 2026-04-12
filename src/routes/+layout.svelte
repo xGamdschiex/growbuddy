@@ -5,12 +5,15 @@
 	import { onboardingStore } from '$lib/stores/onboarding';
 	import { reminderStore } from '$lib/stores/reminders';
 	import { toastStore } from '$lib/stores/toast';
+	import { t } from '$lib/i18n';
+	import { hapticLight } from '$lib/utils/haptic';
 	import type { Toast } from '$lib/stores/toast';
 	import type { Snippet } from 'svelte';
 
 	let { children }: { children: Snippet } = $props();
 	let toasts = $derived.by(() => { let v: Toast[] = []; toastStore.subscribe(x => v = x)(); return v; });
 	let onboarding = $derived.by(() => { let v = { completed: false }; onboardingStore.subscribe(x => v = x)(); return v; });
+	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
 
 	let currentPath = $derived($page.url.pathname);
 	let isOnboardingPage = $derived(currentPath === '/onboarding');
@@ -29,11 +32,11 @@
 	});
 
 	const navItems = [
-		{ href: '/', icon: 'home', label: 'Home' },
-		{ href: '/grow', icon: 'sprout', label: 'Grow' },
-		{ href: '/calc', icon: 'flask', label: 'Rechner' },
-		{ href: '/tools', icon: 'wrench', label: 'Tools' },
-		{ href: '/profile', icon: 'user', label: 'Profil' },
+		{ href: '/', icon: 'home', key: 'nav.home' },
+		{ href: '/grow', icon: 'sprout', key: 'nav.grow' },
+		{ href: '/calc', icon: 'flask', key: 'nav.calc' },
+		{ href: '/tools', icon: 'wrench', key: 'nav.tools' },
+		{ href: '/profile', icon: 'user', key: 'nav.profile' },
 	] as const;
 
 	function isActive(href: string): boolean {
@@ -72,6 +75,7 @@
 		{#each navItems as item}
 			<a
 				href={item.href}
+				onclick={() => hapticLight()}
 				class="flex flex-col items-center gap-0.5 px-3 py-2 text-xs transition-colors
 					{isActive(item.href) ? 'text-gb-green' : 'text-gb-text-muted hover:text-gb-text'}"
 			>
@@ -88,7 +92,7 @@
 						<path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2m8-10a4 4 0 100-8 4 4 0 000 8z" />
 					{/if}
 				</svg>
-				<span>{item.label}</span>
+				<span>{tr(item.key)}</span>
 			</a>
 		{/each}
 	</div>

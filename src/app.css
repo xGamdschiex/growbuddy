@@ -36,6 +36,20 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--color-gb-border); border-radius: 2px; }
 
+/* Touch feedback — schnelle Antwort bei Tap */
+button, a {
+	-webkit-tap-highlight-color: transparent;
+}
+button:active:not(:disabled), a:active {
+	transform: scale(0.97);
+	transition: transform 0.05s ease;
+}
+
+/* Smooth page transitions */
+main > div {
+	animation: fadeIn 0.25s ease-out;
+}
+
 /* Animations */
 @keyframes slideDown {
 	from { opacity: 0; transform: translateY(-1rem); }
@@ -44,4 +58,35 @@ body {
 @keyframes fadeIn {
 	from { opacity: 0; transform: translateY(0.5rem); }
 	to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse-soft {
+	0%, 100% { opacity: 1; }
+	50% { opacity: 0.4; }
+}
+
+/* Skeleton loading */
+.skeleton {
+	background: linear-gradient(90deg, var(--color-gb-surface) 25%, var(--color-gb-surface-2) 50%, var(--color-gb-surface) 75%);
+	background-size: 200% 100%;
+	animation: skeleton-shimmer 1.5s ease-in-out infinite;
+	border-radius: 0.5rem;
+}
+@keyframes skeleton-shimmer {
+	0% { background-position: -200% 0; }
+	100% { background-position: 200% 0; }
+}
+
+/* Focus styles for a11y */
+:focus-visible {
+	outline: 2px solid var(--color-gb-green);
+	outline-offset: 2px;
+	border-radius: 4px;
+}
+
+/* Select-Styling für Dark Mode */
+select {
+	color-scheme: dark;
+}
+input[type="number"], input[type="text"], input[type="time"], textarea {
+	color-scheme: dark;
 }

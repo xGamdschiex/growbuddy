@@ -4,12 +4,15 @@
 	import { growStore } from '$lib/stores/grow';
 	import { xpStore } from '$lib/stores/xp';
 	import { isPro } from '$lib/stores/pro';
+	import { t } from '$lib/i18n';
 	import type { CheckIn } from '$lib/stores/grow';
 	import { calcVPD, getVPDStatus } from '$lib/data/science';
 	import { calculateGrowScore } from '$lib/data/score';
+	import { hapticSuccess, hapticMedium } from '$lib/utils/haptic';
 	import type { ScoreBreakdown } from '$lib/data/score';
 	import MiniChart from '$lib/components/MiniChart.svelte';
 
+	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
 	let growId = $derived($page.params.id);
 	let state = $derived.by(() => { let s: any; growStore.subscribe(v => s = v)(); return s; });
 	let grow = $derived(state?.grows?.find((g: any) => g.id === growId));
@@ -67,6 +70,7 @@
 		growStore.harvestGrow(grow.id, harvestYield);
 		growStore.updateGrow(grow.id, { grow_score: scoreBreakdown.total });
 		xpStore.awardHarvest(scoreBreakdown.total);
+		hapticSuccess();
 		showHarvest = false;
 	}
 
@@ -80,7 +84,6 @@
 		const input = e.target as HTMLInputElement;
 		if (!input.files?.[0]) return;
 		const file = input.files[0];
-		// Resize to max 800px for localStorage
 		const reader = new FileReader();
 		reader.onload = () => {
 			const img = new Image();
@@ -120,11 +123,10 @@
 			training: ciTraining,
 			notes: ciNotes.trim(),
 		});
-		// XP vergeben
 		const hasPhoto = !!ciPhoto;
 		const isFull = !!(ciTemp && ciRh && ciEc && ciPh);
 		xpStore.awardCheckIn(hasPhoto, isFull);
-		// Reset
+		hapticSuccess();
 		showCheckin = false;
 		ciPhoto = null;
 		ciNotes = '';
@@ -144,14 +146,14 @@
 
 {#if !grow}
 	<div class="px-4 pt-6 max-w-lg mx-auto text-center">
-		<p class="text-gb-text-muted">Grow nicht gefunden</p>
-		<a href="/grow" class="text-gb-green text-sm">Zurück</a>
+		<p class="text-gb-text-muted">{tr('grow.not_found')}</p>
+		<a href="/grow" class="text-gb-green text-sm">{tr('grow.back')}</a>
 	</div>
 {:else}
 	<div class="px-4 pt-6 max-w-lg mx-auto space-y-5">
 		<!-- Header -->
 		<div>
-			<a href="/grow" class="text-gb-text-muted text-sm hover:text-gb-text">&larr; Meine Grows</a>
+			<a href="/grow" class="text-gb-text-muted text-sm hover:text-gb-text">&larr; {tr('grow.my_grows')}</a>
 			<h1 class="text-xl font-bold mt-2">{grow.name}</h1>
 			<p class="text-sm text-gb-text-muted">{grow.strain} · {grow.strain_type === 'auto' ? 'Auto' : 'Photo'} · {grow.medium}</p>
 		</div>
@@ -160,24 +162,24 @@
 		<div class="grid grid-cols-3 gap-3">
 			<div class="bg-gb-surface rounded-xl p-3 text-center">
 				<p class="text-2xl font-bold text-gb-green">{daysSince(grow.started_at)}</p>
-				<p class="text-xs text-gb-text-muted">Tage</p>
+				<p class="text-xs text-gb-text-muted">{tr('grow.days')}</p>
 			</div>
 			<div class="bg-gb-surface rounded-xl p-3 text-center">
 				<p class="text-2xl font-bold">{checkins.length}</p>
-				<p class="text-xs text-gb-text-muted">Check-ins</p>
+				<p class="text-xs text-gb-text-muted">{tr('grow.checkins')}</p>
 			</div>
 			<div class="bg-gb-surface rounded-xl p-3 text-center">
 				<p class="text-2xl font-bold">{grow.plant_count}</p>
-				<p class="text-xs text-gb-text-muted">Pflanzen</p>
+				<p class="text-xs text-gb-text-muted">{tr('grow.plants')}</p>
 			</div>
 		</div>
 
 		<!-- Info -->
 		<div class="bg-gb-surface rounded-xl p-4 space-y-2 text-sm">
-			{#if grow.space}<p><span class="text-gb-text-muted">Space:</span> {grow.space}</p>{/if}
-			{#if grow.light_info}<p><span class="text-gb-text-muted">Licht:</span> {grow.light_info}</p>{/if}
-			{#if grow.feedline_id}<p><span class="text-gb-text-muted">Düngerlinie:</span> {grow.feedline_id}</p>{/if}
-			{#if grow.notes}<p><span class="text-gb-text-muted">Notizen:</span> {grow.notes}</p>{/if}
+			{#if grow.space}<p><span class="text-gb-text-muted">{tr('grow.info_space')}:</span> {grow.space}</p>{/if}
+			{#if grow.light_info}<p><span class="text-gb-text-muted">{tr('grow.info_light')}:</span> {grow.light_info}</p>{/if}
+			{#if grow.feedline_id}<p><span class="text-gb-text-muted">{tr('grow.info_feedline')}:</span> {grow.feedline_id}</p>{/if}
+			{#if grow.notes}<p><span class="text-gb-text-muted">{tr('grow.info_notes')}:</span> {grow.notes}</p>{/if}
 		</div>
 
 		<!-- Check-in Button -->
@@ -185,24 +187,24 @@
 			{#if !showCheckin}
 				<button onclick={() => showCheckin = true}
 					class="w-full bg-gb-green text-black font-semibold py-3 rounded-lg text-sm hover:bg-gb-green-light transition-colors">
-					Täglicher Check-in
+					{tr('grow.daily_checkin')}
 				</button>
 			{:else}
 				<!-- Check-in Form -->
 				<div class="bg-gb-surface rounded-xl p-4 space-y-4">
 					<div class="flex items-center justify-between">
-						<h2 class="font-semibold">Check-in</h2>
-						<button onclick={() => showCheckin = false} class="text-gb-text-muted text-sm">Abbrechen</button>
+						<h2 class="font-semibold">{tr('checkin.title')}</h2>
+						<button onclick={() => showCheckin = false} class="text-gb-text-muted text-sm">{tr('checkin.cancel')}</button>
 					</div>
 
 					<!-- Foto -->
 					<div>
-						<label class="block text-xs text-gb-text-muted mb-1">Foto</label>
+						<label class="block text-xs text-gb-text-muted mb-1">{tr('checkin.photo')}</label>
 						{#if ciPhoto}
 							<img src={ciPhoto} alt="Check-in" class="w-full rounded-lg mb-2 max-h-48 object-cover" />
 						{/if}
 						<label class="block w-full bg-gb-surface-2 border border-dashed border-gb-border rounded-lg p-4 text-center text-sm text-gb-text-muted cursor-pointer hover:border-gb-green transition-colors">
-							{ciPhoto ? 'Anderes Foto wählen' : 'Foto aufnehmen / wählen'}
+							{ciPhoto ? tr('checkin.change_photo') : tr('checkin.take_photo')}
 							<input type="file" accept="image/*" capture="environment" onchange={handlePhoto} class="hidden" />
 						</label>
 					</div>
@@ -210,7 +212,7 @@
 					<!-- Phase / Week / Day -->
 					<div class="grid grid-cols-3 gap-2">
 						<div>
-							<label class="block text-xs text-gb-text-muted mb-1">Phase</label>
+							<label class="block text-xs text-gb-text-muted mb-1">{tr('checkin.phase')}</label>
 							<select bind:value={ciPhase} class="w-full bg-gb-bg border border-gb-border rounded-lg px-2 py-2 text-sm">
 								{#each ['Seedling', 'Veg', 'Bloom', 'Flush', 'Dry', 'Cure'] as p}
 									<option>{p}</option>
@@ -218,12 +220,12 @@
 							</select>
 						</div>
 						<div>
-							<label class="block text-xs text-gb-text-muted mb-1">Woche</label>
+							<label class="block text-xs text-gb-text-muted mb-1">{tr('checkin.week')}</label>
 							<input type="number" bind:value={ciWeek} min="1" max="20"
 								class="w-full bg-gb-bg border border-gb-border rounded-lg px-2 py-2 text-sm" />
 						</div>
 						<div>
-							<label class="block text-xs text-gb-text-muted mb-1">Tag</label>
+							<label class="block text-xs text-gb-text-muted mb-1">{tr('checkin.day')}</label>
 							<input type="number" bind:value={ciDay} min="1" max="7"
 								class="w-full bg-gb-bg border border-gb-border rounded-lg px-2 py-2 text-sm" />
 						</div>
@@ -232,22 +234,22 @@
 					<!-- Messwerte -->
 					<div class="grid grid-cols-2 gap-2">
 						<div>
-							<label class="block text-xs text-gb-text-muted mb-1">Temp °C</label>
+							<label class="block text-xs text-gb-text-muted mb-1">{tr('checkin.temp')}</label>
 							<input type="number" bind:value={ciTemp} step="0.5" placeholder="25"
 								class="w-full bg-gb-bg border border-gb-border rounded-lg px-2 py-2 text-sm placeholder:text-gb-border" />
 						</div>
 						<div>
-							<label class="block text-xs text-gb-text-muted mb-1">RH %</label>
+							<label class="block text-xs text-gb-text-muted mb-1">{tr('checkin.rh')}</label>
 							<input type="number" bind:value={ciRh} step="1" placeholder="60"
 								class="w-full bg-gb-bg border border-gb-border rounded-lg px-2 py-2 text-sm placeholder:text-gb-border" />
 						</div>
 						<div>
-							<label class="block text-xs text-gb-text-muted mb-1">EC mS/cm</label>
+							<label class="block text-xs text-gb-text-muted mb-1">{tr('checkin.ec')}</label>
 							<input type="number" bind:value={ciEc} step="0.1" placeholder="1.5"
 								class="w-full bg-gb-bg border border-gb-border rounded-lg px-2 py-2 text-sm placeholder:text-gb-border" />
 						</div>
 						<div>
-							<label class="block text-xs text-gb-text-muted mb-1">pH</label>
+							<label class="block text-xs text-gb-text-muted mb-1">{tr('checkin.ph')}</label>
 							<input type="number" bind:value={ciPh} step="0.1" placeholder="6.0"
 								class="w-full bg-gb-bg border border-gb-border rounded-lg px-2 py-2 text-sm placeholder:text-gb-border" />
 						</div>
@@ -264,17 +266,17 @@
 					<div class="flex gap-3">
 						<label class="flex items-center gap-2 bg-gb-bg rounded-lg px-3 py-2 flex-1">
 							<input type="checkbox" bind:checked={ciWatered} class="accent-gb-green" />
-							<span class="text-sm">Gegossen</span>
+							<span class="text-sm">{tr('checkin.watered')}</span>
 						</label>
 						<label class="flex items-center gap-2 bg-gb-bg rounded-lg px-3 py-2 flex-1">
 							<input type="checkbox" bind:checked={ciNutrients} class="accent-gb-green" />
-							<span class="text-sm">Gedüngt</span>
+							<span class="text-sm">{tr('checkin.nutrients')}</span>
 						</label>
 					</div>
 
 					<!-- Training -->
 					<div>
-						<label class="block text-xs text-gb-text-muted mb-1">Training (optional)</label>
+						<label class="block text-xs text-gb-text-muted mb-1">{tr('checkin.training')}</label>
 						<div class="flex flex-wrap gap-2">
 							{#each ['LST', 'Topping', 'FIM', 'ScrOG', 'Defoliation'] as t}
 								<button onclick={() => ciTraining = ciTraining === t ? null : t}
@@ -288,15 +290,15 @@
 
 					<!-- Notizen -->
 					<div>
-						<label class="block text-xs text-gb-text-muted mb-1">Notizen</label>
-						<textarea bind:value={ciNotes} rows="2" placeholder="Was ist dir aufgefallen?"
+						<label class="block text-xs text-gb-text-muted mb-1">{tr('checkin.notes')}</label>
+						<textarea bind:value={ciNotes} rows="2" placeholder={tr('checkin.notes_placeholder')}
 							class="w-full bg-gb-bg border border-gb-border rounded-lg px-3 py-2 text-sm placeholder:text-gb-border resize-none"></textarea>
 					</div>
 
 					<!-- Submit -->
 					<button onclick={submitCheckin}
 						class="w-full bg-gb-green text-black font-semibold py-3 rounded-lg text-sm hover:bg-gb-green-light transition-colors">
-						Check-in speichern
+						{tr('checkin.save')}
 					</button>
 				</div>
 			{/if}
@@ -306,11 +308,11 @@
 				<div class="flex gap-3">
 					<button onclick={() => showHarvest = true}
 						class="flex-1 bg-gb-warning/10 border border-gb-warning/20 text-gb-warning font-semibold py-2.5 rounded-lg text-sm hover:bg-gb-warning/20 transition-colors">
-						Ernten
+						{tr('grow.harvest_btn')}
 					</button>
 					<button onclick={abandonGrow}
 						class="bg-gb-danger/10 border border-gb-danger/20 text-gb-danger px-4 py-2.5 rounded-lg text-sm hover:bg-gb-danger/20 transition-colors">
-						Abbrechen
+						{tr('grow.abandon_btn')}
 					</button>
 				</div>
 			{/if}
@@ -318,24 +320,24 @@
 			<!-- Harvest Dialog -->
 			{#if showHarvest && scoreBreakdown}
 				<div class="bg-gb-surface rounded-xl p-5 space-y-4">
-					<h2 class="font-bold text-lg text-center">Ernte abschließen</h2>
+					<h2 class="font-bold text-lg text-center">{tr('harvest.title')}</h2>
 
 					<!-- Score -->
 					<div class="text-center">
 						<p class="text-5xl font-bold {scoreBreakdown.total >= 80 ? 'text-gb-green' : scoreBreakdown.total >= 50 ? 'text-gb-warning' : 'text-gb-danger'}">
 							{scoreBreakdown.total}
 						</p>
-						<p class="text-sm text-gb-text-muted">Grow Score</p>
+						<p class="text-sm text-gb-text-muted">{tr('harvest.score')}</p>
 					</div>
 
 					<!-- Score Breakdown -->
 					<div class="space-y-2">
 						{#each [
-							{ label: 'Konsistenz', value: scoreBreakdown.consistency, weight: '30%' },
-							{ label: 'Umwelt', value: scoreBreakdown.environment, weight: '25%' },
-							{ label: 'Dokumentation', value: scoreBreakdown.documentation, weight: '20%' },
-							{ label: 'Pflege', value: scoreBreakdown.care, weight: '15%' },
-							{ label: 'Training', value: scoreBreakdown.training, weight: '10%' },
+							{ label: tr('harvest.consistency'), value: scoreBreakdown.consistency, weight: '30%' },
+							{ label: tr('harvest.environment'), value: scoreBreakdown.environment, weight: '25%' },
+							{ label: tr('harvest.documentation'), value: scoreBreakdown.documentation, weight: '20%' },
+							{ label: tr('harvest.care'), value: scoreBreakdown.care, weight: '15%' },
+							{ label: tr('harvest.training'), value: scoreBreakdown.training, weight: '10%' },
 						] as cat}
 							<div>
 								<div class="flex justify-between text-xs mb-1">
@@ -353,7 +355,7 @@
 
 					<!-- Yield Input -->
 					<div>
-						<label class="block text-xs text-gb-text-muted mb-1">Ertrag (Gramm, trocken)</label>
+						<label class="block text-xs text-gb-text-muted mb-1">{tr('harvest.yield')}</label>
 						<input type="number" bind:value={harvestYield} min="0" step="1" placeholder="0"
 							class="w-full bg-gb-bg border border-gb-border rounded-lg px-3 py-2.5 text-sm" />
 					</div>
@@ -362,11 +364,11 @@
 					<div class="flex gap-3">
 						<button onclick={confirmHarvest}
 							class="flex-1 bg-gb-green text-black font-semibold py-3 rounded-lg text-sm hover:bg-gb-green/80 transition-colors">
-							Ernte bestätigen
+							{tr('harvest.confirm')}
 						</button>
 						<button onclick={() => showHarvest = false}
 							class="px-4 py-3 bg-gb-surface-2 text-gb-text-muted rounded-lg text-sm">
-							Abbrechen
+							{tr('harvest.cancel')}
 						</button>
 					</div>
 				</div>
@@ -376,18 +378,18 @@
 		<!-- Harvested Score Display -->
 		{#if grow.status === 'harvested'}
 			<div class="bg-gb-green/10 border border-gb-green/20 rounded-xl p-4 text-center">
-				<p class="text-sm text-gb-green mb-1">Erfolgreich geerntet</p>
+				<p class="text-sm text-gb-green mb-1">{tr('harvest.success')}</p>
 				<div class="flex justify-center gap-6">
 					{#if grow.yield_g}
 						<div>
 							<p class="text-2xl font-bold">{grow.yield_g}g</p>
-							<p class="text-xs text-gb-text-muted">Ertrag</p>
+							<p class="text-xs text-gb-text-muted">{tr('harvest.yield_label')}</p>
 						</div>
 					{/if}
 					{#if grow.grow_score !== null}
 						<div>
 							<p class="text-2xl font-bold {grow.grow_score >= 80 ? 'text-gb-green' : grow.grow_score >= 50 ? 'text-gb-warning' : 'text-gb-danger'}">{grow.grow_score}</p>
-							<p class="text-xs text-gb-text-muted">Score</p>
+							<p class="text-xs text-gb-text-muted">{tr('harvest.score_label')}</p>
 						</div>
 					{/if}
 				</div>
@@ -398,17 +400,17 @@
 		{#if vpdData.length >= 2 || tempData.length >= 2}
 			{#if userIsPro}
 				<div class="space-y-2">
-					<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">Verlauf</h2>
+					<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">{tr('charts.title')}</h2>
 					{#if vpdData.length >= 2}
 						<MiniChart data={vpdData} color="#22c55e" label="VPD" unit=" kPa"
 							targets={{ min: 0.8, max: 1.3 }} />
 					{/if}
 					{#if tempData.length >= 2}
-						<MiniChart data={tempData} color="#f59e0b" label="Temperatur" unit="°C"
+						<MiniChart data={tempData} color="#f59e0b" label={tr('checkin.temp')} unit="°C"
 							targets={{ min: 22, max: 28 }} />
 					{/if}
 					{#if rhData.length >= 2}
-						<MiniChart data={rhData} color="#3b82f6" label="Luftfeuchte" unit="%"
+						<MiniChart data={rhData} color="#3b82f6" label={tr('checkin.rh')} unit="%"
 							targets={{ min: 45, max: 65 }} />
 					{/if}
 					{#if ecData.length >= 2}
@@ -421,10 +423,10 @@
 				</div>
 			{:else}
 				<div class="bg-gb-accent/10 border border-gb-accent/20 rounded-xl p-4 text-center">
-					<p class="font-semibold text-sm">Grow-Verlauf Charts</p>
-					<p class="text-xs text-gb-text-muted mt-1">VPD, Temperatur, EC/pH als Linien-Chart</p>
+					<p class="font-semibold text-sm">{tr('charts.pro_title')}</p>
+					<p class="text-xs text-gb-text-muted mt-1">{tr('charts.pro_desc')}</p>
 					<a href="/pro" class="inline-block mt-3 bg-gb-accent text-white font-semibold text-xs px-4 py-2 rounded-lg">
-						Pro freischalten
+						{tr('grow.unlock_pro')}
 					</a>
 				</div>
 			{/if}
@@ -432,11 +434,11 @@
 
 		<!-- Timeline -->
 		<div class="space-y-2">
-			<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">Timeline ({checkins.length})</h2>
+			<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">{tr('timeline.title', { count: checkins.length })}</h2>
 
 			{#if checkins.length === 0}
 				<p class="text-gb-text-muted text-sm bg-gb-surface rounded-xl p-4 text-center">
-					Noch keine Check-ins. Starte deinen ersten!
+					{tr('timeline.no_entries')}
 				</p>
 			{:else}
 				<!-- Foto Grid -->
@@ -462,7 +464,6 @@
 								{#if ci.training}<span class="bg-gb-accent/20 text-gb-accent px-2 py-0.5 rounded">{ci.training}</span>{/if}
 							</div>
 						</div>
-						<!-- Messwerte -->
 						{#if ci.temp || ci.ec_measured || ci.ph_measured}
 							<div class="flex gap-3 text-xs text-gb-text-muted">
 								{#if ci.temp}<span>{ci.temp}°C</span>{/if}
