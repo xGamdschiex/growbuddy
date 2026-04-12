@@ -6,6 +6,8 @@
 	import { t, locale } from '$lib/i18n';
 	import type { Locale } from '$lib/i18n';
 	import { ACHIEVEMENTS } from '$lib/data/achievements';
+	import { downloadBackup, importBackup, readFileAsText } from '$lib/utils/backup';
+	import { toastStore } from '$lib/stores/toast';
 	import type { AchievementStats, Achievement } from '$lib/data/achievements';
 	import type { GrowState } from '$lib/stores/grow';
 
@@ -191,6 +193,35 @@
 				<span class="text-gb-text-muted text-sm">&rarr;</span>
 			</div>
 		</a>
+	</div>
+
+	<!-- Daten-Backup -->
+	<div class="space-y-3">
+		<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">Daten</h2>
+		<div class="bg-gb-surface rounded-xl p-4 space-y-3">
+			<div class="flex gap-3">
+				<button onclick={() => { downloadBackup(); toastStore.success('Backup heruntergeladen'); }}
+					class="flex-1 bg-gb-green/10 border border-gb-green/20 text-gb-green font-medium text-sm py-2.5 rounded-lg hover:bg-gb-green/20 transition-colors">
+					📦 Export
+				</button>
+				<label class="flex-1 bg-gb-info/10 border border-gb-info/20 text-gb-info font-medium text-sm py-2.5 rounded-lg hover:bg-gb-info/20 transition-colors text-center cursor-pointer">
+					📥 Import
+					<input type="file" accept=".json" class="hidden" onchange={async (e) => {
+						const input = e.target as HTMLInputElement;
+						if (!input.files?.[0]) return;
+						const text = await readFileAsText(input.files[0]);
+						const result = importBackup(text);
+						if (result.success) {
+							toastStore.success(`${result.keys} Datensätze importiert — App wird neu geladen`);
+							setTimeout(() => window.location.reload(), 1500);
+						} else {
+							toastStore.warning(result.error ?? 'Import fehlgeschlagen');
+						}
+					}} />
+				</label>
+			</div>
+			<p class="text-xs text-gb-text-muted text-center">Sichere deine Daten als JSON-Datei</p>
+		</div>
 	</div>
 
 	<!-- Cloud-Sync -->

@@ -1,9 +1,10 @@
 /**
- * GrowBuddy Service Worker — Cache-first für App Shell, Network-first für API.
- * Erlaubt vollständige Offline-Nutzung nach erstem Laden.
+ * GrowBuddy Service Worker v2 — Stale-While-Revalidate für App Shell,
+ * Cache-first für Assets, Network-first für Navigation.
+ * Volle Offline-Fähigkeit nach erstem Laden.
  */
 
-const CACHE_NAME = 'growbuddy-v1';
+const CACHE_VERSION = 'growbuddy-v2';
 const SHELL_FILES = [
 	'/',
 	'/manifest.json',
@@ -13,52 +14,74 @@ const SHELL_FILES = [
 // Install: App Shell cachen
 self.addEventListener('install', (event) => {
 	event.waitUntil(
-		caches.open(CACHE_NAME).then(cache => cache.addAll(SHELL_FILES))
+		caches.open(CACHE_VERSION).then(cache => cache.addAll(SHELL_FILES))
 	);
 	self.skipWaiting();
 });
 
-// Activate: Alte Caches löschen
+// Activate: Alte Caches löschen, sofort übernehmen
 self.addEventListener('activate', (event) => {
 	event.waitUntil(
 		caches.keys().then(keys =>
-			Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+			Promise.all(keys.filter(k => k !== CACHE_VERSION).map(k => caches.delete(k)))
 		)
 	);
 	self.clients.claim();
 });
 
-// Fetch: Cache-first für statische Assets, Network-first für Navigation
+// Fetch Strategy
 self.addEventListener('fetch', (event) => {
 	const url = new URL(event.request.url);
 
-	// Nur eigene Requests cachen
+	// Nur eigene Requests
 	if (url.origin !== location.origin) return;
 
-	// Navigations-Requests: Network mit Cache-Fallback (SPA fallback)
+	// Navigation: Network mit Cache-Fallback (SPA)
 	if (event.request.mode === 'navigate') {
 		event.respondWith(
 			fetch(event.request)
 				.then(response => {
-					const clone = response.clone();
-					caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+					if (response.ok) {
+						const clone = response.clone();
+						caches.open(CACHE_VERSION).then(cache => cache.put('/', clone));
+					}
 					return response;
 				})
-				.catch(() => caches.match('/') || caches.match(event.request))
+				.catch(() => caches.match('/'))
 		);
 		return;
 	}
 
-	// Statische Assets: Cache-first
-	if (url.pathname.startsWith('/_app/') || url.pathname.match(/\.(js|css|svg|png|jpg|woff2?)$/)) {
+	// Immutable Assets (mit Hash): Cache-first, ewig gültig
+	if (url.pathname.startsWith('/_app/immutable/')) {
 		event.respondWith(
 			caches.match(event.request).then(cached => {
 				if (cached) return cached;
 				return fetch(event.request).then(response => {
-					const clone = response.clone();
-					caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+					if (response.ok) {
+						const clone = response.clone();
+						caches.open(CACHE_VERSION).then(cache => cache.put(event.request, clone));
+					}
 					return response;
 				});
+			})
+		);
+		return;
+	}
+
+	// Andere statische Assets: Stale-While-Revalidate
+	if (url.pathname.match(/\.(js|css|svg|png|jpg|webp|woff2?|json)$/)) {
+		event.respondWith(
+			caches.match(event.request).then(cached => {
+				const fetchPromise = fetch(event.request).then(response => {
+					if (response.ok) {
+						const clone = response.clone();
+						caches.open(CACHE_VERSION).then(cache => cache.put(event.request, clone));
+					}
+					return response;
+				}).catch(() => cached);
+
+				return cached || fetchPromise;
 			})
 		);
 		return;

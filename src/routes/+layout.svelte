@@ -19,6 +19,13 @@
 	let isOnboardingPage = $derived(currentPath === '/onboarding');
 	let showNav = $derived(onboarding.completed && !isOnboardingPage);
 
+	// PWA Install Prompt
+	let deferredPrompt = $state<any>(null);
+	let showInstall = $state(false);
+
+	// Offline Status
+	let isOffline = $state(false);
+
 	// Redirect zu Onboarding wenn nicht completed
 	$effect(() => {
 		if (!onboarding.completed && !isOnboardingPage && typeof window !== 'undefined') {
@@ -30,6 +37,47 @@
 	$effect(() => {
 		if (typeof window !== 'undefined') reminderStore.init();
 	});
+
+	// PWA Install + Offline listeners
+	$effect(() => {
+		if (typeof window === 'undefined') return;
+
+		// Install prompt
+		const handleInstall = (e: Event) => {
+			e.preventDefault();
+			deferredPrompt = e;
+			// Nur anzeigen wenn nicht schon installiert und nicht dismissed
+			const dismissed = localStorage.getItem('growbuddy_install_dismissed');
+			if (!dismissed) showInstall = true;
+		};
+		window.addEventListener('beforeinstallprompt', handleInstall);
+
+		// Offline/Online
+		const goOffline = () => isOffline = true;
+		const goOnline = () => isOffline = false;
+		isOffline = !navigator.onLine;
+		window.addEventListener('offline', goOffline);
+		window.addEventListener('online', goOnline);
+
+		return () => {
+			window.removeEventListener('beforeinstallprompt', handleInstall);
+			window.removeEventListener('offline', goOffline);
+			window.removeEventListener('online', goOnline);
+		};
+	});
+
+	async function installApp() {
+		if (!deferredPrompt) return;
+		deferredPrompt.prompt();
+		const result = await deferredPrompt.userChoice;
+		deferredPrompt = null;
+		showInstall = false;
+	}
+
+	function dismissInstall() {
+		showInstall = false;
+		localStorage.setItem('growbuddy_install_dismissed', '1');
+	}
 
 	const navItems = [
 		{ href: '/', icon: 'home', key: 'nav.home' },
@@ -44,6 +92,34 @@
 		return currentPath.startsWith(href);
 	}
 </script>
+
+<!-- Offline Banner -->
+{#if isOffline}
+	<div class="fixed top-0 inset-x-0 z-[110] bg-gb-warning text-black text-center py-1.5 text-xs font-medium animate-[slideDown_0.3s_ease-out]">
+		📡 Offline — Daten werden lokal gespeichert
+	</div>
+{/if}
+
+<!-- PWA Install Banner -->
+{#if showInstall && showNav}
+	<div class="fixed top-{isOffline ? '8' : '0'} inset-x-0 z-[105] px-4 pt-3 pb-2 animate-[slideDown_0.3s_ease-out]">
+		<div class="max-w-lg mx-auto bg-gb-surface border border-gb-green/30 rounded-xl p-4 flex items-center gap-3 shadow-lg">
+			<span class="text-2xl">🌱</span>
+			<div class="flex-1 min-w-0">
+				<p class="font-medium text-sm">GrowBuddy installieren</p>
+				<p class="text-xs text-gb-text-muted">Für schnellen Zugriff zum Homescreen hinzufügen</p>
+			</div>
+			<button onclick={installApp}
+				class="bg-gb-green text-black font-semibold text-xs px-3 py-1.5 rounded-lg shrink-0">
+				OK
+			</button>
+			<button onclick={dismissInstall}
+				class="text-gb-text-muted text-xs shrink-0">
+				✕
+			</button>
+		</div>
+	</div>
+{/if}
 
 <!-- Toast Notifications -->
 {#if toasts.length > 0}
