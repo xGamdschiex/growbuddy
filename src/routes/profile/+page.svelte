@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { xpStore, currentLevel, xpProgress, LEVELS } from '$lib/stores/xp';
 	import { growStore, totalGrows, totalHarvests } from '$lib/stores/grow';
+	import { proStore, isPro } from '$lib/stores/pro';
+	import { reminderStore } from '$lib/stores/reminders';
 	import { ACHIEVEMENTS } from '$lib/data/achievements';
 	import type { AchievementStats, Achievement } from '$lib/data/achievements';
 	import type { GrowState } from '$lib/stores/grow';
@@ -44,6 +46,8 @@
 	});
 
 	let showHistory = $state(false);
+	let userIsPro = $derived.by(() => { let v = false; isPro.subscribe(x => v = x)(); return v; });
+	let reminder = $derived.by(() => { let v: any = { enabled: false, time: '19:00', permission: 'default' }; reminderStore.subscribe(x => v = x)(); return v; });
 </script>
 
 <div class="px-4 pt-6 max-w-lg mx-auto space-y-6 pb-24">
@@ -123,8 +127,56 @@
 		{/if}
 	</div>
 
-	<!-- Login Prompt -->
+	<!-- Einstellungen -->
+	<div class="space-y-3">
+		<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">Einstellungen</h2>
+
+		<!-- Reminders -->
+		<div class="bg-gb-surface rounded-xl p-4">
+			<div class="flex items-center justify-between">
+				<div>
+					<p class="font-medium text-sm">Check-in Erinnerung</p>
+					<p class="text-xs text-gb-text-muted">Tägliche Benachrichtigung</p>
+				</div>
+				<button
+					onclick={() => reminder.enabled ? reminderStore.disable() : reminderStore.enable()}
+					class="w-12 h-7 rounded-full transition-colors relative
+						{reminder.enabled ? 'bg-gb-green' : 'bg-gb-border'}">
+					<div class="absolute top-0.5 w-6 h-6 rounded-full bg-white shadow transition-transform
+						{reminder.enabled ? 'translate-x-5' : 'translate-x-0.5'}"></div>
+				</button>
+			</div>
+			{#if reminder.enabled}
+				<div class="mt-3 flex items-center gap-2">
+					<span class="text-xs text-gb-text-muted">Uhrzeit:</span>
+					<input type="time" value={reminder.time}
+						onchange={(e) => reminderStore.setTime((e.target as HTMLInputElement).value)}
+						class="bg-gb-bg border border-gb-border rounded-lg px-2 py-1 text-sm" />
+				</div>
+			{/if}
+		</div>
+
+		<!-- Pro Status -->
+		<a href="/pro" class="block bg-gb-surface rounded-xl p-4 hover:bg-gb-surface-2 transition-colors">
+			<div class="flex items-center justify-between">
+				<div>
+					<p class="font-medium text-sm">{userIsPro ? '👑 Pro aktiv' : 'GrowBuddy Pro'}</p>
+					<p class="text-xs text-gb-text-muted">{userIsPro ? 'Abo verwalten' : 'Alle Features freischalten'}</p>
+				</div>
+				<span class="text-gb-text-muted text-sm">&rarr;</span>
+			</div>
+		</a>
+	</div>
+
+	<!-- Cloud-Sync -->
 	<div class="bg-gb-surface rounded-xl p-4 text-center">
 		<p class="text-sm text-gb-text-muted mb-3">Cloud-Sync kommt bald — deine Daten sind lokal gespeichert</p>
+	</div>
+
+	<!-- Footer Links -->
+	<div class="flex justify-center gap-4 text-xs text-gb-text-muted">
+		<a href="/legal" class="hover:text-gb-text">Impressum & Datenschutz</a>
+		<span>·</span>
+		<span>v1.0.0</span>
 	</div>
 </div>

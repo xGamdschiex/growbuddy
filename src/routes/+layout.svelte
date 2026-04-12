@@ -1,12 +1,32 @@
 <script lang="ts">
 	import '../app.css';
 	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
+	import { onboardingStore } from '$lib/stores/onboarding';
+	import { reminderStore } from '$lib/stores/reminders';
 	import { toastStore } from '$lib/stores/toast';
 	import type { Toast } from '$lib/stores/toast';
 	import type { Snippet } from 'svelte';
 
 	let { children }: { children: Snippet } = $props();
 	let toasts = $derived.by(() => { let v: Toast[] = []; toastStore.subscribe(x => v = x)(); return v; });
+	let onboarding = $derived.by(() => { let v = { completed: false }; onboardingStore.subscribe(x => v = x)(); return v; });
+
+	let currentPath = $derived($page.url.pathname);
+	let isOnboardingPage = $derived(currentPath === '/onboarding');
+	let showNav = $derived(onboarding.completed && !isOnboardingPage);
+
+	// Redirect zu Onboarding wenn nicht completed
+	$effect(() => {
+		if (!onboarding.completed && !isOnboardingPage && typeof window !== 'undefined') {
+			goto('/onboarding');
+		}
+	});
+
+	// Reminder-Timer beim App-Start wiederherstellen
+	$effect(() => {
+		if (typeof window !== 'undefined') reminderStore.init();
+	});
 
 	const navItems = [
 		{ href: '/', icon: 'home', label: 'Home' },
@@ -15,8 +35,6 @@
 		{ href: '/tools', icon: 'wrench', label: 'Tools' },
 		{ href: '/profile', icon: 'user', label: 'Profil' },
 	] as const;
-
-	let currentPath = $derived($page.url.pathname);
 
 	function isActive(href: string): boolean {
 		if (href === '/') return currentPath === '/';
@@ -43,11 +61,12 @@
 {/if}
 
 <!-- Main Content -->
-<main class="pb-20 min-h-screen">
+<main class="{showNav ? 'pb-20' : ''} min-h-screen">
 	{@render children()}
 </main>
 
-<!-- Bottom Navigation (Mobile-first) -->
+<!-- Bottom Navigation (nur wenn Onboarding fertig) -->
+{#if showNav}
 <nav class="fixed bottom-0 inset-x-0 bg-gb-surface border-t border-gb-border safe-bottom z-50">
 	<div class="flex justify-around items-center h-16 max-w-lg mx-auto">
 		{#each navItems as item}
@@ -74,3 +93,4 @@
 		{/each}
 	</div>
 </nav>
+{/if}

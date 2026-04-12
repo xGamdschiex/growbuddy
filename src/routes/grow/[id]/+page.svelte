@@ -3,10 +3,12 @@
 	import { goto } from '$app/navigation';
 	import { growStore } from '$lib/stores/grow';
 	import { xpStore } from '$lib/stores/xp';
+	import { isPro } from '$lib/stores/pro';
 	import type { CheckIn } from '$lib/stores/grow';
 	import { calcVPD, getVPDStatus } from '$lib/data/science';
 	import { calculateGrowScore } from '$lib/data/score';
 	import type { ScoreBreakdown } from '$lib/data/score';
+	import MiniChart from '$lib/components/MiniChart.svelte';
 
 	let growId = $derived($page.params.id);
 	let state = $derived.by(() => { let s: any; growStore.subscribe(v => s = v)(); return s; });
@@ -33,6 +35,21 @@
 	let ciPhoto = $state<string | null>(null);
 
 	let ciVpd = $derived(ciTemp && ciRh ? calcVPD(ciTemp, ciRh) : null);
+
+	// Pro-Status
+	let userIsPro = $derived.by(() => { let v = false; isPro.subscribe(x => v = x)(); return v; });
+
+	// Chart-Daten (chronologisch sortiert)
+	let chronCheckins = $derived(
+		(state?.checkins ?? [])
+			.filter((c: CheckIn) => c.grow_id === growId)
+			.sort((a: CheckIn, b: CheckIn) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+	);
+	let vpdData = $derived(chronCheckins.filter((c: CheckIn) => c.vpd !== null).map((c: CheckIn) => c.vpd as number));
+	let tempData = $derived(chronCheckins.filter((c: CheckIn) => c.temp !== null).map((c: CheckIn) => c.temp as number));
+	let rhData = $derived(chronCheckins.filter((c: CheckIn) => c.rh !== null).map((c: CheckIn) => c.rh as number));
+	let ecData = $derived(chronCheckins.filter((c: CheckIn) => c.ec_measured !== null).map((c: CheckIn) => c.ec_measured as number));
+	let phData = $derived(chronCheckins.filter((c: CheckIn) => c.ph_measured !== null).map((c: CheckIn) => c.ph_measured as number));
 
 	// Harvest Flow
 	let showHarvest = $state(false);
@@ -375,6 +392,42 @@
 					{/if}
 				</div>
 			</div>
+		{/if}
+
+		<!-- Charts (Pro Feature) -->
+		{#if vpdData.length >= 2 || tempData.length >= 2}
+			{#if userIsPro}
+				<div class="space-y-2">
+					<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">Verlauf</h2>
+					{#if vpdData.length >= 2}
+						<MiniChart data={vpdData} color="#22c55e" label="VPD" unit=" kPa"
+							targets={{ min: 0.8, max: 1.3 }} />
+					{/if}
+					{#if tempData.length >= 2}
+						<MiniChart data={tempData} color="#f59e0b" label="Temperatur" unit="°C"
+							targets={{ min: 22, max: 28 }} />
+					{/if}
+					{#if rhData.length >= 2}
+						<MiniChart data={rhData} color="#3b82f6" label="Luftfeuchte" unit="%"
+							targets={{ min: 45, max: 65 }} />
+					{/if}
+					{#if ecData.length >= 2}
+						<MiniChart data={ecData} color="#a855f7" label="EC" unit=" mS" />
+					{/if}
+					{#if phData.length >= 2}
+						<MiniChart data={phData} color="#ef4444" label="pH" unit=""
+							targets={{ min: 5.5, max: 6.5 }} />
+					{/if}
+				</div>
+			{:else}
+				<div class="bg-gb-accent/10 border border-gb-accent/20 rounded-xl p-4 text-center">
+					<p class="font-semibold text-sm">Grow-Verlauf Charts</p>
+					<p class="text-xs text-gb-text-muted mt-1">VPD, Temperatur, EC/pH als Linien-Chart</p>
+					<a href="/pro" class="inline-block mt-3 bg-gb-accent text-white font-semibold text-xs px-4 py-2 rounded-lg">
+						Pro freischalten
+					</a>
+				</div>
+			{/if}
 		{/if}
 
 		<!-- Timeline -->

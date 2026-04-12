@@ -1,12 +1,16 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { growStore, totalGrows } from '$lib/stores/grow';
+	import { growStore, totalGrows, activeGrows } from '$lib/stores/grow';
 	import { xpStore } from '$lib/stores/xp';
+	import { proStore, limits } from '$lib/stores/pro';
 	import { getAllFeedLines } from '$lib/calc/feedlines/registry';
 	import type { StrainType } from '$lib/stores/grow';
 	import type { Medium } from '$lib/data/science';
 
 	const feedlines = getAllFeedLines();
+	let activeCount = $derived.by(() => { let v: any[] = []; activeGrows.subscribe(x => v = x)(); return v.length; });
+	let lim = $derived.by(() => { let v: any = {}; limits.subscribe(x => v = x)(); return v; });
+	let atLimit = $derived(activeCount >= (lim.max_active_grows ?? 1));
 
 	let name = $state('');
 	let strain = $state('');
@@ -145,10 +149,21 @@
 			class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm placeholder:text-gb-border resize-none"></textarea>
 	</div>
 
+	<!-- Pro Limit Warning -->
+	{#if atLimit}
+		<div class="bg-gb-accent/10 border border-gb-accent/20 rounded-xl p-4 text-center">
+			<p class="font-semibold text-sm">Grow-Limit erreicht</p>
+			<p class="text-xs text-gb-text-muted mt-1">Free-Nutzer können max. {lim.max_active_grows} aktiven Grow haben</p>
+			<a href="/pro" class="inline-block mt-3 bg-gb-accent text-white font-semibold text-sm px-5 py-2.5 rounded-lg hover:bg-gb-accent/80 transition-colors">
+				Pro freischalten
+			</a>
+		</div>
+	{/if}
+
 	<!-- Start Button -->
 	<button
 		onclick={startGrow}
-		disabled={!strain.trim()}
+		disabled={!strain.trim() || atLimit}
 		class="w-full bg-gb-green text-black font-semibold py-3 rounded-lg text-sm
 			hover:bg-gb-green-light transition-colors
 			disabled:opacity-30 disabled:cursor-not-allowed"

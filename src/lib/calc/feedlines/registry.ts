@@ -7,6 +7,8 @@ import { athenaPro } from './athena-pro';
 import { biobizz } from './biobizz';
 import { ghHybrids, ghShortFlowering, ghGrow } from './greenhouse-feeding';
 import { atamiBcuzz } from './atami-bcuzz';
+import { cannaTerra, cannaCoco } from './canna';
+import { advancedSensi } from './advanced-nutrients';
 
 // ─── REGISTRY ────────────────────────────────────────────────────────────
 
@@ -23,6 +25,9 @@ register(ghHybrids);
 register(ghShortFlowering);
 register(ghGrow);
 register(atamiBcuzz);
+register(cannaTerra);
+register(cannaCoco);
+register(advancedSensi);
 
 // ─── PUBLIC API ──────────────────────────────────────────────────────────
 
@@ -49,5 +54,7 @@ export { athenaPro } from './athena-pro';
 export { biobizz } from './biobizz';
 export { ghHybrids, ghShortFlowering, ghGrow } from './greenhouse-feeding';
 export { atamiBcuzz } from './atami-bcuzz';
+export { cannaTerra, cannaCoco } from './canna';
+export { advancedSensi } from './advanced-nutrients';
 export type { FeedLine, FeedProduct, FeedSchemaRow, PhaseConfig, GenericCalcInput, DosierungResult } from './types';
 export { getSchemaForWeek, getWochenForPhase, calcProductDosierung, calcGrowDay, calcTotalDays } from './types';

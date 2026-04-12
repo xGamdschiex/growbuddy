@@ -36,8 +36,12 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--color-gb-border); border-radius: 2px; }
 
-/* Toast Animation */
+/* Animations */
 @keyframes slideDown {
 	from { opacity: 0; transform: translateY(-1rem); }
+	to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+	from { opacity: 0; transform: translateY(0.5rem); }
 	to { opacity: 1; transform: translateY(0); }
 }
