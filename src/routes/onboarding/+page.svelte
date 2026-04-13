@@ -44,18 +44,18 @@
 
 	function finish() {
 		onboardingStore.complete(experience, goal);
-		goto('/');
+		setTimeout(() => goto('/'), 50);
 	}
 
 	function skip() {
 		onboardingStore.complete(null, null);
-		goto('/');
+		setTimeout(() => goto('/'), 50);
 	}
 
 	function startTrial() {
 		proStore.startTrial();
 		onboardingStore.complete(experience, goal);
-		goto('/');
+		setTimeout(() => goto('/'), 50);
 	}
 
 	let experienceOptions = $derived([

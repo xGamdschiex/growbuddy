@@ -9,6 +9,20 @@
 	let userIsPro = $derived.by(() => { let v = false; isPro.subscribe(x => v = x)(); return v; });
 	let trialing = $derived.by(() => { let v = false; isTrialing.subscribe(x => v = x)(); return v; });
 	let billing = $state<'monthly' | 'yearly'>('yearly');
+	let betaCode = $state('');
+	let showBetaInput = $state(false);
+
+	const BETA_CODE = 'GROWBUDDY2026';
+
+	function activateBeta() {
+		if (betaCode.trim().toUpperCase() === BETA_CODE) {
+			proStore.activatePro('beta-tester');
+			toastStore.achievement('Pro aktiviert — Viel Spaß beim Testen! 🌱');
+			goto('/');
+		} else {
+			toastStore.warning('Ungültiger Code');
+		}
+	}
 
 	function startTrial() {
 		const success = proStore.startTrial();
@@ -115,6 +129,22 @@
 				class="w-full bg-gb-green text-black font-semibold py-3.5 rounded-xl text-sm hover:bg-gb-green/80 transition-colors">
 				{tr('pro.subscribe_btn')}
 			</button>
+
+			<!-- Beta Code -->
+			<button onclick={() => showBetaInput = !showBetaInput}
+				class="w-full text-gb-text-muted text-xs py-2 hover:text-gb-text transition-colors">
+				Beta-Tester Code einlösen
+			</button>
+			{#if showBetaInput}
+				<div class="flex gap-2">
+					<input type="text" bind:value={betaCode} placeholder="Code eingeben"
+						class="flex-1 bg-gb-bg border border-gb-border rounded-lg px-3 py-2.5 text-sm uppercase" />
+					<button onclick={activateBeta}
+						class="bg-gb-accent text-white font-semibold text-sm px-4 rounded-lg">
+						OK
+					</button>
+				</div>
+			{/if}
 		</div>
 	{/if}
 
