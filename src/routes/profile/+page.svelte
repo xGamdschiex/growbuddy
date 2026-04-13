@@ -3,6 +3,8 @@
 	import { growStore, totalGrows, totalHarvests } from '$lib/stores/grow';
 	import { proStore, isPro } from '$lib/stores/pro';
 	import { reminderStore } from '$lib/stores/reminders';
+	import { authStore, isLoggedIn } from '$lib/stores/auth';
+	import { syncStore } from '$lib/stores/sync';
 	import { t, locale } from '$lib/i18n';
 	import type { Locale } from '$lib/i18n';
 	import { ACHIEVEMENTS } from '$lib/data/achievements';
@@ -18,6 +20,69 @@
 	let state = $derived.by(() => { let v: GrowState = { grows: [], checkins: [] }; growStore.subscribe(x => v = x)(); return v; });
 	let grows = $derived.by(() => { let v = 0; totalGrows.subscribe(x => v = x)(); return v; });
 	let harvests = $derived.by(() => { let v = 0; totalHarvests.subscribe(x => v = x)(); return v; });
+	let auth = $derived.by(() => { let v: any = { user: null, loading: true }; authStore.subscribe(x => v = x)(); return v; });
+	let loggedIn = $derived.by(() => { let v = false; isLoggedIn.subscribe(x => v = x)(); return v; });
+	let sync = $derived.by(() => { let v: any = { status: 'idle', last_synced: null }; syncStore.subscribe(x => v = x)(); return v; });
+
+	let loginEmail = $state('');
+	let loginLoading = $state(false);
+	let loginMessage = $state('');
+
+	async function sendMagicLink() {
+		if (!loginEmail.trim()) return;
+		loginLoading = true;
+		loginMessage = '';
+		const { error } = await authStore.loginWithEmail(loginEmail.trim());
+		loginLoading = false;
+		if (error) {
+			loginMessage = error;
+		} else {
+			loginMessage = tr('auth.link_sent');
+			toastStore.success(tr('auth.link_sent'));
+		}
+	}
+
+	async function loginGoogle() {
+		const { error } = await authStore.loginWithGoogle();
+		if (error) toastStore.warning(error);
+	}
+
+	async function logout() {
+		await authStore.logout();
+		toastStore.info(tr('auth.logout'));
+	}
+
+	async function pushSync() {
+		if (!auth.user) return;
+		const ok = await syncStore.push(auth.user.id, state);
+		if (ok) toastStore.success(tr('sync.success'));
+		else toastStore.warning(tr('sync.error'));
+	}
+
+	async function pullSync() {
+		if (!auth.user) return;
+		const data = await syncStore.pull(auth.user.id);
+		if (data) {
+			// Merge: Cloud-Daten überschreiben lokal (einfachste Strategie)
+			const mergedGrows = [...data.grows];
+			const mergedCheckins = data.checkins.map(c => {
+				// Lokale Fotos beibehalten
+				const local = state.checkins.find(lc => lc.id === c.id);
+				return local?.photo_data ? { ...c, photo_data: local.photo_data } : c;
+			});
+			// Lokale Grows/Checkins die nicht in Cloud sind, beibehalten
+			for (const lg of state.grows) {
+				if (!mergedGrows.find(g => g.id === lg.id)) mergedGrows.push(lg);
+			}
+			for (const lc of state.checkins) {
+				if (!mergedCheckins.find(c => c.id === lc.id)) mergedCheckins.push(lc);
+			}
+			growStore.replaceState({ grows: mergedGrows, checkins: mergedCheckins });
+			toastStore.success(tr('sync.success'));
+		} else {
+			toastStore.warning(tr('sync.error'));
+		}
+	}
 
 	let stats = $derived<AchievementStats>({
 		total_grows: grows,
@@ -224,9 +289,80 @@
 		</div>
 	</div>
 
-	<!-- Cloud-Sync -->
-	<div class="bg-gb-surface rounded-xl p-4 text-center">
-		<p class="text-sm text-gb-text-muted mb-3">{tr('profile.cloud_soon')}</p>
+	<!-- Account & Cloud-Sync -->
+	<div class="space-y-3">
+		<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">{tr('sync.title')}</h2>
+
+		{#if loggedIn}
+			<!-- Eingeloggt -->
+			<div class="bg-gb-surface rounded-xl p-4 space-y-3">
+				<div class="flex items-center justify-between">
+					<div>
+						<p class="text-sm font-medium">{tr('auth.logged_in_as')}</p>
+						<p class="text-xs text-gb-text-muted">{auth.user?.email ?? ''}</p>
+					</div>
+					<button onclick={logout}
+						class="text-xs text-gb-danger bg-gb-danger/10 px-3 py-1.5 rounded-lg font-medium hover:bg-gb-danger/20">
+						{tr('auth.logout')}
+					</button>
+				</div>
+
+				<!-- Sync Buttons -->
+				<div class="flex gap-3">
+					<button onclick={pushSync}
+						disabled={sync.status === 'syncing'}
+						class="flex-1 bg-gb-green/10 border border-gb-green/20 text-gb-green font-medium text-sm py-2.5 rounded-lg hover:bg-gb-green/20 transition-colors disabled:opacity-50">
+						{sync.status === 'syncing' ? tr('sync.syncing') : '☁️↑ ' + tr('sync.push')}
+					</button>
+					<button onclick={pullSync}
+						disabled={sync.status === 'syncing'}
+						class="flex-1 bg-gb-info/10 border border-gb-info/20 text-gb-info font-medium text-sm py-2.5 rounded-lg hover:bg-gb-info/20 transition-colors disabled:opacity-50">
+						{sync.status === 'syncing' ? tr('sync.syncing') : '☁️↓ ' + tr('sync.pull')}
+					</button>
+				</div>
+
+				<p class="text-xs text-gb-text-muted text-center">
+					{#if sync.last_synced}
+						{tr('sync.last', { date: new Date(sync.last_synced).toLocaleString() })}
+					{:else}
+						{tr('sync.never')}
+					{/if}
+				</p>
+			</div>
+		{:else}
+			<!-- Nicht eingeloggt -->
+			<div class="bg-gb-surface rounded-xl p-5 space-y-4">
+				<p class="text-sm text-center text-gb-text-muted">{tr('auth.login_for_sync')}</p>
+
+				<!-- Google Login -->
+				<button onclick={loginGoogle}
+					class="w-full flex items-center justify-center gap-2 bg-white text-gray-700 font-medium text-sm py-2.5 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors">
+					<svg class="w-5 h-5" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+					{tr('auth.google')}
+				</button>
+
+				<div class="flex items-center gap-3">
+					<div class="flex-1 h-px bg-gb-border"></div>
+					<span class="text-xs text-gb-text-muted">{tr('auth.or')}</span>
+					<div class="flex-1 h-px bg-gb-border"></div>
+				</div>
+
+				<!-- Magic Link -->
+				<div class="space-y-2">
+					<input type="email" bind:value={loginEmail} placeholder={tr('auth.email_placeholder')}
+						class="w-full bg-gb-bg border border-gb-border rounded-lg px-3 py-2.5 text-sm" />
+					<button onclick={sendMagicLink}
+						disabled={loginLoading || !loginEmail.trim()}
+						class="w-full bg-gb-green text-black font-medium text-sm py-2.5 rounded-lg hover:bg-gb-green/80 transition-colors disabled:opacity-50">
+						{loginLoading ? '...' : tr('auth.send_link')}
+					</button>
+				</div>
+
+				{#if loginMessage}
+					<p class="text-xs text-center text-gb-green">{loginMessage}</p>
+				{/if}
+			</div>
+		{/if}
 	</div>
 
 	<!-- Footer Links -->

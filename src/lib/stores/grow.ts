@@ -90,6 +90,11 @@ function createGrowStore() {
 	return {
 		subscribe,
 
+		/** Kompletten State ersetzen (für Cloud-Sync Merge) */
+		replaceState(newState: GrowState): void {
+			set(newState);
+		},
+
 		addGrow(grow: Omit<Grow, 'id' | 'status' | 'harvested_at' | 'yield_g' | 'grow_score'>): string {
 			const id = crypto.randomUUID();
 			const newGrow: Grow = {

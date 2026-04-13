@@ -21,7 +21,19 @@
 	}
 
 	function subscribe() {
-		toastStore.info('Stripe-Integration kommt bald');
+		// Stripe Payment Links — erstelle Produkte im Stripe Dashboard unter:
+		// https://dashboard.stripe.com/payment-links
+		// Dann ersetze die URLs hier:
+		const links: Record<string, string> = {
+			monthly: 'https://buy.stripe.com/test_bJe14mbC86D72XW7vr48000',
+			yearly: 'https://buy.stripe.com/test_cNi4gyay4f9DfKI02Z48001',
+		};
+		const url = links[billing];
+		if (url) {
+			window.open(url, '_blank');
+		} else {
+			toastStore.info('Stripe Payment Links werden noch eingerichtet');
+		}
 	}
 
 	let features = $derived([

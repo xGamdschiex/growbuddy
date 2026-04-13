@@ -322,6 +322,30 @@ export const en: Record<string, string> = {
 	'onboarding.goal_commercial': 'Professional growing',
 	'onboarding.goal_commercial_desc': 'CSC or commercial operation',
 
+	// Auth
+	'auth.login': 'Sign in',
+	'auth.logout': 'Sign out',
+	'auth.logout_confirm': 'Really sign out?',
+	'auth.email': 'Email address',
+	'auth.email_placeholder': 'your@email.com',
+	'auth.send_link': 'Send Magic Link',
+	'auth.link_sent': 'Link sent! Check your inbox.',
+	'auth.or': 'or',
+	'auth.google': 'Sign in with Google',
+	'auth.logged_in_as': 'Logged in as',
+	'auth.login_for_sync': 'Sign in for Cloud Sync',
+
+	// Sync
+	'sync.title': 'Cloud Sync',
+	'sync.push': 'Upload data',
+	'sync.pull': 'Download data',
+	'sync.last': 'Last sync: {date}',
+	'sync.never': 'Never synced',
+	'sync.syncing': 'Syncing...',
+	'sync.success': 'Sync successful!',
+	'sync.error': 'Sync failed',
+	'sync.login_required': 'Login required for Cloud Sync',
+
 	// General
 	'general.back': 'Back',
 	'general.save': 'Save',

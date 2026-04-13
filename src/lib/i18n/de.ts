@@ -322,6 +322,30 @@ export const de: Record<string, string> = {
 	'onboarding.goal_commercial': 'Professioneller Anbau',
 	'onboarding.goal_commercial_desc': 'CSC oder kommerzieller Betrieb',
 
+	// Auth
+	'auth.login': 'Anmelden',
+	'auth.logout': 'Abmelden',
+	'auth.logout_confirm': 'Wirklich abmelden?',
+	'auth.email': 'E-Mail-Adresse',
+	'auth.email_placeholder': 'deine@email.de',
+	'auth.send_link': 'Magic Link senden',
+	'auth.link_sent': 'Link gesendet! Prüfe dein Postfach.',
+	'auth.or': 'oder',
+	'auth.google': 'Mit Google anmelden',
+	'auth.logged_in_as': 'Eingeloggt als',
+	'auth.login_for_sync': 'Einloggen für Cloud-Sync',
+
+	// Sync
+	'sync.title': 'Cloud-Sync',
+	'sync.push': 'Daten hochladen',
+	'sync.pull': 'Daten herunterladen',
+	'sync.last': 'Letzter Sync: {date}',
+	'sync.never': 'Noch nie synchronisiert',
+	'sync.syncing': 'Synchronisiere...',
+	'sync.success': 'Sync erfolgreich!',
+	'sync.error': 'Sync fehlgeschlagen',
+	'sync.login_required': 'Login erforderlich für Cloud-Sync',
+
 	// General
 	'general.back': 'Zurück',
 	'general.save': 'Speichern',
