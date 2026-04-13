@@ -121,6 +121,8 @@ export const de: Record<string, string> = {
 	'tools.dry_desc': 'Trocknung & Curing überwachen',
 	'tools.ipm': 'IPM Guide',
 	'tools.ipm_desc': 'Schädlingsbekämpfung ohne Neem',
+	'tools.doctor': 'AI Plant Doctor',
+	'tools.doctor_desc': 'Foto → sofortige Pflanzendiagnose',
 	'tools.training': 'Training Guide',
 	'tools.training_desc': 'LST, Topping, ScrOG & mehr',
 

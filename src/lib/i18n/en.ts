@@ -121,6 +121,8 @@ export const en: Record<string, string> = {
 	'tools.dry_desc': 'Monitor drying & curing',
 	'tools.ipm': 'IPM Guide',
 	'tools.ipm_desc': 'Pest control without neem oil',
+	'tools.doctor': 'AI Plant Doctor',
+	'tools.doctor_desc': 'Photo → instant plant diagnosis',
 	'tools.training': 'Training Guide',
 	'tools.training_desc': 'LST, Topping, ScrOG & more',
 
