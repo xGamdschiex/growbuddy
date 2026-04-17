@@ -6,6 +6,15 @@
 import { writable, derived } from 'svelte/store';
 import { supabase } from '$lib/supabase';
 import type { User, Session } from '@supabase/supabase-js';
+import { Capacitor } from '@capacitor/core';
+
+const VERCEL_CALLBACK = 'https://growbuddy-app.vercel.app/auth/callback';
+
+function getRedirectUrl(): string {
+	if (Capacitor.isNativePlatform()) return VERCEL_CALLBACK;
+	if (typeof window !== 'undefined') return `${window.location.origin}/auth/callback`;
+	return VERCEL_CALLBACK;
+}
 
 export interface AuthState {
 	user: User | null;
@@ -55,24 +64,18 @@ function createAuthStore() {
 
 		/** Magic Link Login (E-Mail) */
 		async loginWithEmail(email: string): Promise<{ error: string | null }> {
-			const redirectUrl = typeof window !== 'undefined'
-				? `${window.location.origin}/auth/callback`
-				: undefined;
 			const { error } = await supabase.auth.signInWithOtp({
 				email,
-				options: { emailRedirectTo: redirectUrl },
+				options: { emailRedirectTo: getRedirectUrl() },
 			});
 			return { error: error?.message ?? null };
 		},
 
 		/** Google OAuth Login */
 		async loginWithGoogle(): Promise<{ error: string | null }> {
-			const redirectUrl = typeof window !== 'undefined'
-				? `${window.location.origin}/auth/callback`
-				: undefined;
 			const { error } = await supabase.auth.signInWithOAuth({
 				provider: 'google',
-				options: { redirectTo: redirectUrl },
+				options: { redirectTo: getRedirectUrl() },
 			});
 			return { error: error?.message ?? null };
 		},

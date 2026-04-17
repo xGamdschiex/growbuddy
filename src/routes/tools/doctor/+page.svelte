@@ -3,17 +3,40 @@
 	import { isPro } from '$lib/stores/pro';
 	import { xpStore } from '$lib/stores/xp';
 	import { toastStore } from '$lib/stores/toast';
+	import { growStore, activeGrows } from '$lib/stores/grow';
 	import { hapticSuccess, hapticError } from '$lib/utils/haptic';
 	import { diagnosePlant } from '$lib/utils/gemini';
-	import type { Diagnosis } from '$lib/utils/gemini';
+	import type { Diagnosis, DiagnosisContext } from '$lib/utils/gemini';
+	import type { Grow, CheckIn, GrowState } from '$lib/stores/grow';
 
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
 	let userIsPro = $derived.by(() => { let v = false; isPro.subscribe(x => v = x)(); return v; });
+	let state = $derived.by(() => { let v: GrowState = { grows: [], checkins: [] }; growStore.subscribe(x => v = x)(); return v; });
+	let active = $derived.by(() => { let v: Grow[] = []; activeGrows.subscribe(x => v = x)(); return v; });
 
 	let photo = $state<string | null>(null);
+	let userNote = $state('');
 	let loading = $state(false);
 	let diagnosis = $state<Diagnosis | null>(null);
 	let error = $state<string | null>(null);
+	let includeContext = $state(true);
+	let selectedGrowId = $state<string>('');
+
+	$effect(() => {
+		if (!selectedGrowId && active.length > 0) selectedGrowId = active[0]!.id;
+	});
+
+	let selectedGrow = $derived(active.find(g => g.id === selectedGrowId));
+	let latestCheckin = $derived.by<CheckIn | undefined>(() => {
+		if (!selectedGrowId) return undefined;
+		const growCheckins = state.checkins
+			.filter(c => c.grow_id === selectedGrowId)
+			.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+		return growCheckins[0];
+	});
+	let daysSinceStart = $derived(selectedGrow
+		? Math.floor((Date.now() - new Date(selectedGrow.started_at).getTime()) / 86400000)
+		: undefined);
 
 	function handlePhoto(e: Event) {
 		const input = e.target as HTMLInputElement;
@@ -49,7 +72,10 @@
 		diagnosis = null;
 
 		try {
-			diagnosis = await diagnosePlant(photo);
+			const ctx: DiagnosisContext | undefined = includeContext && selectedGrow
+				? { grow: selectedGrow, checkin: latestCheckin, daysSinceStart }
+				: undefined;
+			diagnosis = await diagnosePlant(photo, ctx, userNote);
 			hapticSuccess();
 			xpStore.awardToolUse('doctor');
 			toastStore.xp('+5 XP — Diagnose abgeschlossen');
@@ -95,6 +121,7 @@
 		photo = null;
 		diagnosis = null;
 		error = null;
+		userNote = '';
 	}
 </script>
 
@@ -116,6 +143,48 @@
 			</a>
 		</div>
 	{:else}
+		<!-- Grow-Kontext-Auswahl -->
+		{#if active.length > 0}
+			<div class="bg-gb-surface rounded-xl p-4 space-y-3">
+				<div class="flex items-center justify-between">
+					<div>
+						<p class="font-medium text-sm">🔗 Grow-Kontext mitsenden</p>
+						<p class="text-xs text-gb-text-muted">Letzter Check-in wird automatisch angehängt</p>
+					</div>
+					<button onclick={() => includeContext = !includeContext}
+						aria-label="Kontext umschalten"
+						class="w-12 h-7 rounded-full transition-colors relative
+							{includeContext ? 'bg-gb-green' : 'bg-gb-border'}">
+						<div class="absolute top-0.5 w-6 h-6 rounded-full bg-white shadow transition-transform
+							{includeContext ? 'translate-x-5' : 'translate-x-0.5'}"></div>
+					</button>
+				</div>
+				{#if includeContext && active.length > 1}
+					<select bind:value={selectedGrowId}
+						class="w-full bg-gb-bg border border-gb-border rounded-lg px-2 py-2 text-sm">
+						{#each active as g}
+							<option value={g.id}>{g.name} · {g.strain}</option>
+						{/each}
+					</select>
+				{/if}
+				{#if includeContext && selectedGrow}
+					<div class="bg-gb-bg rounded-lg p-2 text-xs text-gb-text-muted space-y-0.5">
+						<p>{selectedGrow.strain} · Tag {daysSinceStart} · {selectedGrow.medium}</p>
+						{#if latestCheckin}
+							<p>
+								Letzter Check-in: {latestCheckin.phase} W{latestCheckin.week}T{latestCheckin.day}
+								{#if latestCheckin.temp}· {latestCheckin.temp}°C{/if}
+								{#if latestCheckin.rh}· {latestCheckin.rh}% RH{/if}
+								{#if latestCheckin.ph_measured}· pH {latestCheckin.ph_measured}{/if}
+							</p>
+						{:else}
+							<p class="text-gb-warning">Noch kein Check-in — erst einen Check-in machen für besseren Kontext</p>
+						{/if}
+					</div>
+				{/if}
+			</div>
+		{/if}
+
 		<!-- Photo Upload -->
 		{#if !photo}
 			<label class="block bg-gb-surface border-2 border-dashed border-gb-border rounded-xl p-8 text-center cursor-pointer hover:border-gb-green transition-colors">
@@ -136,6 +205,16 @@
 					✕
 				</button>
 			</div>
+
+			<!-- Textfeld für Fragen / Beschreibung -->
+			{#if !diagnosis && !loading}
+				<div>
+					<label class="block text-xs text-gb-text-muted mb-1">Frage oder Beschreibung (optional)</label>
+					<textarea bind:value={userNote} rows="2"
+						placeholder="z.B. &quot;Blätter rollen sich ein&quot; oder &quot;Was fehlt der Pflanze?&quot;"
+						class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2 text-sm placeholder:text-gb-border resize-none"></textarea>
+				</div>
+			{/if}
 
 			<!-- Analyze Button -->
 			{#if !diagnosis && !loading}
@@ -168,6 +247,11 @@
 
 			<!-- Diagnosis Result -->
 			{#if diagnosis}
+				{#if userNote.trim()}
+					<div class="bg-gb-surface rounded-xl px-4 py-3 text-sm text-gb-text-muted italic">
+						❓ {userNote.trim()}
+					</div>
+				{/if}
 				<!-- Status Header -->
 				<div class="bg-gb-surface rounded-xl p-5 text-center">
 					<span class="text-4xl block mb-2">{statusIcon(diagnosis.status)}</span>

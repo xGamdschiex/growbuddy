@@ -1,0 +1,8 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "app.growbuddy.de",
+    "sha256_cert_fingerprints": ["78:50:A5:C5:AC:DA:38:AF:78:09:AB:C2:AD:5B:BE:0E:81:00:E9:2A:4F:30:98:71:2C:8B:74:68:14:1A:44:62"]
+  }
+}]

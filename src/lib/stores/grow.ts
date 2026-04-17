@@ -36,7 +36,9 @@ export interface CheckIn {
 	phase: string;
 	week: number;
 	day: number;
-	photo_data: string | null;   // base64 data URL (localStorage), später Supabase URL
+	photo_data: string | null;   // base64 data URL (legacy, single photo)
+	photos_data: string[];       // base64 array, max 5
+	photo_url?: string | null;   // Signed URL von Supabase Storage (nach Sync)
 	temp: number | null;
 	rh: number | null;
 	vpd: number | null;
@@ -68,7 +70,15 @@ function loadState(): GrowState {
 	try {
 		const raw = localStorage.getItem(STORAGE_KEY);
 		if (!raw) return DEFAULTS;
-		return { ...DEFAULTS, ...JSON.parse(raw) };
+		const parsed = JSON.parse(raw);
+		// Migrate old check-ins without photos_data
+		if (parsed.checkins) {
+			parsed.checkins = parsed.checkins.map((c: any) => ({
+				photos_data: [],
+				...c,
+			}));
+		}
+		return { ...DEFAULTS, ...parsed };
 	} catch {
 		return DEFAULTS;
 	}
@@ -154,6 +164,13 @@ function createGrowStore() {
 			};
 			update(s => ({ ...s, checkins: [...s.checkins, newCheckin] }));
 			return id;
+		},
+
+		updateCheckIn(id: string, patch: Partial<Omit<CheckIn, 'id' | 'grow_id' | 'created_at'>>): void {
+			update(s => ({
+				...s,
+				checkins: s.checkins.map(c => c.id === id ? { ...c, ...patch } : c),
+			}));
 		},
 
 		deleteCheckIn(id: string): void {

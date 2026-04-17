@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { growStore } from '$lib/stores/grow';
 	import { xpStore } from '$lib/stores/xp';
+	import { streakMultiplier } from '$lib/stores/streak';
 	import { isPro } from '$lib/stores/pro';
 	import { t } from '$lib/i18n';
 	import type { CheckIn } from '$lib/stores/grow';
@@ -11,10 +12,12 @@
 	import { hapticSuccess, hapticMedium } from '$lib/utils/haptic';
 	import type { ScoreBreakdown } from '$lib/data/score';
 	import MiniChart from '$lib/components/MiniChart.svelte';
+	import { clampNumber, RANGES } from '$lib/utils/validation';
 
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
 	let growId = $derived($page.params.id);
-	let state = $derived.by(() => { let s: any; growStore.subscribe(v => s = v)(); return s; });
+	let state = $state<any>({ grows: [], checkins: [] });
+	$effect(() => growStore.subscribe(v => { state = v; }));
 	let grow = $derived(state?.grows?.find((g: any) => g.id === growId));
 	let checkins = $derived(
 		(state?.checkins ?? [])
@@ -24,6 +27,7 @@
 
 	// Check-in Form State
 	let showCheckin = $state(false);
+	let editingId = $state<string | null>(null);
 	let ciPhase = $state('Veg');
 	let ciWeek = $state(1);
 	let ciDay = $state(1);
@@ -35,7 +39,7 @@
 	let ciNutrients = $state(false);
 	let ciTraining = $state<string | null>(null);
 	let ciNotes = $state('');
-	let ciPhoto = $state<string | null>(null);
+	let ciPhotos = $state<string[]>([]);
 
 	let ciVpd = $derived(ciTemp && ciRh ? calcVPD(ciTemp, ciRh) : null);
 
@@ -80,59 +84,109 @@
 		goto('/grow');
 	}
 
-	function handlePhoto(e: Event) {
-		const input = e.target as HTMLInputElement;
-		if (!input.files?.[0]) return;
-		const file = input.files[0];
-		const reader = new FileReader();
-		reader.onload = () => {
-			const img = new Image();
-			img.onload = () => {
-				const canvas = document.createElement('canvas');
-				const maxSize = 800;
-				let w = img.width, h = img.height;
-				if (w > maxSize || h > maxSize) {
-					if (w > h) { h = (h / w) * maxSize; w = maxSize; }
-					else { w = (w / h) * maxSize; h = maxSize; }
-				}
-				canvas.width = w;
-				canvas.height = h;
-				canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
-				ciPhoto = canvas.toDataURL('image/jpeg', 0.7);
+	function compressImage(file: File, maxSize = 800): Promise<string> {
+		return new Promise((resolve) => {
+			const reader = new FileReader();
+			reader.onload = () => {
+				const img = new Image();
+				img.onload = () => {
+					const canvas = document.createElement('canvas');
+					let w = img.width, h = img.height;
+					if (w > maxSize || h > maxSize) {
+						if (w > h) { h = (h / w) * maxSize; w = maxSize; }
+						else { w = (w / h) * maxSize; h = maxSize; }
+					}
+					canvas.width = w; canvas.height = h;
+					canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
+					resolve(canvas.toDataURL('image/jpeg', 0.7));
+				};
+				img.src = reader.result as string;
 			};
-			img.src = reader.result as string;
-		};
-		reader.readAsDataURL(file);
+			reader.readAsDataURL(file);
+		});
 	}
 
-	function submitCheckin() {
-		if (!grow) return;
-		growStore.addCheckIn({
-			grow_id: grow.id,
-			phase: ciPhase,
-			week: ciWeek,
-			day: ciDay,
-			photo_data: ciPhoto,
-			temp: ciTemp,
-			rh: ciRh,
-			vpd: ciVpd ?? null,
-			ec_measured: ciEc,
-			ph_measured: ciPh,
-			watered: ciWatered,
-			nutrients_given: ciNutrients,
-			training: ciTraining,
-			notes: ciNotes.trim(),
-		});
-		const hasPhoto = !!ciPhoto;
-		const isFull = !!(ciTemp && ciRh && ciEc && ciPh);
-		xpStore.awardCheckIn(hasPhoto, isFull);
-		hapticSuccess();
+	async function handlePhoto(e: Event) {
+		const input = e.target as HTMLInputElement;
+		if (!input.files?.length) return;
+		const remaining = 5 - ciPhotos.length;
+		const files = Array.from(input.files).slice(0, remaining);
+		const compressed = await Promise.all(files.map(f => compressImage(f)));
+		ciPhotos = [...ciPhotos, ...compressed].slice(0, 5);
+		input.value = '';
+	}
+
+	function removePhoto(idx: number) {
+		ciPhotos = ciPhotos.filter((_, i) => i !== idx);
+	}
+
+	function startEdit(ci: CheckIn) {
+		editingId = ci.id;
+		ciPhase = ci.phase;
+		ciWeek = ci.week;
+		ciDay = ci.day;
+		ciTemp = ci.temp;
+		ciRh = ci.rh;
+		ciEc = ci.ec_measured;
+		ciPh = ci.ph_measured;
+		ciWatered = ci.watered;
+		ciNutrients = ci.nutrients_given;
+		ciTraining = ci.training;
+		ciNotes = ci.notes;
+		ciPhotos = ci.photos_data?.length ? [...ci.photos_data] : (ci.photo_data ? [ci.photo_data] : []);
+		showCheckin = true;
+	}
+
+	function cancelCheckin() {
 		showCheckin = false;
-		ciPhoto = null;
+		editingId = null;
+		ciPhotos = [];
 		ciNotes = '';
 		ciWatered = false;
 		ciNutrients = false;
 		ciTraining = null;
+		ciTemp = null; ciRh = null; ciEc = null; ciPh = null;
+	}
+
+	let multiplierValue = $derived.by(() => { let v = 1; streakMultiplier.subscribe(x => v = x)(); return v; });
+
+	function submitCheckin() {
+		if (!grow) return;
+		const validTemp = ciTemp !== null ? clampNumber(ciTemp, RANGES.temp.min, RANGES.temp.max) : null;
+		const validRh = ciRh !== null ? clampNumber(ciRh, RANGES.rh.min, RANGES.rh.max) : null;
+		const validEc = ciEc !== null ? clampNumber(ciEc, RANGES.ec.min, RANGES.ec.max) : null;
+		const validPh = ciPh !== null ? clampNumber(ciPh, RANGES.ph.min, RANGES.ph.max) : null;
+		const validWeek = clampNumber(ciWeek, RANGES.week.min, RANGES.week.max);
+		const validDay = clampNumber(ciDay, RANGES.day.min, RANGES.day.max);
+		const validVpd = validTemp !== null && validRh !== null ? calcVPD(validTemp, validRh) : null;
+
+		const patch = {
+			phase: ciPhase,
+			week: validWeek,
+			day: validDay,
+			photo_data: ciPhotos[0] ?? null,
+			photos_data: ciPhotos,
+			temp: validTemp,
+			rh: validRh,
+			vpd: validVpd,
+			ec_measured: validEc,
+			ph_measured: validPh,
+			watered: ciWatered,
+			nutrients_given: ciNutrients,
+			training: ciTraining,
+			notes: ciNotes.trim(),
+		};
+
+		if (editingId) {
+			growStore.updateCheckIn(editingId, patch);
+		} else {
+			growStore.addCheckIn({ grow_id: grow.id, ...patch });
+			const isFull = !!(validTemp && validRh && validEc && validPh);
+			xpStore.awardCheckIn(ciPhotos.length > 0, isFull, multiplierValue);
+		}
+
+		hapticSuccess();
+		cancelCheckin();
 	}
 
 	function daysSince(dateStr: string): number {
@@ -193,20 +247,32 @@
 				<!-- Check-in Form -->
 				<div class="bg-gb-surface rounded-xl p-4 space-y-4">
 					<div class="flex items-center justify-between">
-						<h2 class="font-semibold">{tr('checkin.title')}</h2>
-						<button onclick={() => showCheckin = false} class="text-gb-text-muted text-sm">{tr('checkin.cancel')}</button>
+						<h2 class="font-semibold">{editingId ? 'Check-in bearbeiten' : tr('checkin.title')}</h2>
+						<button onclick={cancelCheckin} class="text-gb-text-muted text-sm">{tr('checkin.cancel')}</button>
 					</div>
 
-					<!-- Foto -->
+					<!-- Fotos (max 5) -->
 					<div>
-						<label class="block text-xs text-gb-text-muted mb-1">{tr('checkin.photo')}</label>
-						{#if ciPhoto}
-							<img src={ciPhoto} alt="Check-in" class="w-full rounded-lg mb-2 max-h-48 object-cover" />
+						<label class="block text-xs text-gb-text-muted mb-1">{tr('checkin.photo')} ({ciPhotos.length}/5)</label>
+						{#if ciPhotos.length > 0}
+							<div class="grid grid-cols-3 gap-1 mb-2">
+								{#each ciPhotos as src, idx}
+									<div class="relative">
+										<img {src} alt="Foto {idx + 1}" class="aspect-square object-cover rounded-lg w-full" />
+										<button onclick={() => removePhoto(idx)}
+											class="absolute top-1 right-1 bg-black/60 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center leading-none">
+											✕
+										</button>
+									</div>
+								{/each}
+							</div>
 						{/if}
-						<label class="block w-full bg-gb-surface-2 border border-dashed border-gb-border rounded-lg p-4 text-center text-sm text-gb-text-muted cursor-pointer hover:border-gb-green transition-colors">
-							{ciPhoto ? tr('checkin.change_photo') : tr('checkin.take_photo')}
-							<input type="file" accept="image/*" capture="environment" onchange={handlePhoto} class="hidden" />
-						</label>
+						{#if ciPhotos.length < 5}
+							<label class="block w-full bg-gb-surface-2 border border-dashed border-gb-border rounded-lg p-3 text-center text-sm text-gb-text-muted cursor-pointer hover:border-gb-green transition-colors">
+								📸 {ciPhotos.length === 0 ? tr('checkin.take_photo') : 'Weiteres Foto'}
+								<input type="file" accept="image/*" multiple onchange={handlePhoto} class="hidden" />
+							</label>
+						{/if}
 					</div>
 
 					<!-- Phase / Week / Day -->
@@ -298,7 +364,7 @@
 					<!-- Submit -->
 					<button onclick={submitCheckin}
 						class="w-full bg-gb-green text-black font-semibold py-3 rounded-lg text-sm hover:bg-gb-green-light transition-colors">
-						{tr('checkin.save')}
+						{editingId ? 'Änderungen speichern' : tr('checkin.save')}
 					</button>
 				</div>
 			{/if}
@@ -441,27 +507,41 @@
 					{tr('timeline.no_entries')}
 				</p>
 			{:else}
-				<!-- Foto Grid -->
-				{#if checkins.some((c: CheckIn) => c.photo_data)}
+				<!-- Foto Grid (alle Fotos aller Check-ins) -->
+				{@const allPhotos = checkins.flatMap((c: CheckIn) =>
+					(c.photos_data?.length ? c.photos_data : (c.photo_data ? [c.photo_data] : []))
+				)}
+				{#if allPhotos.length > 0}
 					<div class="grid grid-cols-4 gap-1 rounded-xl overflow-hidden">
-						{#each checkins.filter((c: CheckIn) => c.photo_data).slice(0, 8) as ci}
-							<img src={ci.photo_data} alt="Day {ci.day}" class="aspect-square object-cover w-full" />
+						{#each allPhotos.slice(0, 8) as src, i}
+							<img {src} alt="Foto {i + 1}" class="aspect-square object-cover w-full" />
 						{/each}
 					</div>
 				{/if}
 
 				<!-- Check-in List -->
 				{#each checkins as ci}
+					{@const ciAllPhotos = ci.photos_data?.length ? ci.photos_data : (ci.photo_data ? [ci.photo_data] : [])}
 					<div class="bg-gb-surface rounded-xl p-3 space-y-2">
 						<div class="flex justify-between items-start">
 							<div>
 								<p class="font-medium text-sm">{ci.phase} W{ci.week}T{ci.day}</p>
 								<p class="text-xs text-gb-text-muted">{formatDate(ci.created_at)}</p>
 							</div>
-							<div class="flex gap-2 text-xs">
+							<div class="flex items-center gap-2 text-xs">
 								{#if ci.watered}<span class="bg-gb-info/20 text-gb-info px-2 py-0.5 rounded">💧</span>{/if}
 								{#if ci.nutrients_given}<span class="bg-gb-green/20 text-gb-green px-2 py-0.5 rounded">🧪</span>{/if}
 								{#if ci.training}<span class="bg-gb-accent/20 text-gb-accent px-2 py-0.5 rounded">{ci.training}</span>{/if}
+								{#if grow.status === 'active'}
+									<button onclick={() => startEdit(ci)}
+										class="text-gb-text-muted hover:text-gb-text p-1 rounded" aria-label="Bearbeiten">
+										✏️
+									</button>
+									<button onclick={() => { if (confirm('Check-in löschen?')) growStore.deleteCheckIn(ci.id); }}
+										class="text-gb-danger/60 hover:text-gb-danger p-1 rounded" aria-label="Löschen">
+										🗑️
+									</button>
+								{/if}
 							</div>
 						</div>
 						{#if ci.temp || ci.ec_measured || ci.ph_measured}
@@ -476,8 +556,14 @@
 						{#if ci.notes}
 							<p class="text-sm text-gb-text-muted">{ci.notes}</p>
 						{/if}
-						{#if ci.photo_data}
-							<img src={ci.photo_data} alt="Check-in" class="w-full rounded-lg max-h-64 object-cover" />
+						{#if ciAllPhotos.length === 1}
+							<img src={ciAllPhotos[0]} alt="Check-in" class="w-full rounded-lg max-h-64 object-cover" />
+						{:else if ciAllPhotos.length > 1}
+							<div class="grid grid-cols-3 gap-1">
+								{#each ciAllPhotos as src, i}
+									<img {src} alt="Foto {i + 1}" class="aspect-square object-cover rounded-lg w-full" />
+								{/each}
+							</div>
 						{/if}
 					</div>
 				{/each}
