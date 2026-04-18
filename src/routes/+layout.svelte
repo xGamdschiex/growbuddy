@@ -5,54 +5,114 @@
 	import { onboardingStore } from '$lib/stores/onboarding';
 	import { reminderStore } from '$lib/stores/reminders';
 	import { toastStore } from '$lib/stores/toast';
+	import { hasCheckinToday, currentStreak } from '$lib/stores/streak';
 	import { t } from '$lib/i18n';
 	import { hapticLight } from '$lib/utils/haptic';
+	import InstallPrompt from '$lib/components/InstallPrompt.svelte';
 	import type { Toast } from '$lib/stores/toast';
 	import type { Snippet } from 'svelte';
 
 	let { children }: { children: Snippet } = $props();
 	let toasts = $derived.by(() => { let v: Toast[] = []; toastStore.subscribe(x => v = x)(); return v; });
-	let onboarding = $derived.by(() => { let v = { completed: false }; onboardingStore.subscribe(x => v = x)(); return v; });
+	let onboarding = $state<{ completed: boolean }>({ completed: false });
+	$effect(() => onboardingStore.subscribe(x => { onboarding = x; }));
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
+
+	let showUpdateBanner = $state(false);
+	let waitingSW: ServiceWorker | null = null;
 
 	let currentPath = $derived($page.url.pathname);
 	let isOnboardingPage = $derived(currentPath === '/onboarding');
-	let showNav = $derived(onboarding.completed && !isOnboardingPage);
-
-	// PWA Install Prompt
-	let deferredPrompt = $state<any>(null);
-	let showInstall = $state(false);
+	let onboardingDone = $derived.by(() => {
+		if (!hydrated || typeof window === 'undefined') return false;
+		const lsRaw = localStorage.getItem('growbuddy_onboarding');
+		return onboarding.completed || (lsRaw ? JSON.parse(lsRaw).completed === true : false);
+	});
+	let showNav = $derived(onboardingDone && !isOnboardingPage);
 
 	// Offline Status
 	let isOffline = $state(false);
 
 	// Redirect zu Onboarding wenn nicht completed
+	// Nur localStorage als Quelle der Wahrheit (verhindert Race-Condition bei Hydration)
+	let hydrated = $state(false);
 	$effect(() => {
-		if (!onboarding.completed && !isOnboardingPage && typeof window !== 'undefined') {
+		hydrated = true;
+	});
+	$effect(() => {
+		if (!hydrated) return;
+		if (isOnboardingPage) return;
+		const lsRaw = localStorage.getItem('growbuddy_onboarding');
+		const lsCompleted = lsRaw ? JSON.parse(lsRaw).completed === true : false;
+		if (!lsCompleted) {
 			goto('/onboarding');
 		}
 	});
 
-	// Reminder-Timer beim App-Start wiederherstellen
+	// Reminder-Timer beim App-Start wiederherstellen + Missed-Check-in prüfen
 	$effect(() => {
-		if (typeof window !== 'undefined') reminderStore.init();
+		if (typeof window === 'undefined') return;
+		reminderStore.init();
+
+		// Nach Hydration: heute noch kein Check-in?
+		setTimeout(() => {
+			let hasToday = false;
+			hasCheckinToday.subscribe(v => hasToday = v)();
+			let streak: any;
+			currentStreak.subscribe(v => streak = v)();
+			reminderStore.checkMissedToday(hasToday, streak?.current ?? 0);
+		}, 2000);
 	});
 
-	// PWA Install + Offline listeners
+	// Service Worker Update-Flow
+	$effect(() => {
+		if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+
+		navigator.serviceWorker.ready.then(reg => {
+			if (reg.waiting) {
+				waitingSW = reg.waiting;
+				showUpdateBanner = true;
+			}
+			reg.addEventListener('updatefound', () => {
+				const newWorker = reg.installing;
+				if (!newWorker) return;
+				newWorker.addEventListener('statechange', () => {
+					if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+						waitingSW = newWorker;
+						showUpdateBanner = true;
+					}
+				});
+			});
+		});
+
+		// Reload wenn neuer SW übernommen hat
+		let refreshing = false;
+		navigator.serviceWorker.addEventListener('controllerchange', () => {
+			if (refreshing) return;
+			refreshing = true;
+			window.location.reload();
+		});
+
+		// SW → Client Messages (z.B. NAVIGATE aus notificationclick)
+		navigator.serviceWorker.addEventListener('message', (event) => {
+			if (event.data?.type === 'NAVIGATE' && event.data.url) {
+				goto(event.data.url);
+			}
+		});
+	});
+
+	function applyUpdate() {
+		if (waitingSW) waitingSW.postMessage({ type: 'SKIP_WAITING' });
+		showUpdateBanner = false;
+	}
+	function dismissUpdate() {
+		showUpdateBanner = false;
+	}
+
+	// Offline listener
 	$effect(() => {
 		if (typeof window === 'undefined') return;
 
-		// Install prompt
-		const handleInstall = (e: Event) => {
-			e.preventDefault();
-			deferredPrompt = e;
-			// Nur anzeigen wenn nicht schon installiert und nicht dismissed
-			const dismissed = localStorage.getItem('growbuddy_install_dismissed');
-			if (!dismissed) showInstall = true;
-		};
-		window.addEventListener('beforeinstallprompt', handleInstall);
-
-		// Offline/Online
 		const goOffline = () => isOffline = true;
 		const goOnline = () => isOffline = false;
 		isOffline = !navigator.onLine;
@@ -60,24 +120,10 @@
 		window.addEventListener('online', goOnline);
 
 		return () => {
-			window.removeEventListener('beforeinstallprompt', handleInstall);
 			window.removeEventListener('offline', goOffline);
 			window.removeEventListener('online', goOnline);
 		};
 	});
-
-	async function installApp() {
-		if (!deferredPrompt) return;
-		deferredPrompt.prompt();
-		const result = await deferredPrompt.userChoice;
-		deferredPrompt = null;
-		showInstall = false;
-	}
-
-	function dismissInstall() {
-		showInstall = false;
-		localStorage.setItem('growbuddy_install_dismissed', '1');
-	}
 
 	const navItems = [
 		{ href: '/', icon: 'home', key: 'nav.home' },
@@ -100,25 +146,30 @@
 	</div>
 {/if}
 
-<!-- PWA Install Banner -->
-{#if showInstall && showNav}
-	<div class="fixed top-{isOffline ? '8' : '0'} inset-x-0 z-[105] px-4 pt-3 pb-2 animate-[slideDown_0.3s_ease-out]">
-		<div class="max-w-lg mx-auto bg-gb-surface border border-gb-green/30 rounded-xl p-4 flex items-center gap-3 shadow-lg">
-			<span class="text-2xl">🌱</span>
+<!-- Update Banner -->
+{#if showUpdateBanner}
+	<div class="fixed top-{isOffline ? '8' : '0'} inset-x-0 z-[108] px-4 pt-3 pb-2 animate-[slideDown_0.3s_ease-out]">
+		<div class="max-w-lg mx-auto bg-gb-surface border border-gb-info/30 rounded-xl p-4 flex items-center gap-3 shadow-lg">
+			<span class="text-2xl">✨</span>
 			<div class="flex-1 min-w-0">
-				<p class="font-medium text-sm">GrowBuddy installieren</p>
-				<p class="text-xs text-gb-text-muted">Für schnellen Zugriff zum Homescreen hinzufügen</p>
+				<p class="font-medium text-sm">Update verfügbar</p>
+				<p class="text-xs text-gb-text-muted">Neue Version bereit — App wird neu geladen</p>
 			</div>
-			<button onclick={installApp}
-				class="bg-gb-green text-black font-semibold text-xs px-3 py-1.5 rounded-lg shrink-0">
-				OK
+			<button onclick={applyUpdate}
+				class="bg-gb-info text-white font-semibold text-xs px-3 py-1.5 rounded-lg shrink-0">
+				Aktualisieren
 			</button>
-			<button onclick={dismissInstall}
+			<button onclick={dismissUpdate} aria-label="Später"
 				class="text-gb-text-muted text-xs shrink-0">
 				✕
 			</button>
 		</div>
 	</div>
+{/if}
+
+<!-- PWA Install Banner (iOS + Chrome/Android) -->
+{#if showNav}
+	<InstallPrompt />
 {/if}
 
 <!-- Toast Notifications -->
@@ -140,7 +191,7 @@
 {/if}
 
 <!-- Main Content -->
-<main class="{showNav ? 'pb-20' : ''} min-h-screen">
+<main class="{showNav ? 'pb-20' : ''} min-h-screen" style="padding-top: env(safe-area-inset-top, 0px)">
 	{@render children()}
 </main>
 

@@ -24,6 +24,7 @@
 	let lightInfo = $state('');
 	let plantCount = $state(1);
 	let notes = $state('');
+	let startDate = $state(new Date().toISOString().slice(0, 10));
 
 	let spaces = $derived([
 		{ value: 'fensterbank', label: tr('grow.space_fensterbank') },
@@ -52,7 +53,7 @@
 			feedline_id: feedlineId,
 			light_info: lightInfo.trim(),
 			plant_count: plantCount,
-			started_at: new Date().toISOString(),
+			started_at: new Date(startDate).toISOString(),
 			notes: notes.trim(),
 		});
 		xpStore.awardGrowStart(isFirst);
@@ -151,6 +152,13 @@
 		<label class="block text-xs text-gb-text-muted mb-1">{tr('grow.notes')}</label>
 		<textarea bind:value={notes} rows="2" placeholder={tr('grow.notes_placeholder')}
 			class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm placeholder:text-gb-border resize-none"></textarea>
+	</div>
+
+	<!-- Startdatum -->
+	<div>
+		<label class="block text-xs text-gb-text-muted mb-1">Startdatum (retroaktiv möglich)</label>
+		<input type="date" bind:value={startDate} max={new Date().toISOString().slice(0, 10)}
+			class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm" />
 	</div>
 
 	<!-- Pro Limit Warning -->

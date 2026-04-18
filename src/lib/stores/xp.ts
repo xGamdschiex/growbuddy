@@ -162,8 +162,8 @@ function createXPStore() {
 	return {
 		subscribe,
 
-		/** Check-in XP vergeben (max 3x pro Tag) */
-		awardCheckIn(hasPhoto: boolean, isFull: boolean): void {
+		/** Check-in XP vergeben (max 3x pro Tag) mit Streak-Multiplier */
+		awardCheckIn(hasPhoto: boolean, isFull: boolean, multiplier: number = 1): void {
 			const today = new Date().toISOString().slice(0, 10);
 			let state: XPState = DEFAULTS;
 			subscribe(s => state = s)();
@@ -176,9 +176,11 @@ function createXPStore() {
 				daily_checkins: { ...s.daily_checkins, [today]: todayCount + 1 },
 			}));
 
-			addXP('checkin', 'Check-in durchgeführt');
-			if (hasPhoto) addXP('checkin_photo', 'Foto im Check-in');
-			if (isFull) addXP('checkin_full', 'Vollständiger Check-in');
+			const mult = Math.max(1, multiplier);
+			const suffix = mult > 1 ? ` (${mult}x Streak)` : '';
+			addXP('checkin', 'Check-in durchgeführt' + suffix, Math.round(XP_REWARDS.checkin * mult));
+			if (hasPhoto) addXP('checkin_photo', 'Foto im Check-in' + suffix, Math.round(XP_REWARDS.checkin_photo * mult));
+			if (isFull) addXP('checkin_full', 'Vollständiger Check-in' + suffix, Math.round(XP_REWARDS.checkin_full * mult));
 		},
 
 		/** Grow-Start XP */

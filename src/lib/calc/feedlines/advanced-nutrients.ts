@@ -41,28 +41,28 @@ export const advancedSensi: FeedLine = {
   ],
 
   phasen: [
-    { phase: 'Veg',   wochen: 4, label: 'Vegetativ' },
-    { phase: 'Bloom', wochen: 8, label: 'Blüte' },
-    { phase: 'Flush', wochen: 1, label: 'Flush' },
+    { name: 'Veg',   schema_wochen: 4, max_wochen: 8,  stretch: 'repeat_last' },
+    { name: 'Bloom', schema_wochen: 8, max_wochen: 12, stretch: 'repeat_peak' },
+    { name: 'Flush', schema_wochen: 1, max_wochen: 2,  stretch: 'repeat_last' },
   ],
 
   schema: [
     // Veg — Sensi Grow A+B immer gleiche Menge
-    { phase: 'Veg', woche: 1, ec_ziel: 1.0, ph_min: 5.5, ph_max: 6.3, fmin: 50, fmax: 70,  dosen: { sensi_grow_a: 1.0, sensi_grow_b: 1.0, b52: 2.0, voodoo_juice: 2.0 } },
-    { phase: 'Veg', woche: 2, ec_ziel: 1.2, ph_min: 5.5, ph_max: 6.3, fmin: 60, fmax: 80,  dosen: { sensi_grow_a: 2.0, sensi_grow_b: 2.0, b52: 2.0, voodoo_juice: 2.0 } },
-    { phase: 'Veg', woche: 3, ec_ziel: 1.3, ph_min: 5.5, ph_max: 6.3, fmin: 65, fmax: 85,  dosen: { sensi_grow_a: 3.0, sensi_grow_b: 3.0, b52: 2.0 } },
-    { phase: 'Veg', woche: 4, ec_ziel: 1.4, ph_min: 5.5, ph_max: 6.3, fmin: 70, fmax: 90,  dosen: { sensi_grow_a: 4.0, sensi_grow_b: 4.0, b52: 2.0 } },
+    { phase: 'Veg', woche: 1, ec_ziel: 1.0, ph_min: 5.5, ph_max: 6.3, fmin: 50, fmax: 70,  dosierungen: { sensi_grow_a: 1.0, sensi_grow_b: 1.0, b52: 2.0, voodoo_juice: 2.0 } },
+    { phase: 'Veg', woche: 2, ec_ziel: 1.2, ph_min: 5.5, ph_max: 6.3, fmin: 60, fmax: 80,  dosierungen: { sensi_grow_a: 2.0, sensi_grow_b: 2.0, b52: 2.0, voodoo_juice: 2.0 } },
+    { phase: 'Veg', woche: 3, ec_ziel: 1.3, ph_min: 5.5, ph_max: 6.3, fmin: 65, fmax: 85,  dosierungen: { sensi_grow_a: 3.0, sensi_grow_b: 3.0, b52: 2.0 } },
+    { phase: 'Veg', woche: 4, ec_ziel: 1.4, ph_min: 5.5, ph_max: 6.3, fmin: 70, fmax: 90,  dosierungen: { sensi_grow_a: 4.0, sensi_grow_b: 4.0, b52: 2.0 } },
     // Bloom — Sensi Bloom A+B
-    { phase: 'Bloom', woche: 1, ec_ziel: 1.4, ph_min: 5.5, ph_max: 6.3, fmin: 60, fmax: 80,  dosen: { sensi_bloom_a: 2.0, sensi_bloom_b: 2.0, b52: 2.0, big_bud: 1.0 } },
-    { phase: 'Bloom', woche: 2, ec_ziel: 1.5, ph_min: 5.5, ph_max: 6.3, fmin: 65, fmax: 85,  dosen: { sensi_bloom_a: 3.0, sensi_bloom_b: 3.0, b52: 2.0, big_bud: 2.0, bud_candy: 2.0 } },
-    { phase: 'Bloom', woche: 3, ec_ziel: 1.7, ph_min: 5.5, ph_max: 6.3, fmin: 70, fmax: 90,  dosen: { sensi_bloom_a: 4.0, sensi_bloom_b: 4.0, big_bud: 2.0, bud_candy: 2.0 } },
-    { phase: 'Bloom', woche: 4, ec_ziel: 1.9, ph_min: 5.5, ph_max: 6.3, fmin: 80, fmax: 100, dosen: { sensi_bloom_a: 4.0, sensi_bloom_b: 4.0, big_bud: 2.0, bud_candy: 2.0 } },
-    { phase: 'Bloom', woche: 5, ec_ziel: 2.0, ph_min: 5.5, ph_max: 6.3, fmin: 80, fmax: 100, dosen: { sensi_bloom_a: 4.0, sensi_bloom_b: 4.0, big_bud: 2.0, bud_candy: 2.0 } },
-    { phase: 'Bloom', woche: 6, ec_ziel: 1.8, ph_min: 5.5, ph_max: 6.3, fmin: 75, fmax: 95,  dosen: { sensi_bloom_a: 3.0, sensi_bloom_b: 3.0, overdrive: 2.0, bud_candy: 2.0 } },
-    { phase: 'Bloom', woche: 7, ec_ziel: 1.5, ph_min: 5.5, ph_max: 6.3, fmin: 60, fmax: 80,  dosen: { sensi_bloom_a: 2.0, sensi_bloom_b: 2.0, overdrive: 2.0 } },
-    { phase: 'Bloom', woche: 8, ec_ziel: 1.0, ph_min: 5.5, ph_max: 6.3, fmin: 40, fmax: 60,  dosen: { sensi_bloom_a: 1.0, sensi_bloom_b: 1.0 } },
+    { phase: 'Bloom', woche: 1, ec_ziel: 1.4, ph_min: 5.5, ph_max: 6.3, fmin: 60, fmax: 80,  dosierungen: { sensi_bloom_a: 2.0, sensi_bloom_b: 2.0, b52: 2.0, big_bud: 1.0 } },
+    { phase: 'Bloom', woche: 2, ec_ziel: 1.5, ph_min: 5.5, ph_max: 6.3, fmin: 65, fmax: 85,  dosierungen: { sensi_bloom_a: 3.0, sensi_bloom_b: 3.0, b52: 2.0, big_bud: 2.0, bud_candy: 2.0 } },
+    { phase: 'Bloom', woche: 3, ec_ziel: 1.7, ph_min: 5.5, ph_max: 6.3, fmin: 70, fmax: 90,  dosierungen: { sensi_bloom_a: 4.0, sensi_bloom_b: 4.0, big_bud: 2.0, bud_candy: 2.0 } },
+    { phase: 'Bloom', woche: 4, ec_ziel: 1.9, ph_min: 5.5, ph_max: 6.3, fmin: 80, fmax: 100, dosierungen: { sensi_bloom_a: 4.0, sensi_bloom_b: 4.0, big_bud: 2.0, bud_candy: 2.0 } },
+    { phase: 'Bloom', woche: 5, ec_ziel: 2.0, ph_min: 5.5, ph_max: 6.3, fmin: 80, fmax: 100, dosierungen: { sensi_bloom_a: 4.0, sensi_bloom_b: 4.0, big_bud: 2.0, bud_candy: 2.0 } },
+    { phase: 'Bloom', woche: 6, ec_ziel: 1.8, ph_min: 5.5, ph_max: 6.3, fmin: 75, fmax: 95,  dosierungen: { sensi_bloom_a: 3.0, sensi_bloom_b: 3.0, overdrive: 2.0, bud_candy: 2.0 } },
+    { phase: 'Bloom', woche: 7, ec_ziel: 1.5, ph_min: 5.5, ph_max: 6.3, fmin: 60, fmax: 80,  dosierungen: { sensi_bloom_a: 2.0, sensi_bloom_b: 2.0, overdrive: 2.0 } },
+    { phase: 'Bloom', woche: 8, ec_ziel: 1.0, ph_min: 5.5, ph_max: 6.3, fmin: 40, fmax: 60,  dosierungen: { sensi_bloom_a: 1.0, sensi_bloom_b: 1.0 } },
     // Flush
-    { phase: 'Flush', woche: 1, ec_ziel: 0.0, ph_min: 5.5, ph_max: 6.3, fmin: 0, fmax: 0, dosen: {} },
+    { phase: 'Flush', woche: 1, ec_ziel: 0.0, ph_min: 5.5, ph_max: 6.3, fmin: 0, fmax: 0, dosierungen: {} },
   ],
 
   hinweise: [

@@ -9,7 +9,12 @@
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"cap:sync": "npm run build && npx cap sync android",
+		"cap:open": "npx cap open android",
+		"apk:debug": "npm run cap:sync && cd android && ./gradlew assembleDebug",
+		"apk:release": "npm run cap:sync && cd android && ./gradlew assembleRelease",
+		"aab:release": "npm run cap:sync && cd android && ./gradlew bundleRelease"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^7.0.1",

@@ -46,6 +46,8 @@ export interface CheckIn {
 	ph_measured: number | null;
 	watered: boolean;
 	nutrients_given: boolean;
+	water_ml: number | null;     // Wassermenge in mL (optional)
+	nutrient_ml: number | null;  // Düngermenge in mL (optional, Gesamt)
 	training: string | null;     // 'lst', 'topping', etc.
 	notes: string;
 	created_at: string;          // ISO date
@@ -71,10 +73,12 @@ function loadState(): GrowState {
 		const raw = localStorage.getItem(STORAGE_KEY);
 		if (!raw) return DEFAULTS;
 		const parsed = JSON.parse(raw);
-		// Migrate old check-ins without photos_data
+		// Migrate old check-ins without photos_data / water_ml / nutrient_ml
 		if (parsed.checkins) {
 			parsed.checkins = parsed.checkins.map((c: any) => ({
 				photos_data: [],
+				water_ml: null,
+				nutrient_ml: null,
 				...c,
 			}));
 		}

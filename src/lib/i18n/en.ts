@@ -67,7 +67,7 @@ export const en: Record<string, string> = {
 	'checkin.day': 'Day',
 	'checkin.temp': 'Temp °C',
 	'checkin.rh': 'RH %',
-	'checkin.ec': 'EC mS/cm',
+	'checkin.ec': 'EC',
 	'checkin.ph': 'pH',
 	'checkin.watered': 'Watered',
 	'checkin.nutrients': 'Fed',
@@ -207,6 +207,13 @@ export const en: Record<string, string> = {
 	'calc.factor_label': 'Factor',
 	'calc.dosages': 'Dosages',
 	'calc.mix_order': 'Mix order',
+	'calc.water_profile': 'Water profile / Location',
+	'calc.custom_water': 'Custom',
+	'calc.custom_water_hint': 'Values from your water supplier or own measurement',
+	'calc.city_lookup': 'Enter city / ZIP code',
+	'calc.city_placeholder': 'e.g. Munich, 10115, London',
+	'calc.lookup_btn': 'Lookup',
+	'calc.lookup_found': 'Water values found and applied!',
 
 	// VPD Tool
 	'vpd.title': 'VPD Calculator',
@@ -353,4 +360,60 @@ export const en: Record<string, string> = {
 	'general.delete': 'Delete',
 	'general.auto': 'Autoflower',
 	'general.photo': 'Photoperiod',
+
+	// Streak
+	'streak.title': 'Streak',
+	'streak.days': '{count} days',
+	'streak.today_done': 'Done today ✓',
+	'streak.check_in_now': 'Check in now',
+	'streak.danger': 'Streak in danger!',
+	'streak.danger_desc': 'Check in today or your streak breaks',
+	'streak.multiplier': '{x}x XP multiplier',
+	'streak.milestone': '{days}-day streak reached! 🔥',
+	'streak.best': 'Best streak: {days} days',
+
+	// Daily Check-in (Dashboard Hero)
+	'dailycheckin.hero_title': 'Daily Check-in',
+	'dailycheckin.hero_sub': 'Photo + values — takes 30 seconds',
+	'dailycheckin.cta': 'Start check-in',
+	'dailycheckin.done_title': 'Great, check-in done!',
+	'dailycheckin.done_sub': '+{xp} XP · See you tomorrow',
+	'dailycheckin.no_grow': 'Start a grow first to check in',
+	'dailycheckin.select_grow': 'Choose grow',
+
+	// Settings
+	'settings.title': 'Settings',
+	'settings.account': 'Account',
+	'settings.logout': 'Sign out',
+	'settings.login_cta': 'Sign in for Cloud Sync',
+	'settings.login_desc': 'Sync grows + check-ins across devices',
+	'settings.reminders': 'Reminders',
+	'settings.reminder_title': 'Daily check-in reminder',
+	'settings.reminder_sub': 'Push notification at chosen time',
+	'settings.reminder_time': 'Time:',
+	'settings.streak_alert': '🔥 Streak warning',
+	'settings.streak_alert_sub': 'Extra reminder 10pm if streak is active',
+	'settings.notifications_blocked': '⚠️ Notifications blocked — please allow in browser settings',
+	'settings.language': 'Language',
+	'settings.app_language': 'App language',
+	'settings.subscription': 'Subscription',
+	'settings.data': 'Data',
+	'settings.export': '📦 Export',
+	'settings.import': '📥 Import',
+	'settings.data_sub': 'Back up your data as JSON file',
+	'settings.danger_zone': 'Danger Zone',
+	'settings.reset_xp': 'Reset XP + streak',
+	'settings.reset_all': '🗑️ Delete everything',
+	'settings.version': 'v1.0.0',
+
+	// Doctor context
+	'doctor.include_context': 'Include grow context',
+	'doctor.include_context_sub': 'Latest check-in + grow info for better diagnosis',
+	'doctor.context_preview': 'Context preview',
+	'doctor.no_context': 'No active grow or check-in available',
+	'doctor.select_grow': 'Grow for context',
+
+	// Update banner
+	'update.available': 'New version available',
+	'update.reload': 'Update',
 };

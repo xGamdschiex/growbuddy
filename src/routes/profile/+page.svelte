@@ -198,67 +198,15 @@
 	</div>
 
 	<!-- Einstellungen -->
-	<div class="space-y-3">
-		<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">{tr('profile.settings')}</h2>
-
-		<!-- Reminders -->
-		<div class="bg-gb-surface rounded-xl p-4">
-			<div class="flex items-center justify-between">
-				<div>
-					<p class="font-medium text-sm">{tr('profile.reminder')}</p>
-					<p class="text-xs text-gb-text-muted">{tr('profile.reminder_desc')}</p>
-				</div>
-				<button
-					onclick={() => reminder.enabled ? reminderStore.disable() : reminderStore.enable()}
-					class="w-12 h-7 rounded-full transition-colors relative
-						{reminder.enabled ? 'bg-gb-green' : 'bg-gb-border'}">
-					<div class="absolute top-0.5 w-6 h-6 rounded-full bg-white shadow transition-transform
-						{reminder.enabled ? 'translate-x-5' : 'translate-x-0.5'}"></div>
-				</button>
+	<a href="/settings" class="block bg-gb-surface rounded-xl p-4 hover:bg-gb-surface-2 transition-colors">
+		<div class="flex items-center justify-between">
+			<div>
+				<p class="font-medium text-sm">⚙️ {tr('profile.settings')}</p>
+				<p class="text-xs text-gb-text-muted">Reminder, Sprache, Pro, Backup</p>
 			</div>
-			{#if reminder.enabled}
-				<div class="mt-3 flex items-center gap-2">
-					<span class="text-xs text-gb-text-muted">{tr('profile.reminder_time')}</span>
-					<input type="time" value={reminder.time}
-						onchange={(e) => reminderStore.setTime((e.target as HTMLInputElement).value)}
-						class="bg-gb-bg border border-gb-border rounded-lg px-2 py-1 text-sm" />
-				</div>
-			{/if}
+			<span class="text-gb-text-muted text-sm">&rarr;</span>
 		</div>
-
-		<!-- Sprache -->
-		<div class="bg-gb-surface rounded-xl p-4">
-			<div class="flex items-center justify-between">
-				<div>
-					<p class="font-medium text-sm">{tr('profile.language')}</p>
-					<p class="text-xs text-gb-text-muted">{currentLocale === 'de' ? 'Deutsch' : 'English'}</p>
-				</div>
-				<div class="flex gap-1">
-					<button onclick={() => locale.set('de')}
-						class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors
-							{currentLocale === 'de' ? 'bg-gb-green text-black' : 'bg-gb-bg text-gb-text-muted'}">
-						DE
-					</button>
-					<button onclick={() => locale.set('en')}
-						class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors
-							{currentLocale === 'en' ? 'bg-gb-green text-black' : 'bg-gb-bg text-gb-text-muted'}">
-						EN
-					</button>
-				</div>
-			</div>
-		</div>
-
-		<!-- Pro Status -->
-		<a href="/pro" class="block bg-gb-surface rounded-xl p-4 hover:bg-gb-surface-2 transition-colors">
-			<div class="flex items-center justify-between">
-				<div>
-					<p class="font-medium text-sm">{userIsPro ? '👑 ' + tr('profile.pro_active') : 'GrowBuddy Pro'}</p>
-					<p class="text-xs text-gb-text-muted">{userIsPro ? tr('profile.pro_manage') : tr('profile.pro_unlock')}</p>
-				</div>
-				<span class="text-gb-text-muted text-sm">&rarr;</span>
-			</div>
-		</a>
-	</div>
+	</a>
 
 	<!-- Daten-Backup -->
 	<div class="space-y-3">

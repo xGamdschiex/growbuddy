@@ -101,16 +101,54 @@
 			</div>
 
 			<div>
-				<p class="font-semibold">4. Cloud-Sync (optional, zukünftig)</p>
+				<p class="font-semibold">4. Cloud-Sync (optional, nach Login)</p>
 				<p class="text-gb-text-muted mt-1">
-					Wenn Cloud-Sync aktiviert wird, werden deine Daten verschlüsselt auf Servern
-					in der EU (Supabase, Frankfurt) gespeichert. Du kannst Cloud-Sync jederzeit
-					deaktivieren und deine Cloud-Daten löschen.
+					Wenn du dich einloggst und Cloud-Sync nutzt, werden deine Grows + Check-ins
+					verschlüsselt auf Servern in der EU (Supabase, Frankfurt) gespeichert.
+					Fotos werden in einem privaten Storage-Bucket abgelegt, nur du kannst sie lesen
+					(Row-Level-Security, Signed URLs mit 7-Tage-Gültigkeit).
+					Du kannst Cloud-Sync jederzeit deaktivieren und deine Cloud-Daten löschen.
 				</p>
 			</div>
 
 			<div>
-				<p class="font-semibold">5. Analytics</p>
+				<p class="font-semibold">5. AI Plant Doctor (optional, Pro-Feature)</p>
+				<p class="text-gb-text-muted mt-1">
+					Wenn du den AI Plant Doctor nutzt, wird das Foto + optional Grow-Kontext
+					(Phase, Klima, letzter Check-in) an Google Gemini 2.0 API gesendet, um
+					die Diagnose zu erstellen. Google verarbeitet die Daten gemäß Google AI
+					Datenschutzbestimmungen. Nutze das Feature nur, wenn du damit einverstanden bist.
+				</p>
+			</div>
+
+			<div>
+				<p class="font-semibold">6. Push-Benachrichtigungen</p>
+				<p class="text-gb-text-muted mt-1">
+					Optional kannst du tägliche Check-in-Reminder aktivieren. Die Zeitplanung
+					erfolgt lokal auf deinem Gerät (Service Worker / Capacitor Local Notifications).
+					Es werden keine Daten an Server gesendet.
+				</p>
+			</div>
+
+			<div>
+				<p class="font-semibold">7. Authentifizierung</p>
+				<p class="text-gb-text-muted mt-1">
+					Login erfolgt via Magic-Link (E-Mail) oder Google OAuth über Supabase Auth.
+					Deine E-Mail-Adresse wird ausschließlich für Authentifizierung genutzt,
+					nicht für Marketing oder Tracking.
+				</p>
+			</div>
+
+			<div>
+				<p class="font-semibold">8. Zahlungen (Pro-Abo)</p>
+				<p class="text-gb-text-muted mt-1">
+					Pro-Abonnements werden über Stripe abgewickelt. Wir speichern keine
+					Zahlungsdaten. Details unter stripe.com/privacy.
+				</p>
+			</div>
+
+			<div>
+				<p class="font-semibold">9. Analytics</p>
 				<p class="text-gb-text-muted mt-1">
 					Wir verwenden keine Tracking-Tools, Cookies oder Analytics-Dienste.
 					Es werden keine Nutzungsdaten an Dritte weitergegeben.
@@ -118,16 +156,17 @@
 			</div>
 
 			<div>
-				<p class="font-semibold">6. Deine Rechte (DSGVO)</p>
+				<p class="font-semibold">10. Deine Rechte (DSGVO)</p>
 				<p class="text-gb-text-muted mt-1">
 					Du hast das Recht auf Auskunft, Berichtigung, Löschung und Datenübertragbarkeit.
-					Da alle Daten lokal auf deinem Gerät liegen, hast du volle Kontrolle.
-					Lösche einfach die App oder den Browser-Cache um alle Daten zu entfernen.
+					Lokal: App oder Browser-Cache löschen entfernt alle Daten.
+					Cloud-Sync: Nutze "Export" in Einstellungen zum Download, oder kontaktiere uns
+					für Komplett-Löschung.
 				</p>
 			</div>
 
 			<div>
-				<p class="font-semibold">7. Kontakt</p>
+				<p class="font-semibold">11. Kontakt</p>
 				<p class="text-gb-text-muted mt-1">
 					Bei Fragen zum Datenschutz: kontakt@growbuddy.app
 				</p>

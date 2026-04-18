@@ -43,8 +43,8 @@
 <div class="px-4 pt-6 pb-12 max-w-lg mx-auto space-y-5">
 	<!-- Header -->
 	<div>
-		<a href="/tools" class="text-gb-text-muted text-sm hover:text-gb-text">&larr; {tr('nav.back')}</a>
-		<h1 class="text-xl font-bold mt-2">{tr('ipm.title')}</h1>
+		<a href="/tools" class="text-gb-text-muted text-sm hover:text-gb-text">&larr; Tools</a>
+		<h1 class="text-xl font-bold mt-2">IPM Guide</h1>
 		<p class="text-gb-text-muted text-sm">Integrierte Schädlingsbekämpfung — wissenschaftlich fundiert, evidenzbasiert</p>
 	</div>
 

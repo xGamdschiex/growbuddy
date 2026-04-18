@@ -2,6 +2,8 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { growStore } from '$lib/stores/grow';
+	import { authStore } from '$lib/stores/auth';
+	import { syncStore } from '$lib/stores/sync';
 	import { xpStore } from '$lib/stores/xp';
 	import { streakMultiplier } from '$lib/stores/streak';
 	import { isPro } from '$lib/stores/pro';
@@ -13,6 +15,7 @@
 	import type { ScoreBreakdown } from '$lib/data/score';
 	import MiniChart from '$lib/components/MiniChart.svelte';
 	import { clampNumber, RANGES } from '$lib/utils/validation';
+	import { toMsPerCm, fromMsPerCm, type ECEinheit } from '$lib/calc/units';
 
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
 	let growId = $derived($page.params.id);
@@ -34,9 +37,19 @@
 	let ciTemp = $state<number | null>(null);
 	let ciRh = $state<number | null>(null);
 	let ciEc = $state<number | null>(null);
+	let ciEcUnit = $state<ECEinheit>(
+		(typeof localStorage !== 'undefined' ? (localStorage.getItem('growbuddy_ec_unit') as ECEinheit | null) : null) ?? 'mS/cm'
+	);
+	$effect(() => {
+		if (typeof localStorage !== 'undefined') localStorage.setItem('growbuddy_ec_unit', ciEcUnit);
+	});
+	let ciEcStep = $derived(ciEcUnit === 'mS/cm' ? '0.1' : '10');
+	let ciEcPlaceholder = $derived(ciEcUnit === 'mS/cm' ? '1.5' : ciEcUnit === 'ppm500' ? '750' : '1050');
 	let ciPh = $state<number | null>(null);
 	let ciWatered = $state(false);
 	let ciNutrients = $state(false);
+	let ciWaterMl = $state<number | null>(null);
+	let ciNutrientMl = $state<number | null>(null);
 	let ciTraining = $state<string | null>(null);
 	let ciNotes = $state('');
 	let ciPhotos = $state<string[]>([]);
@@ -57,6 +70,32 @@
 	let rhData = $derived(chronCheckins.filter((c: CheckIn) => c.rh !== null).map((c: CheckIn) => c.rh as number));
 	let ecData = $derived(chronCheckins.filter((c: CheckIn) => c.ec_measured !== null).map((c: CheckIn) => c.ec_measured as number));
 	let phData = $derived(chronCheckins.filter((c: CheckIn) => c.ph_measured !== null).map((c: CheckIn) => c.ph_measured as number));
+
+	// Aggregat-Statistiken
+	function avg(nums: number[]): number | null {
+		if (!nums.length) return null;
+		return nums.reduce((a, b) => a + b, 0) / nums.length;
+	}
+	function sum(nums: number[]): number {
+		return nums.reduce((a, b) => a + b, 0);
+	}
+	let totalWaterMl = $derived(sum(chronCheckins.filter((c: CheckIn) => c.water_ml != null).map((c: CheckIn) => c.water_ml as number)));
+	let totalNutrientMl = $derived(sum(chronCheckins.filter((c: CheckIn) => c.nutrient_ml != null).map((c: CheckIn) => c.nutrient_ml as number)));
+	let avgTemp = $derived(avg(tempData));
+	let avgRh = $derived(avg(rhData));
+	let avgVpd = $derived(avg(vpdData));
+	let avgEc = $derived(avg(ecData));
+	let avgPh = $derived(avg(phData));
+	let phaseDays = $derived.by(() => {
+		const map = new Map<string, Set<string>>();
+		for (const c of chronCheckins) {
+			const day = c.created_at.slice(0, 10);
+			if (!map.has(c.phase)) map.set(c.phase, new Set());
+			map.get(c.phase)!.add(day);
+		}
+		return Array.from(map.entries()).map(([phase, days]) => ({ phase, days: days.size }));
+	});
+	let hasAggregates = $derived(totalWaterMl > 0 || totalNutrientMl > 0 || avgTemp !== null || phaseDays.length > 0);
 
 	// Harvest Flow
 	let showHarvest = $state(false);
@@ -127,10 +166,12 @@
 		ciDay = ci.day;
 		ciTemp = ci.temp;
 		ciRh = ci.rh;
-		ciEc = ci.ec_measured;
+		ciEc = ci.ec_measured !== null ? +fromMsPerCm(ci.ec_measured, ciEcUnit).toFixed(ciEcUnit === 'mS/cm' ? 2 : 0) : null;
 		ciPh = ci.ph_measured;
 		ciWatered = ci.watered;
 		ciNutrients = ci.nutrients_given;
+		ciWaterMl = ci.water_ml ?? null;
+		ciNutrientMl = ci.nutrient_ml ?? null;
 		ciTraining = ci.training;
 		ciNotes = ci.notes;
 		ciPhotos = ci.photos_data?.length ? [...ci.photos_data] : (ci.photo_data ? [ci.photo_data] : []);
@@ -144,6 +185,8 @@
 		ciNotes = '';
 		ciWatered = false;
 		ciNutrients = false;
+		ciWaterMl = null;
+		ciNutrientMl = null;
 		ciTraining = null;
 		ciTemp = null; ciRh = null; ciEc = null; ciPh = null;
 	}
@@ -154,7 +197,8 @@
 		if (!grow) return;
 		const validTemp = ciTemp !== null ? clampNumber(ciTemp, RANGES.temp.min, RANGES.temp.max) : null;
 		const validRh = ciRh !== null ? clampNumber(ciRh, RANGES.rh.min, RANGES.rh.max) : null;
-		const validEc = ciEc !== null ? clampNumber(ciEc, RANGES.ec.min, RANGES.ec.max) : null;
+		const ecMs = ciEc !== null ? toMsPerCm(ciEc, ciEcUnit) : null;
+		const validEc = ecMs !== null ? clampNumber(ecMs, RANGES.ec.min, RANGES.ec.max) : null;
 		const validPh = ciPh !== null ? clampNumber(ciPh, RANGES.ph.min, RANGES.ph.max) : null;
 		const validWeek = clampNumber(ciWeek, RANGES.week.min, RANGES.week.max);
 		const validDay = clampNumber(ciDay, RANGES.day.min, RANGES.day.max);
@@ -173,6 +217,8 @@
 			ph_measured: validPh,
 			watered: ciWatered,
 			nutrients_given: ciNutrients,
+			water_ml: ciWaterMl,
+			nutrient_ml: ciNutrientMl,
 			training: ciTraining,
 			notes: ciNotes.trim(),
 		};
@@ -186,6 +232,16 @@
 		}
 
 		hapticSuccess();
+
+		// Auto-Sync wenn eingeloggt
+		let authState: any;
+		authStore.subscribe(a => authState = a)();
+		if (authState?.user) {
+			let growState: any;
+			growStore.subscribe(s => growState = s)();
+			syncStore.push(authState.user.id, growState).catch(() => {});
+		}
+
 		cancelCheckin();
 	}
 
@@ -310,14 +366,28 @@
 								class="w-full bg-gb-bg border border-gb-border rounded-lg px-2 py-2 text-sm placeholder:text-gb-border" />
 						</div>
 						<div>
-							<label class="block text-xs text-gb-text-muted mb-1">{tr('checkin.ec')}</label>
-							<input type="number" bind:value={ciEc} step="0.1" placeholder="1.5"
+							<label class="block text-xs text-gb-text-muted mb-1">{tr('checkin.ec')} ({ciEcUnit})</label>
+							<input type="number" bind:value={ciEc} step={ciEcStep} placeholder={ciEcPlaceholder}
 								class="w-full bg-gb-bg border border-gb-border rounded-lg px-2 py-2 text-sm placeholder:text-gb-border" />
 						</div>
 						<div>
 							<label class="block text-xs text-gb-text-muted mb-1">{tr('checkin.ph')}</label>
 							<input type="number" bind:value={ciPh} step="0.1" placeholder="6.0"
 								class="w-full bg-gb-bg border border-gb-border rounded-lg px-2 py-2 text-sm placeholder:text-gb-border" />
+						</div>
+					</div>
+
+					<!-- EC-Einheit Selector -->
+					<div>
+						<span class="block text-xs text-gb-text-muted mb-1">EC-Einheit</span>
+						<div class="grid grid-cols-3 gap-2">
+							{#each [{v:'mS/cm',l:'mS/cm'},{v:'ppm500',l:'ppm (500)'},{v:'ppm700',l:'ppm (700)'}] as opt}
+								<button type="button" onclick={() => {
+									if (ciEc !== null) ciEc = +fromMsPerCm(toMsPerCm(ciEc, ciEcUnit), opt.v as ECEinheit).toFixed(opt.v === 'mS/cm' ? 2 : 0);
+									ciEcUnit = opt.v as ECEinheit;
+								}}
+									class="px-2 py-1.5 rounded-lg text-xs font-medium border {ciEcUnit === opt.v ? 'bg-gb-green/20 border-gb-green text-gb-green' : 'bg-gb-bg border-gb-border text-gb-text-muted'}">{opt.l}</button>
+							{/each}
 						</div>
 					</div>
 
@@ -339,6 +409,26 @@
 							<span class="text-sm">{tr('checkin.nutrients')}</span>
 						</label>
 					</div>
+
+					<!-- Mengen -->
+					{#if ciWatered || ciNutrients}
+						<div class="grid grid-cols-2 gap-2">
+							{#if ciWatered}
+								<div>
+									<label class="block text-xs text-gb-text-muted mb-1">Wasser (mL)</label>
+									<input type="number" bind:value={ciWaterMl} min="0" step="100" placeholder="1000"
+										class="w-full bg-gb-bg border border-gb-border rounded-lg px-2 py-2 text-sm placeholder:text-gb-border" />
+								</div>
+							{/if}
+							{#if ciNutrients}
+								<div>
+									<label class="block text-xs text-gb-text-muted mb-1">Dünger (mL)</label>
+									<input type="number" bind:value={ciNutrientMl} min="0" step="1" placeholder="10"
+										class="w-full bg-gb-bg border border-gb-border rounded-lg px-2 py-2 text-sm placeholder:text-gb-border" />
+								</div>
+							{/if}
+						</div>
+					{/if}
 
 					<!-- Training -->
 					<div>
@@ -459,6 +549,69 @@
 						</div>
 					{/if}
 				</div>
+			</div>
+		{/if}
+
+		<!-- Aggregat-Statistiken -->
+		{#if hasAggregates}
+			<div class="space-y-2">
+				<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">Statistik gesamt</h2>
+				<div class="grid grid-cols-2 gap-2">
+					{#if totalWaterMl > 0}
+						<div class="bg-gb-surface rounded-xl p-3">
+							<p class="text-xs text-gb-text-muted">💧 Wasser total</p>
+							<p class="text-xl font-bold text-gb-info">{(totalWaterMl / 1000).toFixed(1)} L</p>
+						</div>
+					{/if}
+					{#if totalNutrientMl > 0}
+						<div class="bg-gb-surface rounded-xl p-3">
+							<p class="text-xs text-gb-text-muted">🧪 Dünger total</p>
+							<p class="text-xl font-bold text-gb-accent">{totalNutrientMl} mL</p>
+						</div>
+					{/if}
+					{#if avgTemp !== null}
+						<div class="bg-gb-surface rounded-xl p-3">
+							<p class="text-xs text-gb-text-muted">Ø Temp</p>
+							<p class="text-xl font-bold">{avgTemp.toFixed(1)}°C</p>
+						</div>
+					{/if}
+					{#if avgRh !== null}
+						<div class="bg-gb-surface rounded-xl p-3">
+							<p class="text-xs text-gb-text-muted">Ø RH</p>
+							<p class="text-xl font-bold">{avgRh.toFixed(0)}%</p>
+						</div>
+					{/if}
+					{#if avgVpd !== null}
+						<div class="bg-gb-surface rounded-xl p-3">
+							<p class="text-xs text-gb-text-muted">Ø VPD</p>
+							<p class="text-xl font-bold text-gb-green">{avgVpd.toFixed(2)} kPa</p>
+						</div>
+					{/if}
+					{#if avgEc !== null}
+						<div class="bg-gb-surface rounded-xl p-3">
+							<p class="text-xs text-gb-text-muted">Ø EC</p>
+							<p class="text-xl font-bold">{avgEc.toFixed(2)}</p>
+						</div>
+					{/if}
+					{#if avgPh !== null}
+						<div class="bg-gb-surface rounded-xl p-3">
+							<p class="text-xs text-gb-text-muted">Ø pH</p>
+							<p class="text-xl font-bold">{avgPh.toFixed(1)}</p>
+						</div>
+					{/if}
+				</div>
+				{#if phaseDays.length > 0}
+					<div class="bg-gb-surface rounded-xl p-3">
+						<p class="text-xs text-gb-text-muted mb-1">Tage pro Phase</p>
+						<div class="flex flex-wrap gap-2">
+							{#each phaseDays as pd}
+								<span class="bg-gb-bg px-2 py-1 rounded text-xs">
+									<span class="text-gb-text-muted">{pd.phase}:</span> <span class="font-semibold">{pd.days}d</span>
+								</span>
+							{/each}
+						</div>
+					</div>
+				{/if}
 			</div>
 		{/if}
 

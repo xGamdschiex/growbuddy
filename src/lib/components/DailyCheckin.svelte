@@ -4,12 +4,15 @@
 	 * Wird vom Dashboard (Quick-Checkin) und grow/[id] (Full-Checkin) genutzt.
 	 */
 	import { growStore, activeGrows } from '$lib/stores/grow';
+	import { authStore } from '$lib/stores/auth';
+	import { syncStore } from '$lib/stores/sync';
 	import { streakStore, currentStreak, streakMultiplier, hasCheckinToday, STREAK_MILESTONES } from '$lib/stores/streak';
 	import { xpStore } from '$lib/stores/xp';
 	import { toastStore } from '$lib/stores/toast';
 	import { hapticSuccess } from '$lib/utils/haptic';
 	import { calcVPD, getVPDStatus } from '$lib/data/science';
 	import { clampNumber } from '$lib/utils/validation';
+	import { toMsPerCm, type ECEinheit } from '$lib/calc/units';
 	import type { Grow } from '$lib/stores/grow';
 
 	interface Props {
@@ -45,9 +48,19 @@
 	let temp = $state<number | null>(null);
 	let rh = $state<number | null>(null);
 	let ec = $state<number | null>(null);
+	let ecUnit = $state<ECEinheit>(
+		(typeof localStorage !== 'undefined' ? (localStorage.getItem('growbuddy_ec_unit') as ECEinheit | null) : null) ?? 'mS/cm'
+	);
+	$effect(() => {
+		if (typeof localStorage !== 'undefined') localStorage.setItem('growbuddy_ec_unit', ecUnit);
+	});
+	let ecStep = $derived(ecUnit === 'mS/cm' ? '0.1' : '10');
+	let ecPlaceholder = $derived(ecUnit === 'mS/cm' ? '1.5' : ecUnit === 'ppm500' ? '750' : '1050');
 	let ph = $state<number | null>(null);
 	let watered = $state(false);
 	let nutrients = $state(false);
+	let waterMl = $state<number | null>(null);
+	let nutrientMl = $state<number | null>(null);
 	let training = $state<string | null>(null);
 	let notes = $state('');
 	let photos = $state<string[]>([]);
@@ -98,7 +111,8 @@
 		// Input-Validation
 		const validTemp = temp !== null ? clampNumber(temp, 0, 50) : null;
 		const validRh = rh !== null ? clampNumber(rh, 0, 100) : null;
-		const validEc = ec !== null ? clampNumber(ec, 0, 5) : null;
+		const ecMs = ec !== null ? toMsPerCm(ec, ecUnit) : null;
+		const validEc = ecMs !== null ? clampNumber(ecMs, 0, 5) : null;
 		const validPh = ph !== null ? clampNumber(ph, 0, 14) : null;
 		const validVpd = validTemp !== null && validRh !== null ? calcVPD(validTemp, validRh) : null;
 
@@ -116,6 +130,8 @@
 			ph_measured: validPh,
 			watered,
 			nutrients_given: nutrients,
+			water_ml: waterMl,
+			nutrient_ml: nutrientMl,
 			training,
 			notes: notes.trim(),
 		});
@@ -142,6 +158,16 @@
 
 		hapticSuccess();
 		toastStore.success('Check-in gespeichert');
+
+		// Auto-Sync wenn eingeloggt
+		let authState: any;
+		authStore.subscribe(a => authState = a)();
+		if (authState?.user) {
+			let growState: any;
+			growStore.subscribe(s => growState = s)();
+			syncStore.push(authState.user.id, growState).catch(() => {});
+		}
+
 		submitting = false;
 		onDone?.();
 	}
@@ -243,8 +269,8 @@
 				</div>
 				{#if !compact}
 					<div>
-						<label for="ci-ec" class="block text-xs text-gb-text-muted mb-1">EC</label>
-						<input id="ci-ec" type="number" bind:value={ec} step="0.1" min="0" max="5" placeholder="1.5"
+						<label for="ci-ec" class="block text-xs text-gb-text-muted mb-1">EC ({ecUnit})</label>
+						<input id="ci-ec" type="number" bind:value={ec} step={ecStep} min="0" placeholder={ecPlaceholder}
 							class="w-full bg-gb-bg border border-gb-border rounded-lg px-2 py-2 text-sm placeholder:text-gb-border" />
 					</div>
 					<div>
@@ -254,6 +280,19 @@
 					</div>
 				{/if}
 			</div>
+
+			{#if !compact}
+				<!-- EC-Einheit Selector -->
+				<div>
+					<span class="block text-xs text-gb-text-muted mb-1">EC-Einheit</span>
+					<div class="grid grid-cols-3 gap-2">
+						{#each [{v:'mS/cm',l:'mS/cm'},{v:'ppm500',l:'ppm (500)'},{v:'ppm700',l:'ppm (700)'}] as opt}
+							<button type="button" onclick={() => ecUnit = opt.v as ECEinheit}
+								class="px-2 py-1.5 rounded-lg text-xs font-medium border {ecUnit === opt.v ? 'bg-gb-green/20 border-gb-green text-gb-green' : 'bg-gb-bg border-gb-border text-gb-text-muted'}">{opt.l}</button>
+						{/each}
+					</div>
+				</div>
+			{/if}
 
 			{#if vpd !== null}
 				<div class="bg-gb-bg rounded-lg p-2 text-center text-sm">
@@ -273,6 +312,26 @@
 						<span class="text-sm">Gedüngt</span>
 					</label>
 				</div>
+
+				<!-- Mengen -->
+				{#if watered || nutrients}
+					<div class="grid grid-cols-2 gap-2">
+						{#if watered}
+							<div>
+								<label class="block text-xs text-gb-text-muted mb-1">Wasser (mL)</label>
+								<input type="number" bind:value={waterMl} min="0" step="100" placeholder="1000"
+									class="w-full bg-gb-bg border border-gb-border rounded-lg px-2 py-2 text-sm placeholder:text-gb-border" />
+							</div>
+						{/if}
+						{#if nutrients}
+							<div>
+								<label class="block text-xs text-gb-text-muted mb-1">Dünger (mL)</label>
+								<input type="number" bind:value={nutrientMl} min="0" step="1" placeholder="10"
+									class="w-full bg-gb-bg border border-gb-border rounded-lg px-2 py-2 text-sm placeholder:text-gb-border" />
+							</div>
+						{/if}
+					</div>
+				{/if}
 
 				<!-- Training -->
 				<div>

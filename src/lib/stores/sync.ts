@@ -6,6 +6,7 @@
 
 import { writable, derived } from 'svelte/store';
 import { supabase } from '$lib/supabase';
+import { uploadCheckinPhoto, uploadCheckinPhotos } from '$lib/utils/storage';
 import type { GrowState, Grow, CheckIn } from '$lib/stores/grow';
 
 export type SyncStatus = 'idle' | 'syncing' | 'success' | 'error';
@@ -70,26 +71,47 @@ function createSyncStore() {
 					if (error) throw error;
 				}
 
-				// Check-ins upserten (ohne photo_data — zu groß für DB)
+				// Check-ins upserten — Fotos via Storage hochladen, Metadata in DB
 				if (state.checkins.length > 0) {
-					const checkinRows = state.checkins.map(c => ({
-						id: c.id,
-						user_id: userId,
-						grow_id: c.grow_id,
-						phase: c.phase,
-						week: c.week,
-						day: c.day,
-						temp: c.temp,
-						rh: c.rh,
-						vpd: c.vpd,
-						ec_measured: c.ec_measured,
-						ph_measured: c.ph_measured,
-						watered: c.watered,
-						nutrients_given: c.nutrients_given,
-						training: c.training,
-						notes: c.notes,
-						created_at: c.created_at,
-						has_photo: !!c.photo_data,
+					const checkinRows = await Promise.all(state.checkins.map(async c => {
+						// Mehrere Fotos uploaden (bevorzugt), sonst Legacy-Einzel
+						const rawPhotos = (c.photos_data ?? []).filter(p => p?.startsWith('data:'));
+						let photoUrls: string[] = [];
+						let photoUrl: string | null = c.photo_url ?? null;
+						if (rawPhotos.length > 0) {
+							photoUrls = await uploadCheckinPhotos(userId, c.id, rawPhotos);
+							if (photoUrls.length > 0) photoUrl = photoUrls[0];
+						} else if (c.photo_data && c.photo_data.startsWith('data:')) {
+							const url = await uploadCheckinPhoto(userId, c.id, c.photo_data);
+							if (url) {
+								photoUrl = url;
+								photoUrls = [url];
+							}
+						}
+						const hasPhoto = photoUrls.length > 0 || !!photoUrl;
+						return {
+							id: c.id,
+							user_id: userId,
+							grow_id: c.grow_id,
+							phase: c.phase,
+							week: c.week,
+							day: c.day,
+							temp: c.temp,
+							rh: c.rh,
+							vpd: c.vpd,
+							ec_measured: c.ec_measured,
+							ph_measured: c.ph_measured,
+							watered: c.watered,
+							nutrients_given: c.nutrients_given,
+							water_ml: c.water_ml ?? null,
+							nutrient_ml: c.nutrient_ml ?? null,
+							training: c.training,
+							notes: c.notes,
+							created_at: c.created_at,
+							has_photo: hasPhoto,
+							photo_url: photoUrl,
+							photo_urls: photoUrls,
+						};
 					}));
 					const { error } = await supabase.from('checkins').upsert(checkinRows, { onConflict: 'id' });
 					if (error) throw error;
@@ -147,7 +169,9 @@ function createSyncStore() {
 						phase: c.phase,
 						week: c.week,
 						day: c.day,
-						photo_data: null, // Fotos bleiben lokal
+						photo_data: null, // Base64 bleibt lokal, Cloud nutzt photo_url
+						photos_data: [],
+						photo_url: c.photo_url ?? null,
 						temp: c.temp,
 						rh: c.rh,
 						vpd: c.vpd,
@@ -155,6 +179,8 @@ function createSyncStore() {
 						ph_measured: c.ph_measured,
 						watered: c.watered,
 						nutrients_given: c.nutrients_given,
+						water_ml: c.water_ml ?? null,
+						nutrient_ml: c.nutrient_ml ?? null,
 						training: c.training,
 						notes: c.notes ?? '',
 						created_at: c.created_at,

@@ -43,8 +43,12 @@ create table if not exists checkins (
   training text,
   notes text not null default '',
   has_photo boolean not null default false,
+  photo_url text,
   created_at timestamptz not null default now()
 );
+
+-- Migration für existierende DB (idempotent):
+alter table checkins add column if not exists photo_url text;
 
 -- ─── RLS (Row Level Security) ──────────────────────────────────────────
 
@@ -82,3 +86,28 @@ create policy "Users delete own checkins" on checkins
 create index if not exists idx_grows_user on grows(user_id);
 create index if not exists idx_checkins_user on checkins(user_id);
 create index if not exists idx_checkins_grow on checkins(grow_id);
+create index if not exists idx_checkins_created on checkins(grow_id, created_at desc);
+
+-- ─── STORAGE: Check-in Photos Bucket ───────────────────────────────────
+-- Im Supabase Dashboard unter Storage manuell erstellen oder via SQL:
+
+insert into storage.buckets (id, name, public)
+values ('checkin-photos', 'checkin-photos', false)
+on conflict (id) do nothing;
+
+-- RLS für Storage: User darf nur eigene Fotos lesen/schreiben (Pfad: {userId}/{checkinId}.jpg)
+create policy "Users upload own photos"
+  on storage.objects for insert to authenticated
+  with check (bucket_id = 'checkin-photos' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "Users read own photos"
+  on storage.objects for select to authenticated
+  using (bucket_id = 'checkin-photos' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "Users update own photos"
+  on storage.objects for update to authenticated
+  using (bucket_id = 'checkin-photos' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "Users delete own photos"
+  on storage.objects for delete to authenticated
+  using (bucket_id = 'checkin-photos' and (storage.foldername(name))[1] = auth.uid()::text);

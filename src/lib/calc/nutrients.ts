@@ -1,8 +1,7 @@
 /**
- * AutoPot Athena v3 - Nutrient Calculation Engine (GENERISCH)
+ * GrowBuddy — Nutrient Calculation Engine
  *
- * Unterstützt beliebige Düngerlinien via FeedLine-Interface.
- * Backwards-kompatibel: Legacy CalcInput/CalcResult für Athena weiterhin verfügbar.
+ * Generisch für alle Düngerlinien (Athena, CANNA, BioBizz, AN, GH, Atami).
  *
  * Berechnung:
  * - Schema-Lookup by phase + woche (mit Stretch für längere Strains)
@@ -10,6 +9,7 @@
  * - Produkt-Dosierungen: schema_value * faktor/100 * reservoir_scale
  * - Cleanse ramp (Athena): linear T1→T7
  * - CalMag (optional): Ca-First Logik
+ * - Medium-abhängige pH-Korrektur
  */
 
 import type { FeedLine, FeedSchemaRow, GenericCalcInput, DosierungResult, FeedProduct } from './feedlines/types';
@@ -21,8 +21,6 @@ import type { ECEinheit } from './units';
 import { unitFactor } from './units';
 import { calcAutoFaktor, calcFaktor, type FaktorModus } from './factor';
 import { calcCalMag, calcHahnPct, type CalMagResult, type CalMagInput } from './calmag';
-
-// ─── LEGACY INPUT (backwards-compat) ────────────────────────────────────
 
 import type { CalMagTyp } from './schema';
 
@@ -39,12 +37,12 @@ export interface CalcInput {
   ec_einheit: ECEinheit;
   ist_ec?: number;
   ist_ph?: number;
-  /** NEU: FeedLine ID. Default 'athena-pro' für backwards-compat */
   feedline_id?: string;
-  /** NEU: Anbaumedium (für Lines die medium-abhängig dosieren) */
   medium?: 'hydro' | 'coco' | 'erde';
-  /** Hat der User RO-Wasser? false = nur Leitungswasser */
+  /** Hat der User RO-Wasser? Default: false (die meisten Grower haben kein RO) */
   hat_ro?: boolean;
+  /** Custom Wasserprofil (wenn 'Benutzerdefiniert' gewählt) */
+  custom_wasser?: { ca: number; mg: number; ec: number; ph: number };
 }
 
 // ─── GENERIC RESULT ──────────────────────────────────────────────────────
@@ -122,7 +120,7 @@ export function calculate(input: CalcInput): CalcResult {
     throw new Error(`Schema not found: ${feedline_id} ${input.phase}|W${input.woche}`);
   }
 
-  const profil = getWasserProfil(input.wasserprofil);
+  const profil = getWasserProfil(input.wasserprofil, input.custom_wasser);
   if (!profil) {
     throw new Error(`Wasserprofil not found: ${input.wasserprofil}`);
   }
@@ -160,7 +158,7 @@ export function calculate(input: CalcInput): CalcResult {
 
   // ── Water mix (Hahn-Anteil) ──
   let hahn_pct: number;
-  const hat_ro = input.hat_ro !== false; // Default true für backwards-compat
+  const hat_ro = input.hat_ro === true; // Default false — die meisten Grower haben kein RO
   if (!hat_ro) {
     // Kein RO-Wasser → 100% Leitungswasser
     hahn_pct = 100;
@@ -272,9 +270,17 @@ export function calculate(input: CalcInput): CalcResult {
   const core_g = getDosierungMenge(dosierungen, 'core');
   const fade_mL = getDosierungMenge(dosierungen, 'fade');
 
-  // ── pH ──
-  const ph_min = schema.ph_min;
-  const ph_max = schema.ph_max;
+  // ── pH (medium-abhängig) ──
+  let ph_min = schema.ph_min;
+  let ph_max = schema.ph_max;
+  const medium = input.medium ?? 'coco';
+  if (medium === 'erde' && ph_min < 6.0) {
+    ph_min = 6.0;
+    ph_max = Math.max(ph_max, 6.5);
+  } else if (medium === 'hydro' && ph_max > 6.2) {
+    ph_min = Math.min(ph_min, 5.5);
+    ph_max = 6.0;
+  }
   const ph_ziel = `${ph_min} - ${ph_max}`;
 
   // ── Validation ──
@@ -289,7 +295,7 @@ export function calculate(input: CalcInput): CalcResult {
     ph_check = (input.ist_ph >= ph_min && input.ist_ph <= ph_max) ? 'OK' : 'Ausserhalb';
   }
 
-  const ec_budget_ok = profil.ec <= ec_ziel_raw;
+  const ec_budget_ok = profil.ec <= ec_ziel_raw * (dosierfaktor / 100 + 0.3);
 
   // ── Mix Steps ──
   const mix_steps = buildMixSteps({

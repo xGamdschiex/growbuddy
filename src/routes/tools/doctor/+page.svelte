@@ -34,6 +34,16 @@
 			.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 		return growCheckins[0];
 	});
+
+	// Letztes Check-in Foto automatisch vorladen wenn Kontext aktiv
+	$effect(() => {
+		if (includeContext && latestCheckin && !diagnosis) {
+			const checkinPhoto = latestCheckin.photos_data?.length
+				? latestCheckin.photos_data[0]
+				: latestCheckin.photo_data ?? null;
+			if (checkinPhoto && photo !== checkinPhoto) photo = checkinPhoto;
+		}
+	});
 	let daysSinceStart = $derived(selectedGrow
 		? Math.floor((Date.now() - new Date(selectedGrow.started_at).getTime()) / 86400000)
 		: undefined);
@@ -185,6 +195,16 @@
 			</div>
 		{/if}
 
+		<!-- Textfeld — immer sichtbar -->
+		{#if !diagnosis}
+			<div>
+				<label class="block text-xs text-gb-text-muted mb-1">Frage oder Beschreibung (optional)</label>
+				<textarea bind:value={userNote} rows="2"
+					placeholder="z.B. &quot;Blätter rollen sich ein&quot; oder &quot;Was fehlt der Pflanze?&quot;"
+					class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2 text-sm placeholder:text-gb-border resize-none"></textarea>
+			</div>
+		{/if}
+
 		<!-- Photo Upload -->
 		{#if !photo}
 			<label class="block bg-gb-surface border-2 border-dashed border-gb-border rounded-xl p-8 text-center cursor-pointer hover:border-gb-green transition-colors">
@@ -205,16 +225,6 @@
 					✕
 				</button>
 			</div>
-
-			<!-- Textfeld für Fragen / Beschreibung -->
-			{#if !diagnosis && !loading}
-				<div>
-					<label class="block text-xs text-gb-text-muted mb-1">Frage oder Beschreibung (optional)</label>
-					<textarea bind:value={userNote} rows="2"
-						placeholder="z.B. &quot;Blätter rollen sich ein&quot; oder &quot;Was fehlt der Pflanze?&quot;"
-						class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2 text-sm placeholder:text-gb-border resize-none"></textarea>
-				</div>
-			{/if}
 
 			<!-- Analyze Button -->
 			{#if !diagnosis && !loading}

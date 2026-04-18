@@ -7,7 +7,10 @@
 import type { CheckIn, Grow } from '$lib/stores/grow';
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`;
+// Fallback-Kaskade: 2.5-flash (höhere Free-Quota) → 2.0-flash als Notfall
+const MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash'];
+const buildUrl = (model: string) =>
+	`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${API_KEY}`;
 
 export interface Diagnosis {
 	status: 'healthy' | 'issue' | 'critical';
@@ -111,46 +114,61 @@ export async function diagnosePlant(
 	const userNoteSection = userNote?.trim() ? `\n\n=== FRAGE DES GROWERS ===\n${userNote.trim()}` : '';
 	const fullPrompt = SYSTEM_PROMPT + (context ? buildContextPrompt(context) : '') + userNoteSection;
 
+	const body = JSON.stringify({
+		contents: [{
+			parts: [
+				{ text: fullPrompt },
+				{ inline_data: { mime_type: mimeType, data: base64Data } }
+			]
+		}],
+		generationConfig: {
+			temperature: 0.3,
+			maxOutputTokens: 2048,
+			responseMimeType: 'application/json',
+		},
+	});
+
 	let lastError: Error | null = null;
+	let quotaHit = false;
 
-	for (let attempt = 0; attempt <= retries; attempt++) {
-		try {
-			const response = await fetch(API_URL, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					contents: [{
-						parts: [
-							{ text: fullPrompt },
-							{ inline_data: { mime_type: mimeType, data: base64Data } }
-						]
-					}],
-					generationConfig: {
-						temperature: 0.3,
-						maxOutputTokens: 2048,
-						responseMimeType: 'application/json',
-					},
-				}),
-			});
+	// Jedes Model nacheinander probieren; bei 429 direkt nächstes Model
+	for (const model of MODELS) {
+		for (let attempt = 0; attempt <= retries; attempt++) {
+			try {
+				const response = await fetch(buildUrl(model), {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body,
+				});
 
-			if (!response.ok) {
-				const err = await response.text();
-				throw new Error(`Gemini API Fehler: ${response.status} — ${err.slice(0, 200)}`);
-			}
+				if (response.status === 429) {
+					quotaHit = true;
+					lastError = new Error(`Quota erreicht (${model})`);
+					break; // nächstes Model
+				}
 
-			const data = await response.json();
-			const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+				if (!response.ok) {
+					const err = await response.text();
+					throw new Error(`Gemini API Fehler: ${response.status} — ${err.slice(0, 200)}`);
+				}
 
-			if (!text) throw new Error('Keine Antwort von Gemini erhalten');
+				const data = await response.json();
+				const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
-			return JSON.parse(text) as Diagnosis;
-		} catch (e: any) {
-			lastError = e instanceof Error ? e : new Error(String(e));
-			if (attempt < retries) {
-				await new Promise(r => setTimeout(r, 800 * (attempt + 1)));
+				if (!text) throw new Error('Keine Antwort von Gemini erhalten');
+
+				return JSON.parse(text) as Diagnosis;
+			} catch (e: any) {
+				lastError = e instanceof Error ? e : new Error(String(e));
+				if (attempt < retries) {
+					await new Promise(r => setTimeout(r, 800 * (attempt + 1)));
+				}
 			}
 		}
 	}
 
+	if (quotaHit) {
+		throw new Error('Gemini Tages-Limit erreicht. Bitte morgen erneut versuchen oder Billing in Google AI Studio aktivieren.');
+	}
 	throw lastError ?? new Error('Diagnose fehlgeschlagen');
 }

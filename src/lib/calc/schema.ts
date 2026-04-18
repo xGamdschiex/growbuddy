@@ -103,7 +103,20 @@ export function getSchemaRow(phase: Phase, woche: number): SchemaRow | undefined
   return SCHEMA.find(r => r.key === key);
 }
 
-export function getWasserProfil(name: string): WasserProfil | undefined {
+export function getWasserProfil(name: string, custom?: { ca: number; mg: number; ec: number; ph: number }): WasserProfil | undefined {
+  if (name === 'Benutzerdefiniert' && custom) {
+    return {
+      name: 'Benutzerdefiniert',
+      ca: custom.ca,
+      mg: custom.mg,
+      ec: custom.ec,
+      ph: custom.ph,
+      na: 0,
+      hco3: 0,
+      quelle: 'Benutzereingabe',
+      status: 'custom',
+    };
+  }
   return WASSER_PROFILE.find(p => p.name === name);
 }
 

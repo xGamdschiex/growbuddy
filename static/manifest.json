@@ -1,14 +1,52 @@
 {
-	"name": "GrowBuddy",
+	"name": "GrowBuddy — Dein Grow-Assistent",
 	"short_name": "GrowBuddy",
-	"description": "Dein smarter Grow-Assistent — wissenschaftlich korrekt, KI-gestützt",
+	"description": "Dein smarter Grow-Assistent — wissenschaftlich korrekt, KI-gestützt, offline-fähig",
 	"start_url": "/",
+	"scope": "/",
 	"display": "standalone",
+	"display_override": ["standalone", "minimal-ui"],
 	"background_color": "#0a0a0a",
 	"theme_color": "#0a0a0a",
 	"orientation": "portrait",
+	"lang": "de",
+	"dir": "ltr",
+	"categories": ["lifestyle", "utilities", "productivity"],
+	"prefer_related_applications": false,
 	"icons": [
-		{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
-		{ "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+		{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+		{ "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+		{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+		{ "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+	],
+	"shortcuts": [
+		{
+			"name": "Check-in starten",
+			"short_name": "Check-in",
+			"description": "Täglicher Check-in für aktiven Grow",
+			"url": "/?checkin=1",
+			"icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+		},
+		{
+			"name": "Neuer Grow",
+			"short_name": "Grow",
+			"description": "Neuen Grow starten",
+			"url": "/grow/new",
+			"icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+		},
+		{
+			"name": "AI Plant Doctor",
+			"short_name": "Doctor",
+			"description": "Pflanzenfoto analysieren",
+			"url": "/tools/doctor",
+			"icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+		},
+		{
+			"name": "Düngerrechner",
+			"short_name": "Calc",
+			"description": "Nährstoffe berechnen",
+			"url": "/calc",
+			"icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+		}
 	]
 }

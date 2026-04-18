@@ -9,3 +9,9 @@ build/
 
 .vercel
 android/
+
+# Keystore - NIEMALS committen!
+keystore/*.jks
+keystore/*.keystore
+*.jks
+*.keystore

@@ -3,10 +3,12 @@
 	import { t } from '$lib/i18n';
 	import { isPro, limits } from '$lib/stores/pro';
 	import { getAllFeedLines, getFeedLine } from '$lib/calc/feedlines/registry';
+	import { WASSER_PROFILE } from '$lib/calc/schema';
 	import type { FeedLine } from '$lib/calc/feedlines/types';
 	import { getWochenForPhase } from '$lib/calc/feedlines/types';
 	import { calculate } from '$lib/calc/nutrients';
 	import type { CalcResult } from '$lib/calc/nutrients';
+	import { lookupWaterValues, type WaterValues } from '$lib/utils/water-lookup';
 
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
 	let userIsPro = $derived.by(() => { let v = false; isPro.subscribe(x => v = x)(); return v; });
@@ -23,13 +25,55 @@
 	let faktorManuell = $state(100);
 	let calmagTyp = $state<'A' | 'B'>('A');
 	let ecEinheit = $state<'mS/cm' | 'ppm500' | 'ppm700'>('mS/cm');
-	let wasserprofil = $state('Mainz_Hechtsheim');
+	let wasserprofil = $state('Mainz Petersaue');
 	let medium = $state<'hydro' | 'coco' | 'erde'>('coco');
-	let hatRo = $state(true);
+	let hatRo = $state(false);
+	// Custom Wasserprofil
+	let customCa = $state(50);
+	let customMg = $state(10);
+	let customEc = $state(0.3);
+	let customPh = $state(7.0);
+	let isCustomWater = $derived(wasserprofil === 'Benutzerdefiniert');
+	let stadtInput = $state('');
+	let lookupLoading = $state(false);
+	let lookupResult = $state<WaterValues | null>(null);
+	let lookupError = $state('');
+
+	async function lookupCity() {
+		if (!stadtInput.trim()) return;
+		lookupLoading = true;
+		lookupError = '';
+		lookupResult = null;
+		try {
+			const values = await lookupWaterValues(stadtInput.trim());
+			lookupResult = values;
+			// Werte übernehmen
+			wasserprofil = 'Benutzerdefiniert';
+			customCa = Math.round(values.ca);
+			customMg = Math.round(values.mg);
+			customEc = Math.round(values.ec * 100) / 100;
+			customPh = Math.round(values.ph * 10) / 10;
+		} catch (e) {
+			lookupError = e instanceof Error ? e.message : 'Fehler beim Abrufen';
+		} finally {
+			lookupLoading = false;
+		}
+	}
 
 	let feedline = $derived(getFeedLine(feedlineId));
 	let phasen = $derived(feedline ? feedline.phasen.map(p => p.name) : []);
 	let wochen = $derived(feedline ? getWochenForPhase(feedline, phase) : []);
+
+	// Phase/Woche Reset bei Feedline-Wechsel
+	function switchFeedline(id: string) {
+		feedlineId = id;
+		const line = getFeedLine(id);
+		if (line) {
+			phase = line.phasen[0]?.name ?? 'Veg';
+			woche = 1;
+			tag = 1;
+		}
+	}
 
 	let result: CalcResult | null = $state(null);
 	let error: string | null = $state(null);
@@ -51,6 +95,9 @@
 				ec_einheit: ecEinheit,
 				medium,
 				hat_ro: hatRo,
+				custom_wasser: isCustomWater
+					? { ca: customCa, mg: customMg, ec: customEc, ph: customPh }
+					: undefined,
 			});
 			error = null;
 			if (!xpAwarded) { xpAwarded = true; xpStore.awardCalcUse(); }
@@ -70,7 +117,7 @@
 	<!-- Feedline Auswahl -->
 	<div>
 		<label class="block text-xs text-gb-text-muted mb-1">{tr('calc.feedline')}</label>
-		<select bind:value={feedlineId} class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm">
+		<select value={feedlineId} onchange={(e) => switchFeedline(e.currentTarget.value)} class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm">
 			{#each feedlines as fl}
 				<option value={fl.id}>{fl.name} ({fl.hersteller})</option>
 			{/each}
@@ -132,6 +179,82 @@
 		<input type="checkbox" bind:checked={hatRo} class="accent-gb-green w-4 h-4" />
 		<span class="text-sm">{tr('calc.ro_water')}</span>
 	</label>
+
+	<!-- Wasserprofil / Standort -->
+	<div class="space-y-3">
+		<div>
+			<label class="block text-xs text-gb-text-muted mb-1">{tr('calc.city_lookup')}</label>
+			<div class="flex gap-2">
+				<input type="text" bind:value={stadtInput} placeholder={tr('calc.city_placeholder')}
+					onkeydown={(e) => { if (e.key === 'Enter') lookupCity(); }}
+					class="flex-1 bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm" />
+				<button onclick={lookupCity} disabled={lookupLoading || !stadtInput.trim()}
+					class="bg-gb-green text-black font-semibold px-4 py-2.5 rounded-lg text-sm disabled:opacity-50 shrink-0">
+					{lookupLoading ? '...' : tr('calc.lookup_btn')}
+				</button>
+			</div>
+		</div>
+
+		{#if lookupResult}
+			<div class="bg-gb-green/10 border border-gb-green/20 rounded-lg p-3 text-sm">
+				<p class="font-medium text-gb-green">{tr('calc.lookup_found')}</p>
+				<p class="text-xs text-gb-text-muted mt-1">Ca: {lookupResult.ca} · Mg: {lookupResult.mg} · EC: {lookupResult.ec} · pH: {lookupResult.ph}</p>
+				<p class="text-xs text-gb-text-muted">{lookupResult.source} {lookupResult.note ? `— ${lookupResult.note}` : ''}</p>
+			</div>
+		{/if}
+
+		{#if lookupError}
+			<p class="text-xs text-gb-danger">{lookupError}</p>
+		{/if}
+
+		<div>
+			<label class="block text-xs text-gb-text-muted mb-1">{tr('calc.water_profile')}</label>
+			<select bind:value={wasserprofil} class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm">
+				{#each WASSER_PROFILE as p}
+					<option value={p.name}>{p.name}</option>
+				{/each}
+				<option value="Benutzerdefiniert">{tr('calc.custom_water')}</option>
+			</select>
+		</div>
+	</div>
+	{#if isCustomWater}
+		<div class="grid grid-cols-2 gap-3">
+			<div>
+				<label class="block text-xs text-gb-text-muted mb-1">Ca (mg/L)</label>
+				<input type="number" bind:value={customCa} min="0" max="300" step="1"
+					class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm" />
+			</div>
+			<div>
+				<label class="block text-xs text-gb-text-muted mb-1">Mg (mg/L)</label>
+				<input type="number" bind:value={customMg} min="0" max="100" step="1"
+					class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm" />
+			</div>
+			<div>
+				<label class="block text-xs text-gb-text-muted mb-1">EC (mS/cm)</label>
+				<input type="number" bind:value={customEc} min="0" max="3" step="0.01"
+					class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm" />
+			</div>
+			<div>
+				<label class="block text-xs text-gb-text-muted mb-1">pH</label>
+				<input type="number" bind:value={customPh} min="4" max="9" step="0.1"
+					class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm" />
+			</div>
+		</div>
+		<p class="text-xs text-gb-text-muted -mt-3">{tr('calc.custom_water_hint')}</p>
+	{/if}
+
+	<!-- EC-Einheit Selector -->
+	<div>
+		<label class="block text-xs text-gb-text-muted mb-1">EC-Einheit</label>
+		<div class="grid grid-cols-3 gap-2">
+			{#each [{v:'mS/cm',l:'mS/cm'},{v:'ppm500',l:'ppm (500)'},{v:'ppm700',l:'ppm (700)'}] as opt}
+				<button
+					onclick={() => ecEinheit = opt.v as any}
+					class="px-3 py-2 rounded-lg text-xs font-medium border {ecEinheit === opt.v ? 'bg-gb-green/20 border-gb-green text-gb-green' : 'bg-gb-surface border-gb-border text-gb-text-muted'}"
+				>{opt.l}</button>
+			{/each}
+		</div>
+	</div>
 
 	<!-- Faktor -->
 	<div>
