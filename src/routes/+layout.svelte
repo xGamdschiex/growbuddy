@@ -6,6 +6,10 @@
 	import { reminderStore } from '$lib/stores/reminders';
 	import { toastStore } from '$lib/stores/toast';
 	import { hasCheckinToday, currentStreak } from '$lib/stores/streak';
+	import { authStore } from '$lib/stores/auth';
+	import { syncStore } from '$lib/stores/sync';
+	import { growStore } from '$lib/stores/grow';
+	import type { GrowState, Grow, CheckIn } from '$lib/stores/grow';
 	import { t } from '$lib/i18n';
 	import { hapticLight } from '$lib/utils/haptic';
 	import InstallPrompt from '$lib/components/InstallPrompt.svelte';
@@ -16,6 +20,8 @@
 	let toasts = $derived.by(() => { let v: Toast[] = []; toastStore.subscribe(x => v = x)(); return v; });
 	let onboarding = $derived.by(() => { let v = { completed: false }; onboardingStore.subscribe(x => v = x)(); return v; });
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
+	let auth = $derived.by(() => { let v: any = { user: null, loading: true }; authStore.subscribe(x => v = x)(); return v; });
+	let growState = $derived.by(() => { let v: GrowState = { grows: [], checkins: [] }; growStore.subscribe(x => v = x)(); return v; });
 
 	let showUpdateBanner = $state(false);
 	let waitingSW: ServiceWorker | null = null;
@@ -32,11 +38,70 @@
 	// Offline Status
 	let isOffline = $state(false);
 
+	// Cloud-Sync Auto-Flow
+	let lastPulledUserId = $state<string | null>(null);
+	let pushTimer: any = null;
+	let pushReady = $state(false);
+
 	// Hydration + Onboarding-Redirect in einem Effect (vermeidet Doppel-Triggering)
 	$effect(() => {
 		hydrated = true;
 		if (isOnboardingPage) return;
 		if (!onboarding.completed) goto('/onboarding');
+	});
+
+	// Auto-Pull bei Login-Event (Cloud → Local Merge)
+	$effect(() => {
+		if (!auth.user) {
+			lastPulledUserId = null;
+			pushReady = false;
+			return;
+		}
+		if (lastPulledUserId === auth.user.id) return;
+		lastPulledUserId = auth.user.id;
+		const uid = auth.user.id;
+
+		syncStore.pull(uid).then(cloud => {
+			if (!cloud) { pushReady = true; return; }
+			const pickNewer = <T extends { updated_at?: string }>(a: T, b: T): T => {
+				const ta = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+				const tb = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+				return ta >= tb ? a : b;
+			};
+			const local = growState;
+			const growsById = new Map(local.grows.map(g => [g.id, g]));
+			for (const cg of cloud.grows) {
+				const l = growsById.get(cg.id);
+				growsById.set(cg.id, l ? pickNewer(l, cg) : cg);
+			}
+			const checkinsById = new Map(local.checkins.map(c => [c.id, c]));
+			for (const cc of cloud.checkins) {
+				const l = checkinsById.get(cc.id);
+				if (l) {
+					const winner = pickNewer(l, cc);
+					checkinsById.set(cc.id, l.photo_data && winner === cc ? { ...cc, photo_data: l.photo_data } : winner);
+				} else {
+					checkinsById.set(cc.id, cc);
+				}
+			}
+			growStore.replaceState({
+				grows: Array.from(growsById.values()),
+				checkins: Array.from(checkinsById.values()),
+			});
+			setTimeout(() => { pushReady = true; }, 500);
+		}).catch(() => { pushReady = true; });
+	});
+
+	// Auto-Push debounced bei Store-Änderungen (nur wenn eingeloggt + Pull durch)
+	$effect(() => {
+		if (!auth.user || !pushReady) return;
+		const uid = auth.user.id;
+		const snapshot = growState;
+		clearTimeout(pushTimer);
+		pushTimer = setTimeout(() => {
+			syncStore.push(uid, snapshot).catch(() => {});
+		}, 2500);
+		return () => clearTimeout(pushTimer);
 	});
 
 	// Reminder-Timer beim App-Start wiederherstellen + Missed-Check-in prüfen

@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { growStore, activeGrows, harvestedGrows, totalHarvests } from '$lib/stores/grow';
 	import { currentStreak, hasCheckinToday, streakMultiplier, streakInDanger } from '$lib/stores/streak';
+	import { isLoggedIn } from '$lib/stores/auth';
+	import { syncStore } from '$lib/stores/sync';
 	import DailyCheckin from '$lib/components/DailyCheckin.svelte';
 	import { t } from '$lib/i18n';
 	import type { Grow, CheckIn } from '$lib/stores/grow';
@@ -12,6 +14,8 @@
 	let active = $derived.by(() => { let v: Grow[] = []; activeGrows.subscribe(x => v = x)(); return v; });
 	let harvested = $derived.by(() => { let v: Grow[] = []; harvestedGrows.subscribe(x => v = x)(); return v; });
 	let harvestCount = $derived.by(() => { let v = 0; totalHarvests.subscribe(x => v = x)(); return v; });
+	let loggedIn = $derived.by(() => { let v = false; isLoggedIn.subscribe(x => v = x)(); return v; });
+	let sync = $derived.by(() => { let v: any = { status: 'idle' }; syncStore.subscribe(x => v = x)(); return v; });
 
 	let streakInfo = $derived.by(() => { let v = { current: 0, graceActive: false, lastCheckinDate: null as string | null }; currentStreak.subscribe(x => v = x)(); return v; });
 	let doneToday = $derived.by(() => { let v = false; hasCheckinToday.subscribe(x => v = x)(); return v; });
@@ -31,12 +35,33 @@
 			<h1 class="text-2xl font-bold">{tr('home.title')}</h1>
 			<p class="text-gb-text-muted text-sm">{tr('home.subtitle')}</p>
 		</div>
-		<a href="/profile" aria-label="Profil"
-			class="w-10 h-10 rounded-full bg-gb-surface-2 flex items-center justify-center hover:bg-gb-surface transition-colors">
-			<svg class="w-5 h-5 text-gb-green" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-				<path d="M12 22V16m0 0c-2-4-6-6-10-6 4 0 8-2 10-6 2 4 6 6 10 6-4 0-8 2-10 6z" />
-			</svg>
-		</a>
+		<div class="flex items-center gap-2">
+			<a href="/profile" aria-label="Cloud-Status"
+				title={loggedIn ? (sync.status === 'syncing' ? 'Sync läuft…' : sync.status === 'error' ? 'Sync-Fehler' : 'Cloud aktiv') : 'Nicht eingeloggt — Daten nur lokal'}
+				class="w-10 h-10 rounded-full flex items-center justify-center transition-colors
+					{loggedIn ? (sync.status === 'error' ? 'bg-gb-danger/15 text-gb-danger' : 'bg-gb-green/15 text-gb-green') : 'bg-gb-surface-2 text-gb-text-muted'}">
+				{#if sync.status === 'syncing'}
+					<svg class="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<path d="M12 4v4m0 8v4m4.24-12.24l-2.83 2.83m-4.24 4.24l-2.83 2.83M20 12h-4M8 12H4m12.24 4.24l-2.83-2.83M9.17 9.17L6.34 6.34" />
+					</svg>
+				{:else if loggedIn}
+					<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<path d="M17.5 19a4.5 4.5 0 10-.88-8.92A6 6 0 007 10a4 4 0 00-.5 7.97" />
+						<path d="M9 15l2 2 4-4" stroke-linecap="round" stroke-linejoin="round" />
+					</svg>
+				{:else}
+					<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<path d="M17.5 19a4.5 4.5 0 10-.88-8.92A6 6 0 007 10a4 4 0 00-.5 7.97" />
+					</svg>
+				{/if}
+			</a>
+			<a href="/profile" aria-label="Profil"
+				class="w-10 h-10 rounded-full bg-gb-surface-2 flex items-center justify-center hover:bg-gb-surface transition-colors">
+				<svg class="w-5 h-5 text-gb-green" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<path d="M12 22V16m0 0c-2-4-6-6-10-6 4 0 8-2 10-6 2 4 6 6 10 6-4 0-8 2-10 6z" />
+				</svg>
+			</a>
+		</div>
 	</div>
 
 	<!-- ═══ HERO: Daily Check-in ═══ -->

@@ -2,12 +2,42 @@
 	import { goto } from '$app/navigation';
 	import { onboardingStore } from '$lib/stores/onboarding';
 	import { proStore } from '$lib/stores/pro';
+	import { authStore } from '$lib/stores/auth';
+	import { toastStore } from '$lib/stores/toast';
 	import { t } from '$lib/i18n';
 
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
 	let step = $state(0);
 	let experience = $state<'beginner' | 'intermediate' | 'advanced' | null>(null);
 	let goal = $state<'first_grow' | 'improve' | 'document' | 'commercial' | null>(null);
+	let loginEmail = $state('');
+	let loginLoading = $state(false);
+	let loginMessage = $state('');
+
+	const CLOUD_STEP = 6; // nach slides(4) + exp(1) + goal(1)
+
+	function goToCloud() { step = CLOUD_STEP; }
+
+	async function cloudGoogle() {
+		const { error } = await authStore.loginWithGoogle();
+		if (error) toastStore.warning(error);
+		// Redirect passiert durch Supabase, OAuth-Callback kommt zurück
+	}
+
+	async function cloudEmail() {
+		if (!loginEmail.trim()) return;
+		loginLoading = true;
+		const { error } = await authStore.loginWithEmail(loginEmail.trim());
+		loginLoading = false;
+		if (error) {
+			loginMessage = error;
+		} else {
+			loginMessage = tr('auth.link_sent');
+			toastStore.success(tr('auth.link_sent'));
+			// User kann jetzt aufs Mail klicken — wir schließen Onboarding trotzdem
+			setTimeout(() => finish(), 1500);
+		}
+	}
 
 	let slides = $derived([
 		{
@@ -54,8 +84,11 @@
 
 	function startTrial() {
 		proStore.startTrial();
-		onboardingStore.complete(experience, goal);
-		setTimeout(() => goto('/'), 50);
+		goToCloud();
+	}
+
+	function continueFree() {
+		goToCloud();
 	}
 
 	let experienceOptions = $derived([
@@ -161,12 +194,57 @@
 						</button>
 					</div>
 
-					<button onclick={finish}
+					<button onclick={continueFree}
 						class="w-full bg-gb-green text-black font-semibold py-3.5 rounded-xl text-sm hover:bg-gb-green/80 transition-colors">
 						{tr('onboarding.free_btn')}
 					</button>
 				</div>
 			{/if}
+		</div>
+
+	{:else if step === CLOUD_STEP}
+		<!-- Cloud-Sync (Optional) -->
+		<div class="w-full space-y-6 animate-[fadeIn_0.4s_ease-out]">
+			<div class="text-center">
+				<span class="text-5xl block mb-2">☁️</span>
+				<h1 class="text-2xl font-bold">{tr('onboarding.cloud_title')}</h1>
+				<p class="text-gb-text-muted text-sm mt-2 leading-relaxed">{tr('onboarding.cloud_desc')}</p>
+			</div>
+
+			<div class="space-y-3">
+				<!-- Google -->
+				<button onclick={cloudGoogle}
+					class="w-full flex items-center justify-center gap-2 bg-white text-gray-700 font-medium text-sm py-3 rounded-xl border border-gray-300 hover:bg-gray-50 transition-colors">
+					<svg class="w-5 h-5" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+					{tr('auth.google')}
+				</button>
+
+				<div class="flex items-center gap-3">
+					<div class="flex-1 h-px bg-gb-border"></div>
+					<span class="text-xs text-gb-text-muted">{tr('auth.or')}</span>
+					<div class="flex-1 h-px bg-gb-border"></div>
+				</div>
+
+				<!-- Magic Link -->
+				<div class="space-y-2">
+					<input type="email" bind:value={loginEmail} placeholder={tr('auth.email_placeholder')}
+						class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-3 text-sm" />
+					<button onclick={cloudEmail}
+						disabled={loginLoading || !loginEmail.trim()}
+						class="w-full bg-gb-green text-black font-semibold py-3 rounded-xl text-sm hover:bg-gb-green/80 transition-colors disabled:opacity-50">
+						{loginLoading ? '...' : tr('auth.send_link')}
+					</button>
+				</div>
+
+				{#if loginMessage}
+					<p class="text-xs text-center text-gb-green">{loginMessage}</p>
+				{/if}
+			</div>
+
+			<button onclick={finish}
+				class="w-full text-gb-text-muted text-sm py-2 hover:text-gb-text transition-colors">
+				{tr('onboarding.cloud_later')}
+			</button>
 		</div>
 	{/if}
 </div>

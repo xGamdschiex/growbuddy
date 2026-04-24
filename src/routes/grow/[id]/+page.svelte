@@ -19,6 +19,7 @@
 	import Lightbox from '$lib/components/Lightbox.svelte';
 	import { clampNumber, RANGES } from '$lib/utils/validation';
 	import { toMsPerCm, fromMsPerCm, type ECEinheit } from '$lib/calc/units';
+	import { getFeedLine } from '$lib/calc/feedlines/registry';
 
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
 	let growId = $derived($page.params.id);
@@ -66,8 +67,40 @@
 	let ciTraining = $state<string | null>(null);
 	let ciNotes = $state('');
 	let ciPhotos = $state<string[]>([]);
+	let ciMore = $state(false);
 
 	let ciVpd = $derived(ciTemp !== null && ciRh !== null ? calcVPD(ciTemp, ciRh) : null);
+	let ciVpdStatusVal = $derived(ciVpd !== null ? getVPDStatus(ciVpd, ciPhase === 'Bloom' || ciPhase === 'Flush' ? 'early_flower' : 'vegetative') : 'idle');
+	let ciVpdZones = $derived(
+		ciPhase === 'Bloom' || ciPhase === 'Flush'
+			? { opt: [1.2, 1.6], warn: [0.8, 2.0] }
+			: { opt: [0.8, 1.2], warn: [0.4, 1.6] }
+	);
+	function ciToPct(k: number) { return Math.max(0, Math.min(100, ((k - 0) / (2.5 - 0)) * 100)); }
+	let ciVpdColor = $derived(
+		ciVpdStatusVal === 'optimal' ? 'var(--color-gb-green)' :
+		ciVpdStatusVal === 'warn' ? 'var(--color-gb-warning)' :
+		ciVpd === null ? '#666' : 'var(--color-gb-danger)'
+	);
+	let ciVpdLabel = $derived(
+		ciVpdStatusVal === 'optimal' ? 'optimal' :
+		ciVpdStatusVal === 'warn' ? 'grenzwertig' :
+		ciVpd === null ? '' : 'kritisch'
+	);
+	let ciFeedlineLabel = $derived.by(() => {
+		if (!grow?.feedline_id) return null;
+		const line = getFeedLine(grow.feedline_id);
+		return line ? `${line.name} · ${grow.medium}` : null;
+	});
+
+	function ciStepWeek(delta: number) {
+		ciWeek = Math.max(1, Math.min(30, ciWeek + delta));
+		ciWeekDayManual = true;
+	}
+	function ciStepDay(delta: number) {
+		ciDay = Math.max(1, Math.min(7, ciDay + delta));
+		ciWeekDayManual = true;
+	}
 
 	// Pro-Status
 	let userIsPro = $derived.by(() => { let v = false; isPro.subscribe(x => v = x)(); return v; });
@@ -181,6 +214,7 @@
 		ciTraining = ci.training;
 		ciNotes = ci.notes;
 		ciPhotos = ci.photos_data?.length ? [...ci.photos_data] : (ci.photo_data ? [ci.photo_data] : []);
+		ciMore = true;
 		showCheckin = true;
 		hapticMedium();
 		// Zum Formular scrollen + visuelles Feedback
@@ -206,7 +240,16 @@
 		ciNutrientMl = null;
 		ciTraining = null;
 		ciTemp = null; ciRh = null; ciEc = null; ciPh = null;
+		ciMore = false;
 	}
+
+	const CI_PHASES = ['Seedling', 'Veg', 'Bloom', 'Flush', 'Dry', 'Cure'];
+	const CI_TRAININGS = ['LST', 'Topping', 'FIM', 'ScrOG', 'Defoliation'];
+	const CI_EC_OPTS: { v: ECEinheit; l: string }[] = [
+		{ v: 'mS/cm', l: 'mS/cm' },
+		{ v: 'ppm500', l: 'ppm·500' },
+		{ v: 'ppm700', l: 'ppm·700' },
+	];
 
 	let multiplierValue = $derived.by(() => { let v = 1; streakMultiplier.subscribe(x => v = x)(); return v; });
 
@@ -327,161 +370,205 @@
 					{tr('grow.daily_checkin')}
 				</button>
 			{:else}
-				<!-- Check-in Form -->
-				<div id="checkin-form" class="bg-gb-surface rounded-xl p-4 space-y-4 transition-all duration-300">
-					<div class="flex items-center justify-between">
-						<h2 class="font-semibold">{editingId ? 'Check-in bearbeiten' : tr('checkin.title')}</h2>
-						<button onclick={cancelCheckin} class="text-gb-text-muted text-sm">{tr('checkin.cancel')}</button>
+				<!-- Check-in Form (Mockup-Design) -->
+				<div id="checkin-form" class="ci-form">
+					<div class="ci-head">
+						<h2>{editingId ? 'Check-in bearbeiten' : tr('checkin.title')}</h2>
+						<button type="button" onclick={cancelCheckin} class="ci-close" aria-label={tr('checkin.cancel')}>✕</button>
 					</div>
 
-					<!-- Fotos (max 5) -->
-					<div>
-						<label class="block text-xs text-gb-text-muted mb-1">{tr('checkin.photo')} ({ciPhotos.length}/{MAX_PHOTOS})</label>
-						{#if ciPhotos.length > 0}
-							<div class="grid grid-cols-3 gap-1 mb-2">
-								{#each ciPhotos as src, idx}
-									<div class="relative">
-										<img {src} alt="Foto {idx + 1}" class="aspect-square object-cover rounded-lg w-full" />
-										<button onclick={() => removePhoto(idx)}
-											class="absolute top-1 right-1 bg-black/60 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center leading-none">
-											✕
-										</button>
-									</div>
-								{/each}
+					<!-- Fotos -->
+					<div class="ci-card">
+						<div class="ci-sec-head">
+							<span class="ci-sec-title">{tr('checkin.photo')}</span>
+							<span class="ci-sec-hint">{ciPhotos.length}/{MAX_PHOTOS}</span>
+						</div>
+						<div class="ci-photos">
+							{#each ciPhotos as src, idx}
+								<div class="ci-photo">
+									<img {src} alt="Foto {idx + 1}" />
+									<button type="button" class="ci-rm" onclick={() => removePhoto(idx)} aria-label="Entfernen">✕</button>
+								</div>
+							{/each}
+							{#if ciPhotos.length < MAX_PHOTOS}
+								<label class="ci-photo ci-add" class:busy={compressing}>
+									{#if compressing}
+										<span>⏳</span><span>Lade…</span>
+									{:else}
+										<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 8l2-3h4l1-2h4l1 2h4l2 3v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="12" cy="13" r="4" stroke="currentColor" stroke-width="1.5"/></svg>
+										<span>{ciPhotos.length === 0 ? 'Foto' : '+'}</span>
+									{/if}
+									<input type="file" accept="image/*" multiple onchange={handlePhoto} disabled={compressing} />
+								</label>
+							{/if}
+						</div>
+					</div>
+
+					<!-- Phase & Zeit -->
+					<div class="ci-card">
+						<div class="ci-sec-head"><span class="ci-sec-title">Phase &amp; Zeit</span></div>
+						<div class="ci-chip-row">
+							{#each CI_PHASES as p}
+								<button type="button" class="ci-chip" class:active={ciPhase === p} onclick={() => ciPhase = p}>{p}</button>
+							{/each}
+						</div>
+						<div class="ci-grid2 ci-mt10">
+							<div class="ci-stepper">
+								<button type="button" onclick={() => ciStepWeek(-1)} aria-label="Woche minus">−</button>
+								<div class="val">{ciWeek}<small>Woche{ciWeekDayManual ? '' : ' · auto'}</small></div>
+								<button type="button" onclick={() => ciStepWeek(1)} aria-label="Woche plus">+</button>
 							</div>
-						{/if}
-						{#if ciPhotos.length < MAX_PHOTOS}
-							<label class="block w-full bg-gb-surface-2 border border-dashed border-gb-border rounded-lg p-3 text-center text-sm text-gb-text-muted cursor-pointer hover:border-gb-green transition-colors {compressing ? 'opacity-60 pointer-events-none' : ''}">
-								{compressing ? '⏳ Verarbeite…' : `📸 ${ciPhotos.length === 0 ? tr('checkin.take_photo') : 'Weiteres Foto'}`}
-								<input type="file" accept="image/*" multiple onchange={handlePhoto} class="hidden" disabled={compressing} />
+							<div class="ci-stepper">
+								<button type="button" onclick={() => ciStepDay(-1)} aria-label="Tag minus">−</button>
+								<div class="val">{ciDay}<small>Tag{ciWeekDayManual ? '' : ' · auto'}</small></div>
+								<button type="button" onclick={() => ciStepDay(1)} aria-label="Tag plus">+</button>
+							</div>
+						</div>
+					</div>
+
+					<!-- Klima -->
+					<div class="ci-card">
+						<div class="ci-sec-head">
+							<span class="ci-sec-title">Klima</span>
+							<span class="ci-sec-hint">Temp · RH → VPD</span>
+						</div>
+						<div class="ci-grid2 ci-mb10">
+							<label class="ci-field">
+								<span class="ci-field-label">{tr('checkin.temp')}</span>
+								<input class="ci-input" type="number" step="0.5" min="0" max="50" placeholder="25" bind:value={ciTemp} />
 							</label>
-						{/if}
-					</div>
-
-					<!-- Phase / Week / Day -->
-					<div class="grid grid-cols-3 gap-2">
-						<div>
-							<label class="block text-xs text-gb-text-muted mb-1">{tr('checkin.phase')}</label>
-							<select bind:value={ciPhase} class="w-full bg-gb-bg border border-gb-border rounded-lg px-2 py-2 text-sm">
-								{#each ['Seedling', 'Veg', 'Bloom', 'Flush', 'Dry', 'Cure'] as p}
-									<option>{p}</option>
-								{/each}
-							</select>
+							<label class="ci-field">
+								<span class="ci-field-label">{tr('checkin.rh')}</span>
+								<input class="ci-input" type="number" step="1" min="0" max="100" placeholder="60" bind:value={ciRh} />
+							</label>
 						</div>
-						<div>
-							<label class="block text-xs text-gb-text-muted mb-1">{tr('checkin.week')}{ciWeekDayManual ? '' : ' (auto)'}</label>
-							<input type="number" bind:value={ciWeek} oninput={() => ciWeekDayManual = true} min="1" max="20"
-								class="w-full bg-gb-bg border border-gb-border rounded-lg px-2 py-2 text-sm" />
-						</div>
-						<div>
-							<label class="block text-xs text-gb-text-muted mb-1">{tr('checkin.day')}{ciWeekDayManual ? '' : ' (auto)'}</label>
-							<input type="number" bind:value={ciDay} oninput={() => ciWeekDayManual = true} min="1" max="7"
-								class="w-full bg-gb-bg border border-gb-border rounded-lg px-2 py-2 text-sm" />
-						</div>
-					</div>
-
-					<!-- Messwerte -->
-					<div class="grid grid-cols-2 gap-2">
-						<div>
-							<label class="block text-xs text-gb-text-muted mb-1">{tr('checkin.temp')}</label>
-							<input type="number" bind:value={ciTemp} step="0.5" placeholder="25"
-								class="w-full bg-gb-bg border border-gb-border rounded-lg px-2 py-2 text-sm placeholder:text-gb-border" />
-						</div>
-						<div>
-							<label class="block text-xs text-gb-text-muted mb-1">{tr('checkin.rh')}</label>
-							<input type="number" bind:value={ciRh} step="1" placeholder="60"
-								class="w-full bg-gb-bg border border-gb-border rounded-lg px-2 py-2 text-sm placeholder:text-gb-border" />
-						</div>
-						<div>
-							<label class="block text-xs text-gb-text-muted mb-1">{tr('checkin.ec')} ({ciEcUnit})</label>
-							<input type="number" bind:value={ciEc} step={ciEcStep} placeholder={ciEcPlaceholder}
-								class="w-full bg-gb-bg border border-gb-border rounded-lg px-2 py-2 text-sm placeholder:text-gb-border" />
-						</div>
-						<div>
-							<label class="block text-xs text-gb-text-muted mb-1">{tr('checkin.ph')}</label>
-							<input type="number" bind:value={ciPh} step="0.1" placeholder="6.0"
-								class="w-full bg-gb-bg border border-gb-border rounded-lg px-2 py-2 text-sm placeholder:text-gb-border" />
+						<div class="ci-card2 ci-vpd">
+							<div class="ci-row ci-between ci-vpd-head">
+								<span class="ci-vpd-label">VPD · {ciPhase === 'Bloom' || ciPhase === 'Flush' ? 'Bloom' : 'Veg'}</span>
+								<span class="ci-vpd-val" style="color: {ciVpdColor}">
+									{ciVpd === null ? '— kPa' : `${ciVpd.toFixed(2)} kPa`}
+									{#if ciVpdLabel}<em class="ci-vpd-state">· {ciVpdLabel}</em>{/if}
+								</span>
+							</div>
+							<div class="ci-gauge">
+								<div class="ci-gauge-crit"></div>
+								<div class="ci-gauge-warn" style="left: {ciToPct(ciVpdZones.warn[0])}%; width: {ciToPct(ciVpdZones.warn[1]) - ciToPct(ciVpdZones.warn[0])}%;"></div>
+								<div class="ci-gauge-opt" style="left: {ciToPct(ciVpdZones.opt[0])}%; width: {ciToPct(ciVpdZones.opt[1]) - ciToPct(ciVpdZones.opt[0])}%;"></div>
+								{#if ciVpd !== null}
+									<div class="ci-gauge-cursor" style="left: calc({ciToPct(ciVpd)}% - 1.5px); background: {ciVpdColor}"></div>
+								{/if}
+							</div>
+							<div class="ci-scale">
+								<span>0.0</span><span>0.5</span><span>1.0</span><span>1.5</span><span>2.0</span><span>2.5</span>
+							</div>
 						</div>
 					</div>
 
-					<!-- EC-Einheit Selector -->
-					<div>
-						<span class="block text-xs text-gb-text-muted mb-1">EC-Einheit</span>
-						<div class="grid grid-cols-3 gap-2">
-							{#each [{v:'mS/cm',l:'mS/cm'},{v:'ppm500',l:'ppm (500)'},{v:'ppm700',l:'ppm (700)'}] as opt}
-								<button type="button" onclick={() => {
-									if (ciEc !== null) ciEc = +fromMsPerCm(toMsPerCm(ciEc, ciEcUnit), opt.v as ECEinheit).toFixed(opt.v === 'mS/cm' ? 2 : 0);
-									ciEcUnit = opt.v as ECEinheit;
-								}}
-									class="px-2 py-1.5 rounded-lg text-xs font-medium border {ciEcUnit === opt.v ? 'bg-gb-green/20 border-gb-green text-gb-green' : 'bg-gb-bg border-gb-border text-gb-text-muted'}">{opt.l}</button>
-							{/each}
+					<!-- Disclosure -->
+					<button type="button" class="ci-disc" onclick={() => ciMore = !ciMore}>
+						<div class="ci-disc-l">
+							<div class="ci-disc-ico">{ciMore ? '−' : '+'}</div>
+							<div>
+								<div class="ci-disc-title">Mehr erfassen</div>
+								<div class="ci-disc-sub">EC · pH · Gießen · Training · Notizen</div>
+							</div>
 						</div>
-					</div>
+						<div class="ci-chev">{ciMore ? '▾' : '▸'}</div>
+					</button>
 
-					<!-- VPD Live -->
-					{#if ciVpd !== null}
-						<div class="bg-gb-bg rounded-lg p-2 text-center text-sm">
-							VPD: <span class="font-bold {getVPDStatus(ciVpd, ciPhase.toLowerCase() === 'veg' ? 'vegetative' : 'early_flower') === 'optimal' ? 'text-gb-green' : 'text-gb-warning'}">{ciVpd.toFixed(2)} kPa</span>
-						</div>
-					{/if}
-
-					<!-- Toggles -->
-					<div class="flex gap-3">
-						<label class="flex items-center gap-2 bg-gb-bg rounded-lg px-3 py-2 flex-1">
-							<input type="checkbox" bind:checked={ciWatered} class="accent-gb-green" />
-							<span class="text-sm">{tr('checkin.watered')}</span>
-						</label>
-						<label class="flex items-center gap-2 bg-gb-bg rounded-lg px-3 py-2 flex-1">
-							<input type="checkbox" bind:checked={ciNutrients} class="accent-gb-green" />
-							<span class="text-sm">{tr('checkin.nutrients')}</span>
-						</label>
-					</div>
-
-					<!-- Mengen -->
-					{#if ciWatered || ciNutrients}
-						<div class="grid grid-cols-2 gap-2">
-							{#if ciWatered}
-								<div>
-									<label class="block text-xs text-gb-text-muted mb-1">Wasser (mL)</label>
-									<input type="number" bind:value={ciWaterMl} min="0" step="100" placeholder="1000"
-										class="w-full bg-gb-bg border border-gb-border rounded-lg px-2 py-2 text-sm placeholder:text-gb-border" />
+					<div class="ci-fold" style="max-height: {ciMore ? '2000px' : '0'}; opacity: {ciMore ? 1 : 0};">
+						<div class="ci-fold-inner">
+							<!-- EC + pH -->
+							<div class="ci-card">
+								<div class="ci-sec-head">
+									<span class="ci-sec-title">Messwerte</span>
+									<div class="ci-seg">
+										{#each CI_EC_OPTS as opt}
+											<button type="button" class:on={ciEcUnit === opt.v} onclick={() => {
+												if (ciEc !== null) ciEc = +fromMsPerCm(toMsPerCm(ciEc, ciEcUnit), opt.v).toFixed(opt.v === 'mS/cm' ? 2 : 0);
+												ciEcUnit = opt.v;
+											}}>{opt.l}</button>
+										{/each}
+									</div>
 								</div>
-							{/if}
-							{#if ciNutrients}
-								<div>
-									<label class="block text-xs text-gb-text-muted mb-1">Dünger (mL)</label>
-									<input type="number" bind:value={ciNutrientMl} min="0" step="1" placeholder="10"
-										class="w-full bg-gb-bg border border-gb-border rounded-lg px-2 py-2 text-sm placeholder:text-gb-border" />
+								<div class="ci-grid2">
+									<label class="ci-field">
+										<span class="ci-field-label">EC</span>
+										<input class="ci-input" type="number" step={ciEcStep} min="0" placeholder={ciEcPlaceholder} bind:value={ciEc} />
+									</label>
+									<label class="ci-field">
+										<span class="ci-field-label">pH</span>
+										<input class="ci-input" type="number" step="0.1" min="0" max="14" placeholder="6.0" bind:value={ciPh} />
+									</label>
 								</div>
-							{/if}
-						</div>
-					{/if}
+							</div>
 
-					<!-- Training -->
-					<div>
-						<label class="block text-xs text-gb-text-muted mb-1">{tr('checkin.training')}</label>
-						<div class="flex flex-wrap gap-2">
-							{#each ['LST', 'Topping', 'FIM', 'ScrOG', 'Defoliation'] as t}
-								<button onclick={() => ciTraining = ciTraining === t ? null : t}
-									class="px-3 py-1.5 rounded-lg text-xs transition-colors
-										{ciTraining === t ? 'bg-gb-accent text-white' : 'bg-gb-bg text-gb-text-muted'}">
-									{t}
-								</button>
-							{/each}
-						</div>
-					</div>
+							<!-- Gießen & Düngen -->
+							<div class="ci-card">
+								<div class="ci-sec-head"><span class="ci-sec-title">Gießen &amp; Düngen</span></div>
+								<div class="ci-toggle-row">
+									<button type="button" class="ci-toggle-card" class:on={ciWatered} onclick={() => ciWatered = !ciWatered}>
+										<span>💧 {tr('checkin.watered')}</span>
+										<div class="ci-sw" class:on={ciWatered}></div>
+									</button>
+									<button type="button" class="ci-toggle-card" class:on={ciNutrients} onclick={() => ciNutrients = !ciNutrients}>
+										<span>🧪 {tr('checkin.nutrients')}</span>
+										<div class="ci-sw" class:on={ciNutrients}></div>
+									</button>
+								</div>
+								{#if ciNutrients && ciFeedlineLabel}
+									<div class="ci-fp">
+										<div class="ci-fp-l">
+											<div class="ci-fi">
+												<svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 2v6a6 6 0 1 0 12 0V2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M6 8h12" stroke="currentColor" stroke-width="2"/></svg>
+											</div>
+											<div class="ci-fp-t">
+												<div class="ci-fp-cap">Düngerlinie</div>
+												<div class="ci-fp-name">{ciFeedlineLabel}</div>
+											</div>
+										</div>
+										<a href="/calc" class="ci-fp-link">zu Calc →</a>
+									</div>
+								{/if}
+								{#if ciWatered || ciNutrients}
+									<div class="ci-grid2 ci-mt10">
+										{#if ciWatered}
+											<label class="ci-field">
+												<span class="ci-field-label">Wasser (mL)</span>
+												<input class="ci-input" type="number" min="0" step="100" placeholder="1000" bind:value={ciWaterMl} />
+											</label>
+										{/if}
+										{#if ciNutrients}
+											<label class="ci-field">
+												<span class="ci-field-label">Dünger (mL)</span>
+												<input class="ci-input" type="number" min="0" step="1" placeholder="10" bind:value={ciNutrientMl} />
+											</label>
+										{/if}
+									</div>
+								{/if}
+							</div>
 
-					<!-- Notizen -->
-					<div>
-						<label class="block text-xs text-gb-text-muted mb-1">{tr('checkin.notes')}</label>
-						<textarea bind:value={ciNotes} rows="2" placeholder={tr('checkin.notes_placeholder')}
-							class="w-full bg-gb-bg border border-gb-border rounded-lg px-3 py-2 text-sm placeholder:text-gb-border resize-none"></textarea>
+							<!-- Training -->
+							<div class="ci-card">
+								<div class="ci-sec-head"><span class="ci-sec-title">{tr('checkin.training')}</span></div>
+								<div class="ci-chip-row ci-wrap">
+									{#each CI_TRAININGS as t}
+										<button type="button" class="ci-chip ci-accent" class:active={ciTraining === t} onclick={() => ciTraining = ciTraining === t ? null : t}>{t}</button>
+									{/each}
+								</div>
+							</div>
+
+							<!-- Notizen -->
+							<div class="ci-card">
+								<div class="ci-sec-head"><span class="ci-sec-title">{tr('checkin.notes')}</span></div>
+								<textarea class="ci-input ci-notes" rows="3" placeholder={tr('checkin.notes_placeholder')} bind:value={ciNotes}></textarea>
+							</div>
+						</div>
 					</div>
 
 					<!-- Submit -->
-					<button onclick={submitCheckin}
-						class="w-full bg-gb-green text-black font-semibold py-3 rounded-lg text-sm hover:bg-gb-green-light transition-colors">
-						{editingId ? 'Änderungen speichern' : tr('checkin.save')}
+					<button type="button" class="ci-cta" onclick={submitCheckin}>
+						✓ {editingId ? 'Änderungen speichern' : tr('checkin.save')}{#if !editingId && multiplierValue > 1} · +{Math.round(10 * multiplierValue)} XP{/if}
 					</button>
 				</div>
 			{/if}
@@ -761,3 +848,386 @@
 		<Lightbox photos={lightboxPhotos} startIndex={lightboxIndex} onClose={() => lightboxOpen = false} />
 	{/if}
 {/if}
+
+<style>
+	.ci-form {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		color: var(--color-gb-text);
+	}
+	.ci-head {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 4px 2px;
+	}
+	.ci-head h2 {
+		margin: 0;
+		font-size: 20px;
+		font-weight: 700;
+		letter-spacing: -0.01em;
+	}
+	.ci-close {
+		background: none; border: none; color: var(--color-gb-text-muted);
+		font-size: 18px; cursor: pointer; padding: 4px 8px; min-height: 36px; min-width: 36px;
+	}
+	.ci-card {
+		background: var(--color-gb-surface);
+		border-radius: 16px;
+		padding: 14px;
+	}
+	.ci-card2 {
+		background: var(--color-gb-surface-2);
+		border-radius: 12px;
+		padding: 12px;
+	}
+	.ci-row { display: flex; gap: 8px; align-items: center; }
+	.ci-between { justify-content: space-between; }
+	.ci-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+	.ci-mt10 { margin-top: 10px; }
+	.ci-mb10 { margin-bottom: 10px; }
+
+	.ci-sec-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 10px;
+		gap: 8px;
+	}
+	.ci-sec-title {
+		font-size: 11px;
+		font-weight: 600;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--color-gb-text-muted);
+	}
+	.ci-sec-hint { font-size: 11px; color: #666; }
+
+	.ci-chip {
+		min-height: 36px;
+		padding: 8px 12px;
+		border-radius: 999px;
+		font-size: 12px;
+		font-weight: 500;
+		border: 1px solid var(--color-gb-border);
+		background: var(--color-gb-bg);
+		color: var(--color-gb-text-muted);
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		cursor: pointer;
+		transition: all 0.15s ease;
+		white-space: nowrap;
+	}
+	.ci-chip.active {
+		background: rgba(34,197,94,0.14);
+		border-color: var(--color-gb-green);
+		color: var(--color-gb-green);
+	}
+	.ci-chip.ci-accent.active {
+		background: rgba(168,85,247,0.16);
+		border-color: var(--color-gb-accent);
+		color: #d8b4fe;
+	}
+	.ci-chip-row {
+		display: flex;
+		gap: 6px;
+		overflow-x: auto;
+		padding-bottom: 2px;
+	}
+	.ci-chip-row.ci-wrap { flex-wrap: wrap; overflow: visible; }
+	.ci-chip-row::-webkit-scrollbar { display: none; }
+
+	.ci-field { display: flex; flex-direction: column; gap: 4px; }
+	.ci-field-label { font-size: 11px; color: var(--color-gb-text-muted); }
+	.ci-input {
+		width: 100%;
+		background: var(--color-gb-bg);
+		color: var(--color-gb-text);
+		border: 1px solid var(--color-gb-border);
+		border-radius: 10px;
+		padding: 10px 12px;
+		font-size: 14px;
+		min-height: 44px;
+		transition: border-color 0.15s ease;
+		font-family: inherit;
+	}
+	.ci-input:focus { border-color: var(--color-gb-green); outline: none; }
+	.ci-input::placeholder { color: #555; }
+	.ci-input.ci-notes { resize: none; min-height: 80px; }
+
+	.ci-stepper {
+		display: grid;
+		grid-template-columns: 44px 1fr 44px;
+		align-items: center;
+		background: var(--color-gb-bg);
+		border: 1px solid var(--color-gb-border);
+		border-radius: 12px;
+		overflow: hidden;
+		min-height: 44px;
+	}
+	.ci-stepper button {
+		background: none; border: none;
+		min-height: 44px;
+		color: var(--color-gb-text-muted);
+		font-size: 20px; font-weight: 300;
+		cursor: pointer;
+	}
+	.ci-stepper .val {
+		text-align: center;
+		font-size: 15px; font-weight: 600;
+		color: var(--color-gb-text);
+	}
+	.ci-stepper .val small {
+		display: block;
+		color: var(--color-gb-text-muted);
+		font-size: 10px; font-weight: 500;
+		margin-top: 1px;
+	}
+
+	.ci-photos {
+		display: grid;
+		grid-template-columns: repeat(5, 1fr);
+		gap: 6px;
+	}
+	.ci-photo {
+		aspect-ratio: 1;
+		background: var(--color-gb-surface-2);
+		border-radius: 10px;
+		position: relative;
+		overflow: hidden;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+	.ci-photo img { width: 100%; height: 100%; object-fit: cover; }
+	.ci-rm {
+		position: absolute;
+		top: 4px; right: 4px;
+		width: 22px; height: 22px;
+		border-radius: 999px;
+		background: rgba(0,0,0,0.65);
+		color: white; font-size: 11px;
+		display: flex; align-items: center; justify-content: center;
+		border: none; cursor: pointer;
+	}
+	.ci-add {
+		border: 1.5px dashed var(--color-gb-border);
+		background: transparent;
+		color: var(--color-gb-text-muted);
+		font-size: 10px; font-weight: 500;
+		gap: 4px; flex-direction: column;
+		min-height: 44px; cursor: pointer;
+	}
+	.ci-add:hover { border-color: var(--color-gb-green); color: var(--color-gb-green); }
+	.ci-add.busy { opacity: 0.6; pointer-events: none; }
+	.ci-add input { display: none; }
+
+	.ci-vpd { padding: 12px 14px; }
+	.ci-vpd-head { margin-bottom: 8px; }
+	.ci-vpd-label {
+		font-size: 11px;
+		color: var(--color-gb-text-muted);
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+	}
+	.ci-vpd-val { font-size: 14px; font-weight: 700; }
+	.ci-vpd-state {
+		font-size: 10px; font-weight: 500;
+		color: var(--color-gb-text-muted);
+		margin-left: 6px;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		font-style: normal;
+	}
+	.ci-gauge {
+		height: 6px;
+		background: var(--color-gb-surface);
+		border-radius: 999px;
+		overflow: visible;
+		position: relative;
+	}
+	.ci-gauge-crit, .ci-gauge-warn, .ci-gauge-opt {
+		position: absolute;
+		top: 0; bottom: 0;
+		border-radius: 999px;
+	}
+	.ci-gauge-crit { inset: 0; background: var(--color-gb-danger); opacity: 0.35; }
+	.ci-gauge-warn { background: var(--color-gb-warning); opacity: 0.55; }
+	.ci-gauge-opt { background: var(--color-gb-green); opacity: 0.85; }
+	.ci-gauge-cursor {
+		position: absolute;
+		top: -3px;
+		width: 3px; height: 12px;
+		border-radius: 2px;
+	}
+	.ci-scale {
+		display: flex;
+		justify-content: space-between;
+		margin-top: 6px;
+		font-size: 10px;
+		color: #666;
+	}
+
+	.ci-disc {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 14px;
+		background: var(--color-gb-surface);
+		border: none;
+		border-radius: 14px;
+		min-height: 56px;
+		width: 100%;
+		color: var(--color-gb-text);
+		cursor: pointer;
+		text-align: left;
+	}
+	.ci-disc-l { display: flex; align-items: center; gap: 12px; }
+	.ci-disc-ico {
+		width: 36px; height: 36px;
+		border-radius: 10px;
+		background: var(--color-gb-surface-2);
+		display: flex; align-items: center; justify-content: center;
+		color: var(--color-gb-text-muted);
+		font-size: 18px;
+	}
+	.ci-disc-title { font-size: 14px; font-weight: 500; }
+	.ci-disc-sub { font-size: 11px; color: var(--color-gb-text-muted); margin-top: 1px; }
+	.ci-chev { color: #555; font-size: 18px; }
+
+	.ci-fold {
+		overflow: hidden;
+		transition: max-height 0.25s ease, opacity 0.2s ease;
+	}
+	.ci-fold-inner {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		padding-top: 12px;
+	}
+
+	.ci-seg {
+		display: inline-flex;
+		background: var(--color-gb-bg);
+		border: 1px solid var(--color-gb-border);
+		border-radius: 12px;
+		padding: 3px;
+		gap: 2px;
+	}
+	.ci-seg button {
+		padding: 8px 12px;
+		font-size: 12px; font-weight: 500;
+		color: var(--color-gb-text-muted);
+		background: none; border: none;
+		border-radius: 9px;
+		min-height: 36px; min-width: 44px;
+		cursor: pointer;
+		font-family: inherit;
+	}
+	.ci-seg button.on {
+		background: var(--color-gb-surface-2);
+		color: var(--color-gb-text);
+		box-shadow: 0 1px 0 rgba(255,255,255,0.04);
+	}
+
+	.ci-toggle-row { display: flex; gap: 8px; }
+	.ci-toggle-card {
+		flex: 1;
+		padding: 12px;
+		background: var(--color-gb-surface-2);
+		border: 1px solid transparent;
+		border-radius: 12px;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		color: var(--color-gb-text);
+		font-size: 13px; font-weight: 500;
+		cursor: pointer;
+		font-family: inherit;
+	}
+	.ci-toggle-card.on { border-color: var(--color-gb-green); }
+
+	.ci-sw {
+		width: 40px; height: 24px;
+		border-radius: 999px;
+		background: var(--color-gb-surface-2);
+		position: relative;
+		border: 1px solid var(--color-gb-border);
+		flex-shrink: 0;
+		transition: background 0.15s ease;
+	}
+	.ci-sw::after {
+		content: '';
+		position: absolute;
+		top: 2px; left: 2px;
+		width: 18px; height: 18px;
+		border-radius: 999px;
+		background: #666;
+		transition: all 0.15s ease;
+	}
+	.ci-sw.on { background: rgba(34,197,94,0.25); border-color: var(--color-gb-green); }
+	.ci-sw.on::after { left: 18px; background: var(--color-gb-green); }
+
+	.ci-fp {
+		padding: 8px 10px;
+		background: rgba(168,85,247,0.08);
+		border: 1px solid rgba(168,85,247,0.25);
+		border-radius: 10px;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+		margin-top: 10px;
+	}
+	.ci-fp-l { display: flex; align-items: center; gap: 8px; min-width: 0; }
+	.ci-fi {
+		width: 28px; height: 28px;
+		border-radius: 8px;
+		background: rgba(168,85,247,0.18);
+		display: flex; align-items: center; justify-content: center;
+		color: #d8b4fe;
+		flex-shrink: 0;
+	}
+	.ci-fp-t { min-width: 0; }
+	.ci-fp-cap {
+		font-size: 10px;
+		color: var(--color-gb-text-muted);
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+	}
+	.ci-fp-name {
+		font-size: 13px; font-weight: 600;
+		color: #e9d5ff;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.ci-fp-link {
+		font-size: 11px;
+		color: #d8b4fe;
+		text-decoration: none;
+		padding: 6px 8px;
+		white-space: nowrap;
+	}
+
+	.ci-cta {
+		width: 100%;
+		min-height: 52px;
+		background: var(--color-gb-green);
+		color: #000;
+		font-weight: 700;
+		font-size: 15px;
+		border: none;
+		border-radius: 14px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+		cursor: pointer;
+		box-shadow: 0 10px 30px -10px rgba(34,197,94,0.55);
+		font-family: inherit;
+	}
+	.ci-cta:active { transform: scale(0.98); }
+</style>

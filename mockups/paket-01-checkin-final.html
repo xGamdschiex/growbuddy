@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GrowBuddy · Paket #1 — Daily Check-in (Final · Flow A)</title>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  :root {
+    --gb-green: #22c55e;
+    --gb-green-dark: #16a34a;
+    --gb-green-light: #4ade80;
+    --gb-bg: #0a0a0a;
+    --gb-surface: #171717;
+    --gb-surface-2: #262626;
+    --gb-border: #333333;
+    --gb-text: #f5f5f5;
+    --gb-text-muted: #a3a3a3;
+    --gb-accent: #a855f7;
+    --gb-warning: #f59e0b;
+    --gb-danger: #ef4444;
+    --gb-info: #3b82f6;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; background: #050505; color: var(--gb-text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+  button:active:not(:disabled) { transform: scale(0.97); transition: transform 0.05s ease; }
+  input, select, textarea { font-family: inherit; color-scheme: dark; }
+  :focus-visible { outline: 2px solid var(--gb-green); outline-offset: 2px; border-radius: 4px; }
+
+  .canvas { display: flex; flex-direction: column; align-items: center; padding: 32px 16px 64px; gap: 18px; min-height: 100vh; }
+  .canvas-head { max-width: 420px; text-align: center; color: #9ca3af; font-size: 12px; line-height: 1.55; }
+  .canvas-head h1 { color: #f5f5f5; font-size: 20px; font-weight: 700; margin: 0 0 6px; letter-spacing: -0.01em; }
+  .badge { display: inline-block; background: #171717; border: 1px solid #333; color: #a3a3a3; font-size: 10px; padding: 3px 8px; border-radius: 999px; margin-right: 4px; }
+  .phone { width: 390px; height: 820px; border-radius: 44px; background: #000; border: 1px solid #1a1a1a; box-shadow: 0 30px 80px -20px rgba(0,0,0,0.8); padding: 10px; position: relative; overflow: hidden; }
+  .phone-inner { width: 100%; height: 100%; border-radius: 34px; background: var(--gb-bg); overflow: hidden; position: relative; display: flex; flex-direction: column; }
+  .status-bar { height: 40px; padding: 12px 22px 0; display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600; color: var(--gb-text); flex-shrink: 0; }
+  .status-bar .right { display: inline-flex; gap: 6px; align-items: center; }
+  .notch { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); width: 110px; height: 28px; background: #000; border-radius: 999px; z-index: 5; }
+
+  .scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 8px 16px 100px; }
+  .scroll::-webkit-scrollbar { width: 0; }
+
+  .sticky-cta { position: absolute; left: 10px; right: 10px; bottom: 10px; padding: 12px 14px calc(env(safe-area-inset-bottom, 8px) + 14px); background: linear-gradient(to top, #0a0a0a 72%, rgba(10,10,10,0)); border-radius: 0 0 34px 34px; pointer-events: none; }
+  .sticky-cta > * { pointer-events: auto; }
+
+  .card { background: var(--gb-surface); border-radius: 16px; padding: 14px; }
+  .card-2 { background: var(--gb-surface-2); border-radius: 12px; padding: 12px; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .muted { color: var(--gb-text-muted); }
+
+  .input, .select {
+    width: 100%; background: var(--gb-bg); color: var(--gb-text);
+    border: 1px solid var(--gb-border); border-radius: 10px;
+    padding: 10px 12px; font-size: 14px; min-height: 44px;
+    transition: border-color 0.15s ease;
+  }
+  .input:focus, .select:focus { border-color: var(--gb-green); outline: none; }
+  .input::placeholder { color: #555; }
+
+  .chip { min-height: 36px; padding: 8px 12px; border-radius: 999px; font-size: 12px; font-weight: 500; border: 1px solid var(--gb-border); background: var(--gb-bg); color: var(--gb-text-muted); display: inline-flex; align-items: center; gap: 6px; transition: all 0.15s ease; white-space: nowrap; }
+  .chip.active { background: rgba(34,197,94,0.14); border-color: var(--gb-green); color: var(--gb-green); }
+  .chip.accent.active { background: rgba(168,85,247,0.16); border-color: var(--gb-accent); color: #d8b4fe; }
+
+  .seg { display: inline-flex; background: var(--gb-bg); border: 1px solid var(--gb-border); border-radius: 12px; padding: 3px; gap: 2px; }
+  .seg button { padding: 8px 12px; font-size: 12px; font-weight: 500; color: var(--gb-text-muted); border-radius: 9px; min-height: 36px; min-width: 44px; }
+  .seg button.on { background: var(--gb-surface-2); color: var(--gb-text); box-shadow: 0 1px 0 rgba(255,255,255,0.04); }
+
+  .stepper { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; background: var(--gb-bg); border: 1px solid var(--gb-border); border-radius: 12px; overflow: hidden; min-height: 44px; }
+  .stepper button { min-height: 44px; color: var(--gb-text-muted); font-size: 20px; font-weight: 300; }
+  .stepper .val { text-align: center; font-size: 15px; font-weight: 600; color: var(--gb-text); }
+  .stepper .val small { display: block; color: var(--gb-text-muted); font-size: 10px; font-weight: 500; margin-top: 1px; }
+
+  .sec-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; gap: 8px; }
+  .sec-title { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gb-text-muted); }
+  .sec-hint { font-size: 11px; color: #666; }
+
+  .disc { display: flex; align-items: center; justify-content: space-between; padding: 14px; background: var(--gb-surface); border-radius: 14px; min-height: 56px; }
+  .disc .l { display: flex; align-items: center; gap: 12px; }
+  .disc .icon { width: 36px; height: 36px; border-radius: 10px; background: var(--gb-surface-2); display: flex; align-items: center; justify-content: center; color: var(--gb-text-muted); font-size: 18px; }
+  .disc .t { font-size: 14px; font-weight: 500; }
+  .disc .s { font-size: 11px; color: var(--gb-text-muted); margin-top: 1px; }
+  .disc .chev { color: #555; font-size: 18px; }
+
+  .gauge { height: 6px; background: var(--gb-surface); border-radius: 999px; overflow: hidden; position: relative; }
+  .gauge .cursor { position: absolute; top: -3px; width: 3px; height: 12px; border-radius: 2px; }
+
+  .photos { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .photo { aspect-ratio: 1; background: var(--gb-surface-2); border-radius: 10px; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+  .photo .rm { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border-radius: 999px; background: rgba(0,0,0,0.65); font-size: 11px; display: flex; align-items: center; justify-content: center; }
+  .photo.add { border: 1.5px dashed var(--gb-border); background: transparent; color: var(--gb-text-muted); font-size: 10px; font-weight: 500; gap: 4px; flex-direction: column; min-height: 44px; }
+  .photo.add:hover { border-color: var(--gb-green); color: var(--gb-green); }
+
+  .streak { display: inline-flex; align-items: center; gap: 6px; background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.3); color: var(--gb-warning); padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+
+  .fold { overflow: hidden; transition: max-height 0.25s ease, opacity 0.2s ease; }
+
+  .sw { width: 40px; height: 24px; border-radius: 999px; background: var(--gb-surface-2); position: relative; border: 1px solid var(--gb-border); flex-shrink: 0; transition: background 0.15s ease; }
+  .sw::after { content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 999px; background: #666; transition: all 0.15s ease; }
+  .sw.on { background: rgba(34,197,94,0.25); border-color: var(--gb-green); }
+  .sw.on::after { left: 18px; background: var(--gb-green); }
+
+  .cta { width: 100%; min-height: 52px; background: var(--gb-green); color: #000; font-weight: 700; font-size: 15px; border-radius: 14px; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 10px 30px -10px rgba(34,197,94,0.55); }
+  .cta:disabled { opacity: 0.6; }
+
+  .feedline-chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; background: rgba(168,85,247,0.12); border: 1px solid rgba(168,85,247,0.3); border-radius: 999px; font-size: 10px; color: #d8b4fe; font-weight: 500; }
+  .feedline-panel { padding: 8px 10px; background: rgba(168,85,247,0.08); border: 1px solid rgba(168,85,247,0.25); border-radius: 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .feedline-panel .fi { width: 28px; height: 28px; border-radius: 8px; background: rgba(168,85,247,0.18); display: flex; align-items: center; justify-content: center; color: #d8b4fe; flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<div class="canvas">
+  <div class="canvas-head">
+    <h1>Paket #1 · Daily Check-in — Final</h1>
+    <p>
+      <span class="badge">Flow A</span>
+      <span class="badge">Alle Felder erhalten</span>
+      <span class="badge">Touch ≥44px</span>
+    </p>
+  </div>
+
+  <div class="phone"><div class="notch"></div><div id="root" class="phone-inner"></div></div>
+
+  <div class="canvas-head" style="max-width:720px; text-align:left;">
+    <h1 style="font-size:14px; text-align:left; margin-top:12px;">Felder-Mapping → <code style="color:#ccc;">growStore.addCheckIn()</code></h1>
+    <pre style="background:#0f0f0f; border:1px solid #222; border-radius:10px; padding:12px; font-size:11px; line-height:1.5; overflow-x:auto; color:#ccc;">
+photos_data  → Foto-Grid (max 5) · photo_data = photos[0]
+phase        → Phase-Chips (Seedling|Veg|Bloom|Flush|Dry|Cure)
+week, day    → Stepper (min 1 · auto ab started_at · manuell override → weekDayManual=true)
+temp, rh     → Inputs → calcVPD(temp, rh) = vpd
+ecUnit       → Segmented 3-way (localStorage 'growbuddy_ec_unit')
+ec_measured  → Input (mit toMsPerCm() konvertiert vor save)
+ph_measured  → Input 0-14 step 0.1
+watered      → Toggle-Card → entblößt water_ml
+nutrients_given → Toggle-Card → entblößt nutrient_ml + Feedline-Info-Panel
+training     → Accent-Chip (single-select · re-tap deselektiert → null)
+notes        → Textarea trim()
+feedline_label → readonly Anzeige aus selectedGrow (keine Eingabe!)
+    </pre>
+    <p style="color:#777; font-size:11px;">Keine State-Änderungen vs. aktueller Komponente — nur visuell neu. `grow.feedline_id` → Label-Lookup (bestehende helper nutzen).</p>
+  </div>
+</div>
+
+<script type="text/babel" data-presets="react">
+const { useState } = React;
+
+const PHASES = ['Seedling', 'Veg', 'Bloom', 'Flush', 'Dry', 'Cure'];
+const TRAININGS = ['LST', 'Topping', 'FIM', 'ScrOG', 'Defoliation'];
+const EC_UNITS = [
+  { v: 'mS/cm', l: 'mS/cm', step: 0.1, placeholder: '1.5' },
+  { v: 'ppm500', l: 'ppm·500', step: 10, placeholder: '750' },
+  { v: 'ppm700', l: 'ppm·700', step: 10, placeholder: '1050' },
+];
+const MAX_PHOTOS = 5;
+
+const MOCK_GROWS = [
+  { id: '1', name: 'Tent 80', strain: 'Wedding Cake', started_at: '2026-03-14', feedline_label: 'BioBizz · Soil' },
+  { id: '2', name: 'Tent 60', strain: 'Gelato Auto', started_at: '2026-04-02', feedline_label: 'GHE Flora · Coco' },
+];
+
+function calcVPD(temp, rh) {
+  if (temp == null || rh == null) return null;
+  const svp = 0.6108 * Math.exp((17.27 * temp) / (temp + 237.3));
+  return +(svp * (1 - rh / 100)).toFixed(2);
+}
+function vpdZones(phase) {
+  const bloom = phase === 'Bloom' || phase === 'Flush';
+  return bloom
+    ? { opt: [1.2, 1.6], warn: [0.8, 2.0] }
+    : { opt: [0.8, 1.2], warn: [0.4, 1.6] };
+}
+function vpdStatus(v, phase) {
+  if (v == null) return 'idle';
+  const { opt, warn } = vpdZones(phase);
+  if (v >= opt[0] && v <= opt[1]) return 'optimal';
+  if (v >= warn[0] && v <= warn[1]) return 'warn';
+  return 'critical';
+}
+const VPD_COLORS = {
+  idle: '#666',
+  optimal: 'var(--gb-green)',
+  warn: 'var(--gb-warning)',
+  critical: 'var(--gb-danger)',
+};
+
+function StatusBar() {
+  return (
+    <div className="status-bar">
+      <span>9:41</span>
+      <span className="right">
+        <svg width="16" height="12" viewBox="0 0 16 12" fill="none"><path d="M1 11h2M5 8h2M9 5h2M13 2h2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+        <svg width="14" height="10" viewBox="0 0 14 10" fill="none"><path d="M1 5c1.5-1.5 3-2.5 6-2.5s4.5 1 6 2.5M3 7c1-1 2-1.5 4-1.5s3 .5 4 1.5M5.5 9c.5-.5 1-.7 1.5-.7s1 .2 1.5.7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+        <svg width="22" height="12" viewBox="0 0 22 12" fill="none"><rect x="1" y="1" width="18" height="10" rx="2.5" stroke="currentColor" strokeWidth="1"/><rect x="3" y="3" width="14" height="6" rx="1" fill="currentColor"/><rect x="20" y="4" width="1.5" height="4" rx="0.5" fill="currentColor"/></svg>
+      </span>
+    </div>
+  );
+}
+
+function BottleIcon({ size = 10 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"><path d="M6 2v6a6 6 0 1 0 12 0V2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M6 8h12" stroke="currentColor" strokeWidth="2"/></svg>
+  );
+}
+
+function PhotoGrid({ photos, onAdd, onRemove }) {
+  return (
+    <div className="photos">
+      {photos.map((p, i) => (
+        <div className="photo" key={i} style={{ background: p }}>
+          <button className="rm" onClick={() => onRemove(i)}>✕</button>
+        </div>
+      ))}
+      {photos.length < MAX_PHOTOS && (
+        <button className="photo add" onClick={onAdd}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 8l2-3h4l1-2h4l1 2h4l2 3v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><circle cx="12" cy="13" r="4" stroke="currentColor" strokeWidth="1.5"/></svg>
+          <span>{photos.length === 0 ? 'Foto' : '+'}</span>
+        </button>
+      )}
+    </div>
+  );
+}
+
+function Stepper({ value, onChange, step = 1, min = 1, max = 999, label, auto = false }) {
+  return (
+    <div className="stepper">
+      <button onClick={() => onChange(Math.max(min, (value ?? min) - step))}>−</button>
+      <div className="val">{value ?? '–'}<small>{label}{auto ? ' · auto' : ''}</small></div>
+      <button onClick={() => onChange(Math.min(max, (value ?? min) + step))}>+</button>
+    </div>
+  );
+}
+
+function PhaseSelect({ value, onChange }) {
+  return (
+    <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
+      {PHASES.map(p => (
+        <button key={p} className={'chip' + (value === p ? ' active' : '')} onClick={() => onChange(p)}>{p}</button>
+      ))}
+    </div>
+  );
+}
+
+function VPDBlock({ temp, rh, phase }) {
+  const v = calcVPD(temp, rh);
+  const st = vpdStatus(v, phase);
+  const color = VPD_COLORS[st];
+  const MIN = 0, MAX = 2.5;
+  const toPct = (k) => Math.max(0, Math.min(100, ((k - MIN) / (MAX - MIN)) * 100));
+  const { opt, warn } = vpdZones(phase);
+  const pct = v == null ? 0 : toPct(v);
+  const label = st === 'optimal' ? 'optimal' : st === 'warn' ? 'grenzwertig' : st === 'critical' ? 'kritisch' : '';
+  const phaseLabel = phase === 'Bloom' || phase === 'Flush' ? 'Bloom' : 'Veg';
+  return (
+    <div className="card-2" style={{ padding: '12px 14px' }}>
+      <div className="row" style={{ justifyContent: 'space-between', marginBottom: 8 }}>
+        <span style={{ fontSize: 11, color: 'var(--gb-text-muted)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+          VPD · {phaseLabel}
+        </span>
+        <span style={{ fontSize: 14, fontWeight: 700, color }}>
+          {v == null ? '— kPa' : `${v.toFixed(2)} kPa`}
+          {label && <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--gb-text-muted)', marginLeft: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>· {label}</span>}
+        </span>
+      </div>
+      <div className="gauge">
+        <div style={{ position: 'absolute', inset: 0, background: 'var(--gb-danger)', opacity: 0.35 }} />
+        <div style={{ position: 'absolute', top: 0, bottom: 0, left: `${toPct(warn[0])}%`, width: `${toPct(warn[1]) - toPct(warn[0])}%`, background: 'var(--gb-warning)', opacity: 0.55 }} />
+        <div style={{ position: 'absolute', top: 0, bottom: 0, left: `${toPct(opt[0])}%`, width: `${toPct(opt[1]) - toPct(opt[0])}%`, background: 'var(--gb-green)', opacity: 0.85 }} />
+        {v != null && <div className="cursor" style={{ left: `calc(${pct}% - 1.5px)`, background: color }} />}
+      </div>
+      <div className="row" style={{ justifyContent: 'space-between', marginTop: 6, fontSize: 10, color: '#666' }}>
+        <span>0.0</span><span>0.5</span><span>1.0</span><span>1.5</span><span>2.0</span><span>2.5</span>
+      </div>
+    </div>
+  );
+}
+
+function Checkin({ streak = 7, multiplier = 2 }) {
+  const [selectedGrowId, setSelectedGrowId] = useState(MOCK_GROWS[0].id);
+  const selectedGrow = MOCK_GROWS.find(g => g.id === selectedGrowId);
+
+  const [phase, setPhase] = useState('Veg');
+  const [week, setWeek] = useState(3);
+  const [day, setDay] = useState(4);
+  const [weekDayManual, setWeekDayManual] = useState(false);
+
+  const [temp, setTemp] = useState(24.5);
+  const [rh, setRh] = useState(58);
+  const [ec, setEc] = useState(null);
+  const [ecUnit, setEcUnit] = useState('mS/cm');
+  const [ph, setPh] = useState(null);
+
+  const [watered, setWatered] = useState(false);
+  const [nutrients, setNutrients] = useState(false);
+  const [waterMl, setWaterMl] = useState(null);
+  const [nutrientMl, setNutrientMl] = useState(null);
+
+  const [training, setTraining] = useState(null);
+  const [notes, setNotes] = useState('');
+  const [photos, setPhotos] = useState(['linear-gradient(135deg,#14532d,#166534)']);
+  const [more, setMore] = useState(false);
+
+  const addPhoto = () => {
+    if (photos.length >= MAX_PHOTOS) return;
+    const hues = [120, 90, 150, 60, 180];
+    const h = hues[photos.length % hues.length];
+    setPhotos([...photos, `linear-gradient(135deg, hsl(${h} 30% 18%), hsl(${h + 40} 40% 28%))`]);
+  };
+  const removePhoto = (idx) => setPhotos(photos.filter((_, i) => i !== idx));
+  const ecMeta = EC_UNITS.find(u => u.v === ecUnit);
+
+  return (
+    <>
+      <StatusBar />
+      <div className="scroll">
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 2px 12px' }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, letterSpacing: '-0.01em' }}>Check-in</h2>
+            <div style={{ fontSize: 12, color: 'var(--gb-text-muted)', marginTop: 2 }}>
+              {new Date().toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'short' })}
+            </div>
+          </div>
+          {streak > 0 && <span className="streak">🔥 {streak}T{multiplier > 1 ? ` · ${multiplier}×` : ''}</span>}
+        </div>
+
+        {/* Grow card */}
+        <div className="card" style={{ marginBottom: 12, padding: '10px 12px' }}>
+          <div className="row" style={{ justifyContent: 'space-between' }}>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>{selectedGrow.name} · {selectedGrow.strain}</div>
+              <div style={{ fontSize: 11, color: 'var(--gb-text-muted)', marginTop: 1 }}>Woche {week} · Tag {day}{!weekDayManual ? ' · auto' : ''}</div>
+              <div className="feedline-chip" style={{ marginTop: 6 }}>
+                <BottleIcon size={10} />
+                {selectedGrow.feedline_label}
+              </div>
+            </div>
+            <button className="chip" onClick={() => {
+              const i = MOCK_GROWS.findIndex(g => g.id === selectedGrowId);
+              setSelectedGrowId(MOCK_GROWS[(i + 1) % MOCK_GROWS.length].id);
+            }}>wechseln</button>
+          </div>
+        </div>
+
+        {/* Photos */}
+        <div className="card" style={{ marginBottom: 12 }}>
+          <div className="sec-head">
+            <span className="sec-title">Fotos</span>
+            <span className="sec-hint">{photos.length}/{MAX_PHOTOS} · empfohlen</span>
+          </div>
+          <PhotoGrid photos={photos} onAdd={addPhoto} onRemove={removePhoto} />
+        </div>
+
+        {/* Phase + Zeit */}
+        <div className="card" style={{ marginBottom: 12 }}>
+          <div className="sec-head"><span className="sec-title">Phase & Zeit</span></div>
+          <PhaseSelect value={phase} onChange={setPhase} />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
+            <Stepper value={week} onChange={v => { setWeek(v); setWeekDayManual(true); }} min={1} max={30} label="Woche" auto={!weekDayManual} />
+            <Stepper value={day} onChange={v => { setDay(v); setWeekDayManual(true); }} min={1} max={7} label="Tag" auto={!weekDayManual} />
+          </div>
+        </div>
+
+        {/* Klima */}
+        <div className="card" style={{ marginBottom: 12 }}>
+          <div className="sec-head"><span className="sec-title">Klima</span><span className="sec-hint">Temp · RH → VPD</span></div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span style={{ fontSize: 11, color: 'var(--gb-text-muted)' }}>Temperatur °C</span>
+              <input className="input" type="number" step="0.5" value={temp ?? ''} onChange={e => setTemp(e.target.value === '' ? null : +e.target.value)} placeholder="25" />
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span style={{ fontSize: 11, color: 'var(--gb-text-muted)' }}>Feuchte %</span>
+              <input className="input" type="number" step="1" value={rh ?? ''} onChange={e => setRh(e.target.value === '' ? null : +e.target.value)} placeholder="60" />
+            </label>
+          </div>
+          <VPDBlock temp={temp} rh={rh} phase={phase} />
+        </div>
+
+        {/* More disclosure */}
+        <button
+          className="disc"
+          style={{ width: '100%', textAlign: 'left', marginBottom: more ? 12 : 0 }}
+          onClick={() => setMore(!more)}
+        >
+          <div className="l">
+            <div className="icon">{more ? '−' : '+'}</div>
+            <div>
+              <div className="t">Mehr erfassen</div>
+              <div className="s">EC · pH · Gießen · Training · Notizen</div>
+            </div>
+          </div>
+          <div className="chev">{more ? '▾' : '▸'}</div>
+        </button>
+
+        <div className="fold" style={{ maxHeight: more ? 2000 : 0, opacity: more ? 1 : 0 }}>
+          {/* EC + pH */}
+          <div className="card" style={{ marginBottom: 12 }}>
+            <div className="sec-head">
+              <span className="sec-title">Messwerte</span>
+              <div className="seg">
+                {EC_UNITS.map(u => (
+                  <button key={u.v} className={ecUnit === u.v ? 'on' : ''} onClick={() => setEcUnit(u.v)}>{u.l}</button>
+                ))}
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 11, color: 'var(--gb-text-muted)' }}>EC</span>
+                <input className="input" type="number" step={ecMeta.step} placeholder={ecMeta.placeholder} value={ec ?? ''} onChange={e => setEc(e.target.value === '' ? null : +e.target.value)} />
+              </label>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 11, color: 'var(--gb-text-muted)' }}>pH</span>
+                <input className="input" type="number" step="0.1" min="0" max="14" placeholder="6.0" value={ph ?? ''} onChange={e => setPh(e.target.value === '' ? null : +e.target.value)} />
+              </label>
+            </div>
+          </div>
+
+          {/* Watered / Nutrients */}
+          <div className="card" style={{ marginBottom: 12 }}>
+            <div className="sec-head"><span className="sec-title">Gießen & Düngen</span></div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="card-2" style={{ flex: 1, padding: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: `1px solid ${watered ? 'var(--gb-green)' : 'transparent'}` }} onClick={() => setWatered(!watered)}>
+                <span style={{ fontSize: 13, fontWeight: 500 }}>💧 Gegossen</span>
+                <div className={'sw' + (watered ? ' on' : '')}></div>
+              </button>
+              <button className="card-2" style={{ flex: 1, padding: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: `1px solid ${nutrients ? 'var(--gb-green)' : 'transparent'}` }} onClick={() => setNutrients(!nutrients)}>
+                <span style={{ fontSize: 13, fontWeight: 500 }}>🧪 Gedüngt</span>
+                <div className={'sw' + (nutrients ? ' on' : '')}></div>
+              </button>
+            </div>
+            {nutrients && (
+              <div className="feedline-panel" style={{ marginTop: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                  <div className="fi"><BottleIcon size={14} /></div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 10, color: 'var(--gb-text-muted)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Düngerlinie</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#e9d5ff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selectedGrow.feedline_label}</div>
+                  </div>
+                </div>
+                <a href="#" style={{ fontSize: 11, color: '#d8b4fe', textDecoration: 'none', padding: '6px 8px', whiteSpace: 'nowrap' }}>zu Calc →</a>
+              </div>
+            )}
+            {(watered || nutrients) && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
+                {watered && (
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <span style={{ fontSize: 11, color: 'var(--gb-text-muted)' }}>Wasser (mL)</span>
+                    <input className="input" type="number" step="100" placeholder="1000" value={waterMl ?? ''} onChange={e => setWaterMl(e.target.value === '' ? null : +e.target.value)} />
+                  </label>
+                )}
+                {nutrients && (
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <span style={{ fontSize: 11, color: 'var(--gb-text-muted)' }}>Dünger (mL)</span>
+                    <input className="input" type="number" step="1" placeholder="10" value={nutrientMl ?? ''} onChange={e => setNutrientMl(e.target.value === '' ? null : +e.target.value)} />
+                  </label>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Training */}
+          <div className="card" style={{ marginBottom: 12 }}>
+            <div className="sec-head"><span className="sec-title">Training</span></div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {TRAININGS.map(t => (
+                <button key={t} className={'chip accent' + (training === t ? ' active' : '')} onClick={() => setTraining(training === t ? null : t)}>{t}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* Notizen */}
+          <div className="card" style={{ marginBottom: 12 }}>
+            <div className="sec-head"><span className="sec-title">Notizen</span></div>
+            <textarea className="input" style={{ resize: 'none', minHeight: 80 }} rows="3" placeholder="Beobachtungen…" value={notes} onChange={e => setNotes(e.target.value)} />
+          </div>
+        </div>
+
+        <div style={{ height: 80 }} />
+      </div>
+
+      <div className="sticky-cta">
+        <button className="cta">✓ Check-in speichern{multiplier > 1 ? ` · +${Math.round(10 * multiplier)} XP` : ''}</button>
+      </div>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<Checkin />);
+</script>
+
+</body>
+</html>

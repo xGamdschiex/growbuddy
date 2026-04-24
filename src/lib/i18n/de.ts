@@ -175,6 +175,9 @@ export const de: Record<string, string> = {
 	'onboarding.trial_desc': 'Unbegrenzte Grows, AI Diagnose, Cloud-Sync',
 	'onboarding.trial_btn': 'Pro testen — kostenlos',
 	'onboarding.free_btn': 'Mit Free starten',
+	'onboarding.cloud_title': 'Daten in der Cloud sichern',
+	'onboarding.cloud_desc': 'Optional — aber damit verlierst du nichts bei Handy-Wechsel und kannst auf allen Geräten synchronisieren.',
+	'onboarding.cloud_later': 'Später entscheiden',
 
 	// Grow Detail
 	'grow.my_grows': 'Meine Grows',

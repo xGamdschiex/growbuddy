@@ -175,6 +175,9 @@ export const en: Record<string, string> = {
 	'onboarding.trial_desc': 'Unlimited grows, AI diagnosis, cloud sync',
 	'onboarding.trial_btn': 'Try Pro — free',
 	'onboarding.free_btn': 'Start with Free',
+	'onboarding.cloud_title': 'Back up your data',
+	'onboarding.cloud_desc': 'Optional — but this way you won\'t lose anything when switching devices and can sync across all of them.',
+	'onboarding.cloud_later': 'Decide later',
 
 	// Grow Detail
 	'grow.my_grows': 'My Grows',
