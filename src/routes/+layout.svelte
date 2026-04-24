@@ -14,8 +14,7 @@
 
 	let { children }: { children: Snippet } = $props();
 	let toasts = $derived.by(() => { let v: Toast[] = []; toastStore.subscribe(x => v = x)(); return v; });
-	let onboarding = $state<{ completed: boolean }>({ completed: false });
-	$effect(() => onboardingStore.subscribe(x => { onboarding = x; }));
+	let onboarding = $derived.by(() => { let v = { completed: false }; onboardingStore.subscribe(x => v = x)(); return v; });
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
 
 	let showUpdateBanner = $state(false);
@@ -23,30 +22,21 @@
 
 	let currentPath = $derived($page.url.pathname);
 	let isOnboardingPage = $derived(currentPath === '/onboarding');
+	let hydrated = $state(false);
 	let onboardingDone = $derived.by(() => {
-		if (!hydrated || typeof window === 'undefined') return false;
-		const lsRaw = localStorage.getItem('growbuddy_onboarding');
-		return onboarding.completed || (lsRaw ? JSON.parse(lsRaw).completed === true : false);
+		if (!hydrated) return false;
+		return onboarding.completed;
 	});
 	let showNav = $derived(onboardingDone && !isOnboardingPage);
 
 	// Offline Status
 	let isOffline = $state(false);
 
-	// Redirect zu Onboarding wenn nicht completed
-	// Nur localStorage als Quelle der Wahrheit (verhindert Race-Condition bei Hydration)
-	let hydrated = $state(false);
+	// Hydration + Onboarding-Redirect in einem Effect (vermeidet Doppel-Triggering)
 	$effect(() => {
 		hydrated = true;
-	});
-	$effect(() => {
-		if (!hydrated) return;
 		if (isOnboardingPage) return;
-		const lsRaw = localStorage.getItem('growbuddy_onboarding');
-		const lsCompleted = lsRaw ? JSON.parse(lsRaw).completed === true : false;
-		if (!lsCompleted) {
-			goto('/onboarding');
-		}
+		if (!onboarding.completed) goto('/onboarding');
 	});
 
 	// Reminder-Timer beim App-Start wiederherstellen + Missed-Check-in prüfen

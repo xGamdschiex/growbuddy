@@ -1,20 +1,34 @@
 /**
- * Gemini Water Lookup — Wasserwerte per Stadtname ermitteln
- * User gibt Stadt/PLZ ein → Gemini sucht Wasserwerte beim lokalen Versorger.
+ * Gemini Water Lookup — Wasserwerte per Stadtname ermitteln.
+ * Model-Kaskade 2.5-flash → 2.0-flash mit Retry. 30-Tage localStorage-Cache.
  */
 
+import { safeSetItem } from '$lib/utils/storage-safe';
+import { logger } from '$lib/utils/logger';
+
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`;
+const MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash'];
+const CACHE_KEY = 'growbuddy_water_lookup_cache';
+const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 Tage — Wasserwerte ändern sich nur bei Labor-Reports
+
+const buildUrl = (model: string) =>
+	`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${API_KEY}`;
 
 export interface WaterValues {
-	ca: number;      // mg/L
-	mg: number;      // mg/L
-	ec: number;      // mS/cm
+	ca: number;
+	mg: number;
+	ec: number;
 	ph: number;
-	hardness: number; // °dH
-	source: string;   // z.B. "Stadtwerke München 2024"
-	note: string;     // Zusatzinfo
+	hardness: number;
+	source: string;
+	note: string;
 }
+
+interface CacheEntry {
+	values: WaterValues;
+	timestamp: number;
+}
+type Cache = Record<string, CacheEntry>;
 
 const PROMPT = `Du bist Experte für Trinkwasseranalyse. Der User gibt einen Standort an (Stadt, PLZ, Region).
 
@@ -39,48 +53,113 @@ Antworte NUR mit validem JSON:
   "note": "Zusatzinfo oder 'geschätzt' wenn unsicher"
 }`;
 
-export async function lookupWaterValues(location: string): Promise<WaterValues> {
-	if (!API_KEY) {
-		throw new Error('Gemini API Key nicht konfiguriert');
+function loadCache(): Cache {
+	if (typeof localStorage === 'undefined') return {};
+	try {
+		const raw = localStorage.getItem(CACHE_KEY);
+		return raw ? JSON.parse(raw) : {};
+	} catch {
+		return {};
 	}
+}
 
-	const response = await fetch(API_URL, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({
-			contents: [{
+function saveCache(cache: Cache) {
+	safeSetItem(CACHE_KEY, JSON.stringify(cache));
+}
+
+function cacheGet(location: string): WaterValues | null {
+	const cache = loadCache();
+	const entry = cache[location.toLowerCase()];
+	if (!entry) return null;
+	if (Date.now() - entry.timestamp > CACHE_TTL_MS) return null;
+	return entry.values;
+}
+
+function cacheSet(location: string, values: WaterValues) {
+	const cache = loadCache();
+	cache[location.toLowerCase()] = { values, timestamp: Date.now() };
+	saveCache(cache);
+}
+
+function validate(v: WaterValues): void {
+	if (v.ca < 0 || v.ca > 500) throw new Error('Ca-Wert unrealistisch');
+	if (v.mg < 0 || v.mg > 200) throw new Error('Mg-Wert unrealistisch');
+	if (v.ec < 0 || v.ec > 5) throw new Error('EC-Wert unrealistisch');
+	if (v.ph < 4 || v.ph > 10) throw new Error('pH-Wert unrealistisch');
+}
+
+export async function lookupWaterValues(location: string, retries = 2): Promise<WaterValues> {
+	if (!API_KEY) throw new Error('Gemini API Key nicht konfiguriert');
+
+	const cached = cacheGet(location);
+	if (cached) return cached;
+
+	const body = JSON.stringify({
+		contents: [
+			{
 				parts: [
 					{ text: PROMPT },
 					{ text: `Standort: ${location}` },
-				]
-			}],
-			generationConfig: {
-				temperature: 0.2,
-				maxOutputTokens: 512,
-				responseMimeType: 'application/json',
+				],
 			},
-		}),
+		],
+		generationConfig: {
+			temperature: 0.2,
+			maxOutputTokens: 512,
+			responseMimeType: 'application/json',
+		},
 	});
 
-	if (!response.ok) {
-		const err = await response.text();
-		throw new Error(`Gemini API Fehler: ${response.status}`);
+	let lastError: Error | null = null;
+	let quotaHit = false;
+
+	for (const model of MODELS) {
+		for (let attempt = 0; attempt <= retries; attempt++) {
+			try {
+				const response = await fetch(buildUrl(model), {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body,
+				});
+
+				if (response.status === 429) {
+					quotaHit = true;
+					lastError = new Error(`Quota erreicht (${model})`);
+					break; // nächstes Model direkt
+				}
+
+				if (!response.ok) {
+					throw new Error(`Gemini Fehler: ${response.status}`);
+				}
+
+				const data = await response.json();
+				const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+				if (!text) throw new Error('Keine Antwort von Gemini');
+
+				const result = JSON.parse(text) as WaterValues;
+				validate(result);
+
+				cacheSet(location, result);
+				return result;
+			} catch (e: any) {
+				lastError = e instanceof Error ? e : new Error(String(e));
+				logger.warn('Water-Lookup fetch fehlgeschlagen', { model, attempt, err: lastError.message });
+				if (attempt < retries) {
+					await new Promise(r => setTimeout(r, 800 * (attempt + 1)));
+				}
+			}
+		}
 	}
 
-	const data = await response.json();
-	const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-	if (!text) {
-		throw new Error('Keine Antwort von Gemini');
+	if (quotaHit) {
+		throw new Error('Gemini Tages-Limit erreicht. Bitte später erneut oder Werte manuell eingeben.');
 	}
+	throw lastError ?? new Error('Standortabfrage fehlgeschlagen');
+}
 
-	const result = JSON.parse(text) as WaterValues;
-
-	// Validierung: Werte müssen in realistischem Bereich liegen
-	if (result.ca < 0 || result.ca > 500) throw new Error('Ca-Wert unrealistisch');
-	if (result.mg < 0 || result.mg > 200) throw new Error('Mg-Wert unrealistisch');
-	if (result.ec < 0 || result.ec > 5) throw new Error('EC-Wert unrealistisch');
-	if (result.ph < 4 || result.ph > 10) throw new Error('pH-Wert unrealistisch');
-
-	return result;
+/** Cache manuell leeren (z.B. in Settings-Page) */
+export function clearWaterLookupCache(): void {
+	if (typeof localStorage !== 'undefined') {
+		localStorage.removeItem(CACHE_KEY);
+	}
 }

@@ -70,6 +70,11 @@ function buildContextPrompt(ctx: DiagnosisContext): string {
 		lines.push('=== GROW-KONTEXT ===');
 		lines.push(`Strain: ${ctx.grow.strain} (${ctx.grow.strain_type === 'auto' ? 'Autoflower' : 'Photoperiod'})`);
 		lines.push(`Medium: ${ctx.grow.medium}`);
+		if (ctx.grow.medium === 'coco' && (ctx.grow as any).coco_perlite_ratio !== undefined) {
+			const ratio = (ctx.grow as any).coco_perlite_ratio;
+			lines.push(`Kokos/Perlite-Mix: ${ratio}% Kokos / ${100 - ratio}% Perlite`);
+		}
+		if ((ctx.grow as any).system) lines.push(`System: ${(ctx.grow as any).system}`);
 		if (ctx.grow.space) lines.push(`Space: ${ctx.grow.space}`);
 		if (ctx.grow.light_info) lines.push(`Licht: ${ctx.grow.light_info}`);
 		if (ctx.grow.feedline_id) lines.push(`Düngerlinie: ${ctx.grow.feedline_id}`);

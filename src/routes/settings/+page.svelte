@@ -210,6 +210,6 @@
 	<div class="flex justify-center gap-4 text-xs text-gb-text-muted pt-4">
 		<a href="/legal" class="hover:text-gb-text">Rechtliches</a>
 		<span>·</span>
-		<span>v1.0.0</span>
+		<span>v{__APP_VERSION__}</span>
 	</div>
 </div>

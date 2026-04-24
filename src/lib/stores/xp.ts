@@ -6,6 +6,7 @@
 
 import { writable, derived } from 'svelte/store';
 import { toastStore } from './toast';
+import { safeSetItem } from '$lib/utils/storage-safe';
 
 // ─── TYPES ──────────────────────────────────────────────────────────────
 
@@ -38,6 +39,7 @@ export interface XPState {
 	daily_checkins: Record<string, number>;  // "2026-04-12": count
 	streaks_awarded: number[];               // [7, 30] — welche Streak-Meilensteine vergeben
 	first_grow_awarded: boolean;
+	awarded_achievements: string[];          // IDs bereits vergebener Achievements
 }
 
 // ─── LEVEL CONFIG ───────────────────────────────────────────────────────
@@ -105,6 +107,7 @@ const DEFAULTS: XPState = {
 	daily_checkins: {},
 	streaks_awarded: [],
 	first_grow_awarded: false,
+	awarded_achievements: [],
 };
 
 function loadState(): XPState {
@@ -119,8 +122,7 @@ function loadState(): XPState {
 }
 
 function saveState(state: XPState): void {
-	if (typeof window === 'undefined') return;
-	localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+	safeSetItem(STORAGE_KEY, JSON.stringify(state));
 }
 
 function createXPStore() {
@@ -256,6 +258,18 @@ function createXPStore() {
 
 		/** Achievement-XP */
 		awardAchievement(name: string, xp: number): void {
+			addXP('achievement', `Achievement: ${name}`, xp);
+		},
+
+		/** Achievement-XP, nur einmal vergeben (persistiert). */
+		awardAchievementOnce(id: string, name: string, xp: number): void {
+			let state: XPState = DEFAULTS;
+			subscribe(s => state = s)();
+			if (state.awarded_achievements?.includes(id)) return;
+			update(s => ({
+				...s,
+				awarded_achievements: [...(s.awarded_achievements ?? []), id],
+			}));
 			addXP('achievement', `Achievement: ${name}`, xp);
 		},
 

@@ -13,6 +13,7 @@
 	import { calcVPD, getVPDStatus } from '$lib/data/science';
 	import { clampNumber } from '$lib/utils/validation';
 	import { toMsPerCm, type ECEinheit } from '$lib/calc/units';
+	import { compressBatch, MAX_PHOTOS } from '$lib/utils/photo';
 	import type { Grow } from '$lib/stores/grow';
 
 	interface Props {
@@ -45,6 +46,17 @@
 	let phase = $state('Veg');
 	let week = $state(1);
 	let day = $state(1);
+	let weekDayManual = $state(false);
+
+	// Auto-Berechnung aus started_at — User kann manuell overriden
+	$effect(() => {
+		if (!selectedGrow || weekDayManual) return;
+		const started = new Date(selectedGrow.started_at).getTime();
+		if (Number.isNaN(started)) return;
+		const daysSince = Math.max(1, Math.floor((Date.now() - started) / 86400000) + 1);
+		week = Math.max(1, Math.ceil(daysSince / 7));
+		day = ((daysSince - 1) % 7) + 1;
+	});
 	let temp = $state<number | null>(null);
 	let rh = $state<number | null>(null);
 	let ec = $state<number | null>(null);
@@ -68,36 +80,28 @@
 
 	let vpd = $derived(temp !== null && rh !== null ? calcVPD(temp, rh) : null);
 
-	function compressImage(file: File, maxSize = 1024): Promise<string> {
-		return new Promise((resolve) => {
-			const reader = new FileReader();
-			reader.onload = () => {
-				const img = new Image();
-				img.onload = () => {
-					const canvas = document.createElement('canvas');
-					let w = img.width, h = img.height;
-					if (w > maxSize || h > maxSize) {
-						if (w > h) { h = (h / w) * maxSize; w = maxSize; }
-						else { w = (w / h) * maxSize; h = maxSize; }
-					}
-					canvas.width = w; canvas.height = h;
-					canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
-					resolve(canvas.toDataURL('image/jpeg', 0.75));
-				};
-				img.src = reader.result as string;
-			};
-			reader.readAsDataURL(file);
-		});
-	}
+	let compressing = $state(false);
 
 	async function handlePhoto(e: Event) {
 		const input = e.target as HTMLInputElement;
 		if (!input.files?.length) return;
-		const remaining = 5 - photos.length;
-		const files = Array.from(input.files).slice(0, remaining);
-		const compressed = await Promise.all(files.map(f => compressImage(f)));
-		photos = [...photos, ...compressed].slice(0, 5);
+		const remaining = MAX_PHOTOS - photos.length;
+		const all = Array.from(input.files);
+		const files = all.slice(0, remaining);
+		if (all.length > remaining) {
+			toastStore.warning(`Max ${MAX_PHOTOS} Fotos — ${all.length - remaining} ignoriert`);
+		}
 		input.value = '';
+		if (!files.length) return;
+		compressing = true;
+		try {
+			const compressed = await compressBatch(files);
+			photos = [...photos, ...compressed].slice(0, MAX_PHOTOS);
+		} catch {
+			toastStore.warning('Foto konnte nicht verarbeitet werden');
+		} finally {
+			compressing = false;
+		}
 	}
 
 	function removePhoto(idx: number) {
@@ -211,7 +215,7 @@
 		{#if selectedGrow}
 			<!-- Fotos (max 5) -->
 			<div>
-				<label class="block text-xs text-gb-text-muted mb-1">Fotos ({photos.length}/5){compact ? ' (empfohlen)' : ''}</label>
+				<label class="block text-xs text-gb-text-muted mb-1">Fotos ({photos.length}/{MAX_PHOTOS}){compact ? ' (empfohlen)' : ''}</label>
 				{#if photos.length > 0}
 					<div class="grid grid-cols-3 gap-1 mb-2">
 						{#each photos as src, idx}
@@ -225,10 +229,10 @@
 						{/each}
 					</div>
 				{/if}
-				{#if photos.length < 5}
-					<label class="block w-full bg-gb-bg border border-dashed border-gb-border rounded-lg p-3 text-center text-sm text-gb-text-muted cursor-pointer hover:border-gb-green transition-colors">
-						📸 {photos.length === 0 ? 'Foto aufnehmen' : 'Weiteres Foto'}
-						<input type="file" accept="image/*" multiple onchange={handlePhoto} class="hidden" />
+				{#if photos.length < MAX_PHOTOS}
+					<label class="block w-full bg-gb-bg border border-dashed border-gb-border rounded-lg p-3 text-center text-sm text-gb-text-muted cursor-pointer hover:border-gb-green transition-colors {compressing ? 'opacity-60 pointer-events-none' : ''}">
+						{compressing ? '⏳ Verarbeite…' : `📸 ${photos.length === 0 ? 'Foto aufnehmen' : 'Weiteres Foto'}`}
+						<input type="file" accept="image/*" multiple onchange={handlePhoto} class="hidden" disabled={compressing} />
 					</label>
 				{/if}
 			</div>
@@ -244,13 +248,13 @@
 					</select>
 				</div>
 				<div>
-					<label for="ci-week" class="block text-xs text-gb-text-muted mb-1">Woche</label>
-					<input id="ci-week" type="number" bind:value={week} min="1" max="30"
+					<label for="ci-week" class="block text-xs text-gb-text-muted mb-1">Woche{weekDayManual ? '' : ' (auto)'}</label>
+					<input id="ci-week" type="number" bind:value={week} oninput={() => weekDayManual = true} min="1" max="30"
 						class="w-full bg-gb-bg border border-gb-border rounded-lg px-2 py-2 text-sm" />
 				</div>
 				<div>
-					<label for="ci-day" class="block text-xs text-gb-text-muted mb-1">Tag</label>
-					<input id="ci-day" type="number" bind:value={day} min="1" max="7"
+					<label for="ci-day" class="block text-xs text-gb-text-muted mb-1">Tag{weekDayManual ? '' : ' (auto)'}</label>
+					<input id="ci-day" type="number" bind:value={day} oninput={() => weekDayManual = true} min="1" max="7"
 						class="w-full bg-gb-bg border border-gb-border rounded-lg px-2 py-2 text-sm" />
 				</div>
 			</div>

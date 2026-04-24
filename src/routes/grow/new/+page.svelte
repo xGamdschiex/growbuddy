@@ -2,17 +2,19 @@
 	import { goto } from '$app/navigation';
 	import { growStore, totalGrows, activeGrows } from '$lib/stores/grow';
 	import { xpStore } from '$lib/stores/xp';
-	import { proStore, limits } from '$lib/stores/pro';
+	import { proStore, isPro, limits } from '$lib/stores/pro';
 	import { t } from '$lib/i18n';
 	import { getAllFeedLines } from '$lib/calc/feedlines/registry';
-	import type { StrainType } from '$lib/stores/grow';
+	import type { StrainType, GrowSystem } from '$lib/stores/grow';
 	import type { Medium } from '$lib/data/science';
 	import { hapticSuccess } from '$lib/utils/haptic';
+	import { toastStore } from '$lib/stores/toast';
 
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
 	const feedlines = getAllFeedLines();
 	let activeCount = $derived.by(() => { let v: any[] = []; activeGrows.subscribe(x => v = x)(); return v.length; });
 	let lim = $derived.by(() => { let v: any = {}; limits.subscribe(x => v = x)(); return v; });
+	let userIsPro = $derived.by(() => { let v = false; isPro.subscribe(x => v = x)(); return v; });
 	let atLimit = $derived(activeCount >= (lim.max_active_grows ?? 1));
 
 	let name = $state('');
@@ -25,6 +27,8 @@
 	let plantCount = $state(1);
 	let notes = $state('');
 	let startDate = $state(new Date().toISOString().slice(0, 10));
+	let system = $state<GrowSystem>('topf');
+	let cocoPerliteRatio = $state(70); // % Kokos (Rest Perlite)
 
 	let spaces = $derived([
 		{ value: 'fensterbank', label: tr('grow.space_fensterbank') },
@@ -39,6 +43,15 @@
 	]);
 
 	let growCount = $derived.by(() => { let v = 0; totalGrows.subscribe(x => v = x)(); return v; });
+
+	// Pro-Gate für Hydro-Systeme (AutoPot/DWC/RDWC)
+	function selectSystem(s: GrowSystem) {
+		if (s !== 'topf' && !userIsPro) {
+			toastStore.error('Hydro-Systeme sind Pro-Feature');
+			return;
+		}
+		system = s;
+	}
 
 	function startGrow() {
 		if (!strain.trim()) return;
@@ -55,6 +68,8 @@
 			plant_count: plantCount,
 			started_at: new Date(startDate).toISOString(),
 			notes: notes.trim(),
+			system,
+			coco_perlite_ratio: medium === 'coco' ? cocoPerliteRatio : undefined,
 		});
 		xpStore.awardGrowStart(isFirst);
 		hapticSuccess();
@@ -111,6 +126,53 @@
 				</button>
 			{/each}
 		</div>
+	</div>
+
+	<!-- Coco / Perlite Verhältnis (nur bei Coco) -->
+	{#if medium === 'coco'}
+		<div>
+			<label class="block text-xs text-gb-text-muted mb-2">
+				Kokos/Perlite-Mix: <span class="text-gb-text">{cocoPerliteRatio}% Kokos · {100 - cocoPerliteRatio}% Perlite</span>
+			</label>
+			<input type="range" min="50" max="100" step="5" bind:value={cocoPerliteRatio}
+				class="w-full accent-gb-green" />
+			<p class="text-xs text-gb-text-muted mt-1">
+				Empfehlung: 70/30 für ausgeglichen, 60/40 bei viel Wasser, 80/20 bei trockener Umgebung. Relevant für Diagnose.
+			</p>
+		</div>
+	{/if}
+
+	<!-- Anbausystem -->
+	<div>
+		<label class="block text-xs text-gb-text-muted mb-2">Anbausystem</label>
+		<div class="grid grid-cols-2 gap-2">
+			{#each [
+				{ val: 'topf', label: '🪴 Topf', desc: 'Klassisch' },
+				{ val: 'autopot', label: '💧 AutoPot', desc: 'Pro', pro: true },
+				{ val: 'dwc', label: '🫧 DWC', desc: 'Pro', pro: true },
+				{ val: 'rdwc', label: '♻️ RDWC', desc: 'Pro', pro: true }
+			] as opt}
+				<button onclick={() => selectSystem(opt.val as GrowSystem)}
+					disabled={opt.pro && !userIsPro}
+					class="px-3 py-2.5 rounded-lg text-sm text-left transition-colors
+						{system === opt.val ? 'bg-gb-green text-black font-semibold' : 'bg-gb-surface-2 text-gb-text-muted'}
+						{opt.pro && !userIsPro ? 'opacity-50 cursor-not-allowed' : ''}">
+					<div class="flex items-center justify-between">
+						<span>{opt.label}</span>
+						{#if opt.pro && !userIsPro}
+							<span class="text-[10px] bg-gb-accent/20 text-gb-accent px-1.5 py-0.5 rounded">PRO</span>
+						{/if}
+					</div>
+				</button>
+			{/each}
+		</div>
+		<p class="text-xs text-gb-text-muted mt-2">
+			{#if system === 'topf'}Topf: Standard-Dosierung (100%)
+			{:else if system === 'autopot'}AutoPot: Reduzierte EC (85%) — konstante Wasserverfügbarkeit
+			{:else if system === 'dwc'}DWC: Stark reduzierte EC (65%) — direkte Wurzelzone
+			{:else if system === 'rdwc'}RDWC: Reduzierte EC (68%) — Rezirkulation
+			{/if}
+		</p>
 	</div>
 
 	<!-- Space + Plants -->

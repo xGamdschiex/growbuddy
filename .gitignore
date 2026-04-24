@@ -15,3 +15,7 @@ keystore/*.jks
 keystore/*.keystore
 *.jks
 *.keystore
+
+# Build-Artefakte / APKs
+dist/*.apk
+*.apk

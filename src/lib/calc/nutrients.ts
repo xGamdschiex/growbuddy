@@ -43,7 +43,17 @@ export interface CalcInput {
   hat_ro?: boolean;
   /** Custom Wasserprofil (wenn 'Benutzerdefiniert' gewählt) */
   custom_wasser?: { ca: number; mg: number; ec: number; ph: number };
+  /** Anbausystem — beeinflusst EC-Dosierung */
+  system?: 'topf' | 'autopot' | 'dwc' | 'rdwc';
 }
+
+/** System-Multiplikator auf Dosierfaktor. Hydro-Systeme brauchen niedrigere EC. */
+export const SYSTEM_FAKTOR: Record<NonNullable<CalcInput['system']>, number> = {
+  topf: 1.00,
+  autopot: 0.85,  // Konstante Verfügbarkeit → weniger konzentriert
+  dwc: 0.65,      // Direkte Wurzel im Wasser → niedrige EC
+  rdwc: 0.68,     // Ähnlich DWC, Rezirkulation
+};
 
 // ─── GENERIC RESULT ──────────────────────────────────────────────────────
 
@@ -94,8 +104,23 @@ export interface CalcResult {
   ec_budget_ok: boolean;
   ec_budget_warnung: string;
 
+  // Meta-Info für UI
+  /** True wenn Feedline organisch (BioBizz) — EC ist nur Richtwert */
+  ec_ist_richtwert: boolean;
+  /** Stretch-Info: Wenn Woche > schema_wochen, welche Woche wurde tatsächlich genutzt? */
+  stretch_info: StretchInfo | null;
+
   // Mix steps
   mix_steps: MixStep[];
+}
+
+export interface StretchInfo {
+  /** Vom User angeforderte Woche */
+  requested_woche: number;
+  /** Tatsächlich verwendete Schema-Woche */
+  used_woche: number;
+  /** Stretch-Strategie ('repeat_last' | 'repeat_peak' | 'hold_ec') */
+  strategy: string;
 }
 
 export interface MixStep {
@@ -118,6 +143,17 @@ export function calculate(input: CalcInput): CalcResult {
   const schema = getSchemaForWeek(feedline, input.phase, input.woche);
   if (!schema) {
     throw new Error(`Schema not found: ${feedline_id} ${input.phase}|W${input.woche}`);
+  }
+
+  // Stretch-Info ermitteln: Liegt die angeforderte Woche außerhalb des Schemas?
+  let stretch_info: StretchInfo | null = null;
+  const phaseConfig = feedline.phasen.find(p => p.name === input.phase);
+  if (phaseConfig && input.woche > phaseConfig.schema_wochen) {
+    stretch_info = {
+      requested_woche: input.woche,
+      used_woche: schema.woche,
+      strategy: phaseConfig.stretch,
+    };
   }
 
   const profil = getWasserProfil(input.wasserprofil, input.custom_wasser);
@@ -203,9 +239,16 @@ export function calculate(input: CalcInput): CalcResult {
     ec_budget_warnung = '';
   }
 
+  // System-Faktor (Topf/AutoPot/DWC/RDWC) — Hydro-Systeme brauchen niedrigere EC
+  const system = input.system ?? 'topf';
+  const systemFaktor = SYSTEM_FAKTOR[system];
+  if (systemFaktor !== 1) {
+    dosierfaktor = round(dosierfaktor * systemFaktor, 1);
+  }
+
   const ec_soll = round(
     ist_organisch
-      ? ec_ziel_raw * (faktor / 100) * uf  // Organisch: EC ist nur Schätzwert, LW-EC nicht addieren
+      ? ec_ziel_raw * (faktor * systemFaktor / 100) * uf  // Organisch: EC ist nur Schätzwert, LW-EC nicht addieren
       : ec_ziel_raw * (dosierfaktor / 100) * uf + lw_ec_anteil * uf,
     2
   );
@@ -316,6 +359,8 @@ export function calculate(input: CalcInput): CalcResult {
     calmag,
     ph_min, ph_max, ph_ziel,
     ec_check, ph_check, ec_budget_ok, ec_budget_warnung,
+    ec_ist_richtwert: ist_organisch,
+    stretch_info,
     mix_steps,
   };
 }

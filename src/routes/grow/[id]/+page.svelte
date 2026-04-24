@@ -7,6 +7,8 @@
 	import { xpStore } from '$lib/stores/xp';
 	import { streakMultiplier } from '$lib/stores/streak';
 	import { isPro } from '$lib/stores/pro';
+	import { toastStore } from '$lib/stores/toast';
+	import { compressBatch, MAX_PHOTOS } from '$lib/utils/photo';
 	import { t } from '$lib/i18n';
 	import type { CheckIn } from '$lib/stores/grow';
 	import { calcVPD, getVPDStatus } from '$lib/data/science';
@@ -14,13 +16,13 @@
 	import { hapticSuccess, hapticMedium } from '$lib/utils/haptic';
 	import type { ScoreBreakdown } from '$lib/data/score';
 	import MiniChart from '$lib/components/MiniChart.svelte';
+	import Lightbox from '$lib/components/Lightbox.svelte';
 	import { clampNumber, RANGES } from '$lib/utils/validation';
 	import { toMsPerCm, fromMsPerCm, type ECEinheit } from '$lib/calc/units';
 
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
 	let growId = $derived($page.params.id);
-	let state = $state<any>({ grows: [], checkins: [] });
-	$effect(() => growStore.subscribe(v => { state = v; }));
+	let state = $derived.by<any>(() => { let v: any = { grows: [], checkins: [] }; growStore.subscribe(x => v = x)(); return v; });
 	let grow = $derived(state?.grows?.find((g: any) => g.id === growId));
 	let checkins = $derived(
 		(state?.checkins ?? [])
@@ -34,6 +36,17 @@
 	let ciPhase = $state('Veg');
 	let ciWeek = $state(1);
 	let ciDay = $state(1);
+	let ciWeekDayManual = $state(false);
+
+	// Auto-Berechnung Woche/Tag aus Grow-Start (wenn kein Edit, kein manueller Override)
+	$effect(() => {
+		if (editingId || ciWeekDayManual || !grow || !showCheckin) return;
+		const started = new Date(grow.started_at).getTime();
+		if (Number.isNaN(started)) return;
+		const daysSince = Math.max(1, Math.floor((Date.now() - started) / 86400000) + 1);
+		ciWeek = Math.max(1, Math.ceil(daysSince / 7));
+		ciDay = ((daysSince - 1) % 7) + 1;
+	});
 	let ciTemp = $state<number | null>(null);
 	let ciRh = $state<number | null>(null);
 	let ciEc = $state<number | null>(null);
@@ -54,7 +67,7 @@
 	let ciNotes = $state('');
 	let ciPhotos = $state<string[]>([]);
 
-	let ciVpd = $derived(ciTemp && ciRh ? calcVPD(ciTemp, ciRh) : null);
+	let ciVpd = $derived(ciTemp !== null && ciRh !== null ? calcVPD(ciTemp, ciRh) : null);
 
 	// Pro-Status
 	let userIsPro = $derived.by(() => { let v = false; isPro.subscribe(x => v = x)(); return v; });
@@ -123,36 +136,28 @@
 		goto('/grow');
 	}
 
-	function compressImage(file: File, maxSize = 800): Promise<string> {
-		return new Promise((resolve) => {
-			const reader = new FileReader();
-			reader.onload = () => {
-				const img = new Image();
-				img.onload = () => {
-					const canvas = document.createElement('canvas');
-					let w = img.width, h = img.height;
-					if (w > maxSize || h > maxSize) {
-						if (w > h) { h = (h / w) * maxSize; w = maxSize; }
-						else { w = (w / h) * maxSize; h = maxSize; }
-					}
-					canvas.width = w; canvas.height = h;
-					canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
-					resolve(canvas.toDataURL('image/jpeg', 0.7));
-				};
-				img.src = reader.result as string;
-			};
-			reader.readAsDataURL(file);
-		});
-	}
+	let compressing = $state(false);
 
 	async function handlePhoto(e: Event) {
 		const input = e.target as HTMLInputElement;
 		if (!input.files?.length) return;
-		const remaining = 5 - ciPhotos.length;
-		const files = Array.from(input.files).slice(0, remaining);
-		const compressed = await Promise.all(files.map(f => compressImage(f)));
-		ciPhotos = [...ciPhotos, ...compressed].slice(0, 5);
+		const remaining = MAX_PHOTOS - ciPhotos.length;
+		const all = Array.from(input.files);
+		const files = all.slice(0, remaining);
+		if (all.length > remaining) {
+			toastStore.warning(`Max ${MAX_PHOTOS} Fotos — ${all.length - remaining} ignoriert`);
+		}
 		input.value = '';
+		if (!files.length) return;
+		compressing = true;
+		try {
+			const compressed = await compressBatch(files, 800);
+			ciPhotos = [...ciPhotos, ...compressed].slice(0, MAX_PHOTOS);
+		} catch {
+			toastStore.warning('Foto konnte nicht verarbeitet werden');
+		} finally {
+			compressing = false;
+		}
 	}
 
 	function removePhoto(idx: number) {
@@ -161,6 +166,7 @@
 
 	function startEdit(ci: CheckIn) {
 		editingId = ci.id;
+		ciWeekDayManual = true;
 		ciPhase = ci.phase;
 		ciWeek = ci.week;
 		ciDay = ci.day;
@@ -176,11 +182,22 @@
 		ciNotes = ci.notes;
 		ciPhotos = ci.photos_data?.length ? [...ci.photos_data] : (ci.photo_data ? [ci.photo_data] : []);
 		showCheckin = true;
+		hapticMedium();
+		// Zum Formular scrollen + visuelles Feedback
+		setTimeout(() => {
+			const form = document.getElementById('checkin-form');
+			if (form) {
+				form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+				form.classList.add('ring-2', 'ring-gb-green');
+				setTimeout(() => form.classList.remove('ring-2', 'ring-gb-green'), 1500);
+			}
+		}, 50);
 	}
 
 	function cancelCheckin() {
 		showCheckin = false;
 		editingId = null;
+		ciWeekDayManual = false;
 		ciPhotos = [];
 		ciNotes = '';
 		ciWatered = false;
@@ -252,6 +269,16 @@
 	function formatDate(dateStr: string): string {
 		return new Date(dateStr).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
 	}
+
+	// Lightbox State
+	let lightboxPhotos = $state<string[]>([]);
+	let lightboxIndex = $state(0);
+	let lightboxOpen = $state(false);
+	function openLightbox(photos: string[], idx: number) {
+		lightboxPhotos = photos;
+		lightboxIndex = idx;
+		lightboxOpen = true;
+	}
 </script>
 
 {#if !grow}
@@ -301,7 +328,7 @@
 				</button>
 			{:else}
 				<!-- Check-in Form -->
-				<div class="bg-gb-surface rounded-xl p-4 space-y-4">
+				<div id="checkin-form" class="bg-gb-surface rounded-xl p-4 space-y-4 transition-all duration-300">
 					<div class="flex items-center justify-between">
 						<h2 class="font-semibold">{editingId ? 'Check-in bearbeiten' : tr('checkin.title')}</h2>
 						<button onclick={cancelCheckin} class="text-gb-text-muted text-sm">{tr('checkin.cancel')}</button>
@@ -309,7 +336,7 @@
 
 					<!-- Fotos (max 5) -->
 					<div>
-						<label class="block text-xs text-gb-text-muted mb-1">{tr('checkin.photo')} ({ciPhotos.length}/5)</label>
+						<label class="block text-xs text-gb-text-muted mb-1">{tr('checkin.photo')} ({ciPhotos.length}/{MAX_PHOTOS})</label>
 						{#if ciPhotos.length > 0}
 							<div class="grid grid-cols-3 gap-1 mb-2">
 								{#each ciPhotos as src, idx}
@@ -323,10 +350,10 @@
 								{/each}
 							</div>
 						{/if}
-						{#if ciPhotos.length < 5}
-							<label class="block w-full bg-gb-surface-2 border border-dashed border-gb-border rounded-lg p-3 text-center text-sm text-gb-text-muted cursor-pointer hover:border-gb-green transition-colors">
-								📸 {ciPhotos.length === 0 ? tr('checkin.take_photo') : 'Weiteres Foto'}
-								<input type="file" accept="image/*" multiple onchange={handlePhoto} class="hidden" />
+						{#if ciPhotos.length < MAX_PHOTOS}
+							<label class="block w-full bg-gb-surface-2 border border-dashed border-gb-border rounded-lg p-3 text-center text-sm text-gb-text-muted cursor-pointer hover:border-gb-green transition-colors {compressing ? 'opacity-60 pointer-events-none' : ''}">
+								{compressing ? '⏳ Verarbeite…' : `📸 ${ciPhotos.length === 0 ? tr('checkin.take_photo') : 'Weiteres Foto'}`}
+								<input type="file" accept="image/*" multiple onchange={handlePhoto} class="hidden" disabled={compressing} />
 							</label>
 						{/if}
 					</div>
@@ -342,13 +369,13 @@
 							</select>
 						</div>
 						<div>
-							<label class="block text-xs text-gb-text-muted mb-1">{tr('checkin.week')}</label>
-							<input type="number" bind:value={ciWeek} min="1" max="20"
+							<label class="block text-xs text-gb-text-muted mb-1">{tr('checkin.week')}{ciWeekDayManual ? '' : ' (auto)'}</label>
+							<input type="number" bind:value={ciWeek} oninput={() => ciWeekDayManual = true} min="1" max="20"
 								class="w-full bg-gb-bg border border-gb-border rounded-lg px-2 py-2 text-sm" />
 						</div>
 						<div>
-							<label class="block text-xs text-gb-text-muted mb-1">{tr('checkin.day')}</label>
-							<input type="number" bind:value={ciDay} min="1" max="7"
+							<label class="block text-xs text-gb-text-muted mb-1">{tr('checkin.day')}{ciWeekDayManual ? '' : ' (auto)'}</label>
+							<input type="number" bind:value={ciDay} oninput={() => ciWeekDayManual = true} min="1" max="7"
 								class="w-full bg-gb-bg border border-gb-border rounded-lg px-2 py-2 text-sm" />
 						</div>
 					</div>
@@ -667,7 +694,9 @@
 				{#if allPhotos.length > 0}
 					<div class="grid grid-cols-4 gap-1 rounded-xl overflow-hidden">
 						{#each allPhotos.slice(0, 8) as src, i}
-							<img {src} alt="Foto {i + 1}" class="aspect-square object-cover w-full" />
+							<button type="button" onclick={() => openLightbox(allPhotos, i)} class="aspect-square overflow-hidden">
+								<img {src} alt="Foto {i + 1}" class="aspect-square object-cover w-full hover:opacity-80 transition-opacity cursor-zoom-in" />
+							</button>
 						{/each}
 					</div>
 				{/if}
@@ -710,11 +739,15 @@
 							<p class="text-sm text-gb-text-muted">{ci.notes}</p>
 						{/if}
 						{#if ciAllPhotos.length === 1}
-							<img src={ciAllPhotos[0]} alt="Check-in" class="w-full rounded-lg max-h-64 object-cover" />
+							<button type="button" onclick={() => openLightbox(ciAllPhotos, 0)} class="w-full block">
+								<img src={ciAllPhotos[0]} alt="Check-in" class="w-full rounded-lg max-h-64 object-cover cursor-zoom-in hover:opacity-90 transition-opacity" />
+							</button>
 						{:else if ciAllPhotos.length > 1}
 							<div class="grid grid-cols-3 gap-1">
 								{#each ciAllPhotos as src, i}
-									<img {src} alt="Foto {i + 1}" class="aspect-square object-cover rounded-lg w-full" />
+									<button type="button" onclick={() => openLightbox(ciAllPhotos, i)} class="aspect-square">
+										<img {src} alt="Foto {i + 1}" class="aspect-square object-cover rounded-lg w-full cursor-zoom-in hover:opacity-90 transition-opacity" />
+									</button>
 								{/each}
 							</div>
 						{/if}
@@ -723,4 +756,8 @@
 			{/if}
 		</div>
 	</div>
+
+	{#if lightboxOpen}
+		<Lightbox photos={lightboxPhotos} startIndex={lightboxIndex} onClose={() => lightboxOpen = false} />
+	{/if}
 {/if}

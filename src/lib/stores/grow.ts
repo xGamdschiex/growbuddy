@@ -6,11 +6,13 @@
 
 import { writable, derived } from 'svelte/store';
 import type { Medium, GrowPhase } from '$lib/data/science';
+import { safeSetItem } from '$lib/utils/storage-safe';
 
 // ─── TYPES ──────────────────────────────────────────────────────────────
 
 export type StrainType = 'auto' | 'photo';
 export type GrowStatus = 'active' | 'harvested' | 'abandoned';
+export type GrowSystem = 'topf' | 'autopot' | 'dwc' | 'rdwc';
 
 export interface Grow {
 	id: string;
@@ -28,6 +30,11 @@ export interface Grow {
 	yield_g: number | null;
 	grow_score: number | null;
 	notes: string;
+	// Neu: Anbausystem + Substratverhältnis
+	system?: GrowSystem;                // default 'topf'
+	coco_perlite_ratio?: number;        // % Kokos (0-100), Rest = Perlite. Default 70.
+	/** Last-Write-Wins Merge-Key für Sync */
+	updated_at?: string;
 }
 
 export interface CheckIn {
@@ -51,6 +58,8 @@ export interface CheckIn {
 	training: string | null;     // 'lst', 'topping', etc.
 	notes: string;
 	created_at: string;          // ISO date
+	/** Last-Write-Wins Merge-Key für Sync */
+	updated_at?: string;
 }
 
 export interface GrowState {
@@ -73,13 +82,20 @@ function loadState(): GrowState {
 		const raw = localStorage.getItem(STORAGE_KEY);
 		if (!raw) return DEFAULTS;
 		const parsed = JSON.parse(raw);
-		// Migrate old check-ins without photos_data / water_ml / nutrient_ml
+		// Migrate old check-ins without photos_data / water_ml / nutrient_ml / updated_at
 		if (parsed.checkins) {
 			parsed.checkins = parsed.checkins.map((c: any) => ({
 				photos_data: [],
 				water_ml: null,
 				nutrient_ml: null,
 				...c,
+				updated_at: c.updated_at ?? c.created_at ?? new Date().toISOString(),
+			}));
+		}
+		if (parsed.grows) {
+			parsed.grows = parsed.grows.map((g: any) => ({
+				...g,
+				updated_at: g.updated_at ?? g.started_at ?? new Date().toISOString(),
 			}));
 		}
 		return { ...DEFAULTS, ...parsed };
@@ -89,8 +105,7 @@ function loadState(): GrowState {
 }
 
 function saveState(state: GrowState): void {
-	if (typeof window === 'undefined') return;
-	localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+	safeSetItem(STORAGE_KEY, JSON.stringify(state));
 }
 
 // ─── STORE ──────────────────────────────────────────────────────────────
@@ -111,6 +126,7 @@ function createGrowStore() {
 
 		addGrow(grow: Omit<Grow, 'id' | 'status' | 'harvested_at' | 'yield_g' | 'grow_score'>): string {
 			const id = crypto.randomUUID();
+			const now = new Date().toISOString();
 			const newGrow: Grow = {
 				...grow,
 				id,
@@ -118,36 +134,42 @@ function createGrowStore() {
 				harvested_at: null,
 				yield_g: null,
 				grow_score: null,
+				updated_at: now,
 			};
 			update(s => ({ ...s, grows: [...s.grows, newGrow] }));
 			return id;
 		},
 
 		updateGrow(id: string, patch: Partial<Grow>): void {
+			const now = new Date().toISOString();
 			update(s => ({
 				...s,
-				grows: s.grows.map(g => g.id === id ? { ...g, ...patch } : g),
+				grows: s.grows.map(g => g.id === id ? { ...g, ...patch, updated_at: now } : g),
 			}));
 		},
 
 		harvestGrow(id: string, yield_g: number): void {
+			const now = new Date().toISOString();
 			update(s => ({
 				...s,
 				grows: s.grows.map(g => g.id === id ? {
 					...g,
 					status: 'harvested' as GrowStatus,
-					harvested_at: new Date().toISOString(),
+					harvested_at: now,
 					yield_g,
+					updated_at: now,
 				} : g),
 			}));
 		},
 
 		abandonGrow(id: string): void {
+			const now = new Date().toISOString();
 			update(s => ({
 				...s,
 				grows: s.grows.map(g => g.id === id ? {
 					...g,
 					status: 'abandoned' as GrowStatus,
+					updated_at: now,
 				} : g),
 			}));
 		},
@@ -161,19 +183,22 @@ function createGrowStore() {
 
 		addCheckIn(checkin: Omit<CheckIn, 'id' | 'created_at'>): string {
 			const id = crypto.randomUUID();
+			const now = new Date().toISOString();
 			const newCheckin: CheckIn = {
 				...checkin,
 				id,
-				created_at: new Date().toISOString(),
+				created_at: now,
+				updated_at: now,
 			};
 			update(s => ({ ...s, checkins: [...s.checkins, newCheckin] }));
 			return id;
 		},
 
 		updateCheckIn(id: string, patch: Partial<Omit<CheckIn, 'id' | 'grow_id' | 'created_at'>>): void {
+			const now = new Date().toISOString();
 			update(s => ({
 				...s,
-				checkins: s.checkins.map(c => c.id === id ? { ...c, ...patch } : c),
+				checkins: s.checkins.map(c => c.id === id ? { ...c, ...patch, updated_at: now } : c),
 			}));
 		},
 

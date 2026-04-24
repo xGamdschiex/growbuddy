@@ -63,20 +63,33 @@
 		if (!auth.user) return;
 		const data = await syncStore.pull(auth.user.id);
 		if (data) {
-			// Merge: Cloud-Daten überschreiben lokal (einfachste Strategie)
-			const mergedGrows = [...data.grows];
-			const mergedCheckins = data.checkins.map(c => {
-				// Lokale Fotos beibehalten
-				const local = state.checkins.find(lc => lc.id === c.id);
-				return local?.photo_data ? { ...c, photo_data: local.photo_data } : c;
-			});
-			// Lokale Grows/Checkins die nicht in Cloud sind, beibehalten
-			for (const lg of state.grows) {
-				if (!mergedGrows.find(g => g.id === lg.id)) mergedGrows.push(lg);
+			// Last-Write-Wins Merge via updated_at — schützt Offline-Edits
+			const pickNewer = <T extends { updated_at?: string }>(a: T, b: T): T => {
+				const ta = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+				const tb = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+				return ta >= tb ? a : b;
+			};
+
+			const growsById = new Map(state.grows.map(g => [g.id, g]));
+			for (const cg of data.grows) {
+				const local = growsById.get(cg.id);
+				growsById.set(cg.id, local ? pickNewer(local, cg) : cg);
 			}
-			for (const lc of state.checkins) {
-				if (!mergedCheckins.find(c => c.id === lc.id)) mergedCheckins.push(lc);
+			const mergedGrows = Array.from(growsById.values());
+
+			const checkinsById = new Map(state.checkins.map(c => [c.id, c]));
+			for (const cc of data.checkins) {
+				const local = checkinsById.get(cc.id);
+				if (local) {
+					const winner = pickNewer(local, cc);
+					// Lokale Foto-Base64 bewahren, auch wenn Cloud gewinnt
+					checkinsById.set(cc.id, local.photo_data && winner === cc ? { ...cc, photo_data: local.photo_data } : winner);
+				} else {
+					checkinsById.set(cc.id, cc);
+				}
 			}
+			const mergedCheckins = Array.from(checkinsById.values());
+
 			growStore.replaceState({ grows: mergedGrows, checkins: mergedCheckins });
 			toastStore.success(tr('sync.success'));
 		} else {
@@ -104,12 +117,10 @@
 		ACHIEVEMENTS.filter(a => a.check(stats)).map(a => a.id)
 	));
 
-	let awardedAchievements = $state(new Set<string>());
 	$effect(() => {
 		for (const ach of ACHIEVEMENTS) {
-			if (unlockedIds.has(ach.id) && !awardedAchievements.has(ach.id)) {
-				awardedAchievements.add(ach.id);
-				xpStore.awardAchievement(ach.name, ach.xp);
+			if (unlockedIds.has(ach.id)) {
+				xpStore.awardAchievementOnce(ach.id, ach.name, ach.xp);
 			}
 		}
 	});
@@ -317,6 +328,6 @@
 	<div class="flex justify-center gap-4 text-xs text-gb-text-muted">
 		<a href="/legal" class="hover:text-gb-text">{tr('profile.legal')}</a>
 		<span>·</span>
-		<span>v1.0.0</span>
+		<span>v{__APP_VERSION__}</span>
 	</div>
 </div>
