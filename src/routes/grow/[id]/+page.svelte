@@ -322,6 +322,19 @@
 		lightboxIndex = idx;
 		lightboxOpen = true;
 	}
+
+	// Custom Delete-Confirm-Sheet (statt nativem confirm)
+	let pendingDeleteId = $state<string | null>(null);
+	function askDeleteCheckin(id: string) {
+		pendingDeleteId = id;
+		hapticMedium();
+	}
+	function confirmDeleteCheckin() {
+		if (!pendingDeleteId) return;
+		growStore.deleteCheckIn(pendingDeleteId);
+		toastStore.success('Check-in gelöscht');
+		pendingDeleteId = null;
+	}
 </script>
 
 {#if !grow}
@@ -803,11 +816,15 @@
 								{#if ci.training}<span class="bg-gb-accent/20 text-gb-accent px-2 py-0.5 rounded">{ci.training}</span>{/if}
 								{#if grow.status === 'active'}
 									<button onclick={() => startEdit(ci)}
-										class="text-gb-text-muted hover:text-gb-text p-1 rounded" aria-label="Bearbeiten">
+										class="text-gb-text-muted hover:text-gb-text rounded-lg flex items-center justify-center"
+										style="min-width:44px;min-height:44px"
+										aria-label="Bearbeiten">
 										✏️
 									</button>
-									<button onclick={() => { if (confirm('Check-in löschen?')) growStore.deleteCheckIn(ci.id); }}
-										class="text-gb-danger/60 hover:text-gb-danger p-1 rounded" aria-label="Löschen">
+									<button onclick={() => askDeleteCheckin(ci.id)}
+										class="text-gb-danger/70 hover:text-gb-danger rounded-lg flex items-center justify-center"
+										style="min-width:44px;min-height:44px"
+										aria-label="Löschen">
 										🗑️
 									</button>
 								{/if}
@@ -846,6 +863,35 @@
 
 	{#if lightboxOpen}
 		<Lightbox photos={lightboxPhotos} startIndex={lightboxIndex} onClose={() => lightboxOpen = false} />
+	{/if}
+
+	{#if pendingDeleteId}
+		<div class="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center p-4"
+			onclick={() => pendingDeleteId = null}
+			onkeydown={(e) => { if (e.key === 'Escape') pendingDeleteId = null; }}
+			role="presentation">
+			<div class="bg-gb-surface w-full max-w-sm rounded-2xl p-5 space-y-4"
+				onclick={(e) => e.stopPropagation()}
+				onkeydown={(e) => e.stopPropagation()}
+				role="dialog" aria-modal="true" tabindex="-1">
+				<div>
+					<p class="font-semibold text-base">Check-in löschen?</p>
+					<p class="text-sm text-gb-text-muted mt-1">Dieser Eintrag wird endgültig entfernt — kann nicht rückgängig gemacht werden.</p>
+				</div>
+				<div class="flex gap-3 pt-1">
+					<button onclick={() => pendingDeleteId = null}
+						class="flex-1 bg-gb-bg border border-gb-border text-gb-text font-medium rounded-xl"
+						style="min-height:48px">
+						Abbrechen
+					</button>
+					<button onclick={confirmDeleteCheckin}
+						class="flex-1 bg-gb-danger text-white font-medium rounded-xl"
+						style="min-height:48px">
+						Löschen
+					</button>
+				</div>
+			</div>
+		</div>
 	{/if}
 {/if}
 

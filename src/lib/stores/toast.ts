@@ -7,7 +7,7 @@ import { writable } from 'svelte/store';
 export interface Toast {
 	id: string;
 	message: string;
-	type: 'xp' | 'achievement' | 'info' | 'success' | 'warning';
+	type: 'xp' | 'achievement' | 'info' | 'success' | 'warning' | 'error';
 	icon?: string;
 	duration?: number; // ms, default 3000
 }
@@ -41,6 +41,12 @@ function createToastStore() {
 		},
 		info(message: string) {
 			add({ message, type: 'info' });
+		},
+		warning(message: string) {
+			add({ message, type: 'warning', icon: '⚠️', duration: 4000 });
+		},
+		error(message: string) {
+			add({ message, type: 'error', icon: '⛔', duration: 5000 });
 		},
 	};
 }

@@ -9,6 +9,7 @@
 	import { xpStore } from '$lib/stores/xp';
 	import { streakStore } from '$lib/stores/streak';
 	import { growStore } from '$lib/stores/grow';
+	import { supabase } from '$lib/supabase';
 
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
 	let reminder = $derived.by(() => { let v: any = { enabled: false, time: '19:00', permission: 'default', streak_alerts: true }; reminderStore.subscribe(x => v = x)(); return v; });
@@ -18,6 +19,9 @@
 	let auth = $derived.by(() => { let v: any = { user: null }; authStore.subscribe(x => v = x)(); return v; });
 
 	let showDangerZone = $state(false);
+	let showDeleteAccount = $state(false);
+	let deleteConfirmText = $state('');
+	let deletingAccount = $state(false);
 
 	async function logout() {
 		await authStore.logout();
@@ -41,6 +45,42 @@
 		localStorage.removeItem('growbuddy_sync');
 		toastStore.success('Alles zurückgesetzt — App wird neu geladen');
 		setTimeout(() => window.location.reload(), 1500);
+	}
+
+	async function deleteAccount() {
+		const userId = auth.user?.id;
+		if (!userId) return;
+		deletingAccount = true;
+		try {
+			// Cloud-Daten löschen (RLS sorgt für Eigentümer-Match)
+			await supabase.from('checkins').delete().eq('user_id', userId);
+			await supabase.from('grows').delete().eq('user_id', userId);
+			// Storage-Fotos im User-Folder
+			try {
+				const { data: list } = await supabase.storage.from('checkin-photos').list(userId);
+				if (list?.length) {
+					await supabase.storage.from('checkin-photos').remove(list.map(f => `${userId}/${f.name}`));
+				}
+			} catch {}
+			// RPC zum Auth-Eintrag löschen (falls in Supabase definiert) — fail-soft
+			try { await supabase.rpc('delete_my_account'); } catch {}
+			await supabase.auth.signOut();
+
+			// Lokal alles weg
+			xpStore.reset();
+			streakStore.reset();
+			growStore.replaceState({ grows: [], checkins: [] });
+			localStorage.removeItem('growbuddy_reminders');
+			localStorage.removeItem('growbuddy_sync');
+			toastStore.success('Konto und Daten gelöscht');
+			setTimeout(() => window.location.reload(), 1500);
+		} catch (e: any) {
+			toastStore.add({ message: 'Löschung fehlgeschlagen: ' + (e?.message ?? 'unbekannter Fehler'), type: 'warning', icon: '⚠️' });
+		} finally {
+			deletingAccount = false;
+			showDeleteAccount = false;
+			deleteConfirmText = '';
+		}
 	}
 </script>
 
@@ -112,7 +152,17 @@
 				</div>
 			{/if}
 			{#if reminder.permission === 'denied'}
-				<p class="text-xs text-gb-danger">⚠️ Benachrichtigungen blockiert — bitte in Browser-Einstellungen erlauben</p>
+				<div class="bg-gb-danger/10 border border-gb-danger/30 rounded-lg p-3 space-y-2">
+					<p class="text-xs text-gb-danger font-medium">⚠️ Benachrichtigungen blockiert</p>
+					<p class="text-xs text-gb-text-muted">Aktiviere sie in den App-Einstellungen deines Geräts unter „GrowBuddy → Benachrichtigungen", damit Reminder funktionieren.</p>
+					<button onclick={() => reminderStore.requestPermission()}
+						class="w-full bg-gb-danger/20 text-gb-danger text-xs font-medium py-2 rounded-lg"
+						style="min-height:44px">
+						Erneut anfragen
+					</button>
+				</div>
+			{:else if reminder.enabled && reminder.permission !== 'granted'}
+				<p class="text-xs text-gb-warning">⚠️ Permission noch nicht erteilt — Reminder wird nicht erscheinen</p>
 			{/if}
 		</div>
 	</div>
@@ -176,7 +226,7 @@
 							toastStore.success(`${result.keys} Datensätze importiert`);
 							setTimeout(() => window.location.reload(), 1500);
 						} else {
-							toastStore.warning(result.error ?? 'Import fehlgeschlagen');
+							toastStore.add({ message: result.error ?? 'Import fehlgeschlagen', type: 'warning', icon: '⚠️' });
 						}
 					}} />
 				</label>
@@ -195,16 +245,61 @@
 		{#if showDangerZone}
 			<div class="bg-gb-danger/5 border border-gb-danger/20 rounded-xl p-4 space-y-3">
 				<button onclick={resetXP}
-					class="w-full bg-gb-danger/10 text-gb-danger font-medium text-sm py-2 rounded-lg hover:bg-gb-danger/20 transition-colors">
+					class="w-full bg-gb-danger/10 text-gb-danger font-medium text-sm py-2 rounded-lg hover:bg-gb-danger/20 transition-colors"
+					style="min-height:44px">
 					XP + Streak zurücksetzen
 				</button>
 				<button onclick={resetAll}
-					class="w-full bg-gb-danger text-white font-medium text-sm py-2 rounded-lg hover:bg-gb-danger/80 transition-colors">
-					🗑️ Alles löschen
+					class="w-full bg-gb-danger text-white font-medium text-sm py-2 rounded-lg hover:bg-gb-danger/80 transition-colors"
+					style="min-height:44px">
+					🗑️ Alles löschen (lokal)
 				</button>
+				{#if loggedIn}
+					<button onclick={() => showDeleteAccount = true}
+						class="w-full bg-gb-danger text-white font-medium text-sm py-2 rounded-lg hover:bg-gb-danger/80 transition-colors"
+						style="min-height:44px">
+						⚠️ Konto + Cloud-Daten löschen
+					</button>
+				{/if}
 			</div>
 		{/if}
 	</div>
+
+	{#if showDeleteAccount}
+		<div class="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center p-4"
+			onclick={() => { if (!deletingAccount) { showDeleteAccount = false; deleteConfirmText = ''; } }}
+			onkeydown={(e) => { if (e.key === 'Escape' && !deletingAccount) { showDeleteAccount = false; deleteConfirmText = ''; } }}
+			role="presentation">
+			<div class="bg-gb-surface w-full max-w-sm rounded-2xl p-5 space-y-4"
+				onclick={(e) => e.stopPropagation()}
+				onkeydown={(e) => e.stopPropagation()}
+				role="dialog" aria-modal="true" tabindex="-1">
+				<div>
+					<p class="font-semibold text-base">Konto endgültig löschen?</p>
+					<p class="text-sm text-gb-text-muted mt-2">Cloud-Daten (Grows, Check-ins, Fotos), lokale Daten und Login werden entfernt. Dieser Vorgang ist <span class="text-gb-danger font-medium">unwiderruflich</span>.</p>
+				</div>
+				<div>
+					<label for="delete-confirm" class="text-xs text-gb-text-muted">Tippe <span class="font-mono text-gb-danger">LÖSCHEN</span> zur Bestätigung:</label>
+					<input id="delete-confirm" type="text" bind:value={deleteConfirmText} disabled={deletingAccount}
+						class="w-full bg-gb-bg border border-gb-border rounded-lg px-3 mt-1 text-sm"
+						style="min-height:44px"
+						placeholder="LÖSCHEN" autocapitalize="characters" />
+				</div>
+				<div class="flex gap-3 pt-1">
+					<button onclick={() => { showDeleteAccount = false; deleteConfirmText = ''; }} disabled={deletingAccount}
+						class="flex-1 bg-gb-bg border border-gb-border text-gb-text font-medium rounded-xl"
+						style="min-height:48px">
+						Abbrechen
+					</button>
+					<button onclick={deleteAccount} disabled={deleteConfirmText !== 'LÖSCHEN' || deletingAccount}
+						class="flex-1 bg-gb-danger text-white font-medium rounded-xl disabled:opacity-50"
+						style="min-height:48px">
+						{deletingAccount ? '…' : 'Löschen'}
+					</button>
+				</div>
+			</div>
+		</div>
+	{/if}
 
 	<!-- Footer -->
 	<div class="flex justify-center gap-4 text-xs text-gb-text-muted pt-4">
