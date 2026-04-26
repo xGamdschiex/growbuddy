@@ -129,3 +129,27 @@ create policy "Users update own photos"
 create policy "Users delete own photos"
   on storage.objects for delete to authenticated
   using (bucket_id = 'checkin-photos' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- ─── DSGVO: Account-Komplettlöschung ───────────────────────────────────
+-- Client-side löscht checkins/grows/storage; dieser RPC entfernt auth.users.
+-- security definer, damit der User seinen eigenen auth-Eintrag löschen kann.
+
+create or replace function public.delete_my_account()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := auth.uid();
+begin
+  if uid is null then
+    raise exception 'not authenticated';
+  end if;
+  -- Cascade-Deletes greifen über FK auf grows/checkins
+  delete from auth.users where id = uid;
+end;
+$$;
+
+revoke all on function public.delete_my_account() from public;
+grant execute on function public.delete_my_account() to authenticated;

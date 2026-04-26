@@ -204,6 +204,13 @@
 				<p class="font-medium text-sm">{tr('home.vpd')}</p>
 				<p class="text-xs text-gb-text-muted">{tr('home.vpd_sub')}</p>
 			</a>
+			<a href="/insights" class="bg-gb-green/10 border border-gb-green/20 rounded-xl p-4 hover:bg-gb-green/20 transition-colors">
+				<svg class="w-6 h-6 text-gb-green mb-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<path d="M3 3v18h18M7 14l4-4 4 4 5-5" />
+				</svg>
+				<p class="font-medium text-sm">Insights</p>
+				<p class="text-xs text-gb-text-muted">Strain-Stats &amp; Trends</p>
+			</a>
 		</div>
 	</div>
 
