@@ -111,11 +111,97 @@
 			.filter((c: CheckIn) => c.grow_id === growId)
 			.sort((a: CheckIn, b: CheckIn) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
 	);
-	let vpdData = $derived(chronCheckins.filter((c: CheckIn) => c.vpd !== null).map((c: CheckIn) => c.vpd as number));
-	let tempData = $derived(chronCheckins.filter((c: CheckIn) => c.temp !== null).map((c: CheckIn) => c.temp as number));
-	let rhData = $derived(chronCheckins.filter((c: CheckIn) => c.rh !== null).map((c: CheckIn) => c.rh as number));
-	let ecData = $derived(chronCheckins.filter((c: CheckIn) => c.ec_measured !== null).map((c: CheckIn) => c.ec_measured as number));
-	let phData = $derived(chronCheckins.filter((c: CheckIn) => c.ph_measured !== null).map((c: CheckIn) => c.ph_measured as number));
+	function dayOf(c: CheckIn): number {
+		if (!grow) return 1;
+		const start = new Date(grow.started_at).getTime();
+		const t = new Date(c.created_at).getTime();
+		return Math.max(1, Math.floor((t - start) / 86400000) + 1);
+	}
+	function seriesFrom<K extends keyof CheckIn>(key: K) {
+		const filtered = chronCheckins.filter((c: CheckIn) => (c as any)[key] !== null && (c as any)[key] !== undefined);
+		return {
+			values: filtered.map((c: CheckIn) => (c as any)[key] as number),
+			days: filtered.map(dayOf),
+		};
+	}
+	let vpdSeries = $derived(seriesFrom('vpd'));
+	let tempSeries = $derived(seriesFrom('temp'));
+	let rhSeries = $derived(seriesFrom('rh'));
+	let ecSeries = $derived(seriesFrom('ec_measured'));
+	let phSeries = $derived(seriesFrom('ph_measured'));
+	let vpdData = $derived(vpdSeries.values);
+	let tempData = $derived(tempSeries.values);
+	let rhData = $derived(rhSeries.values);
+	let ecData = $derived(ecSeries.values);
+	let phData = $derived(phSeries.values);
+
+	// Wasser/Dünger-Verlauf
+	let waterSeries = $derived.by(() => {
+		const filtered = chronCheckins.filter((c: CheckIn) => c.water_ml != null && c.water_ml > 0);
+		return { values: filtered.map((c: CheckIn) => c.water_ml as number), days: filtered.map(dayOf) };
+	});
+	let nutrientSeries = $derived.by(() => {
+		const filtered = chronCheckins.filter((c: CheckIn) => c.nutrient_ml != null && c.nutrient_ml > 0);
+		return { values: filtered.map((c: CheckIn) => c.nutrient_ml as number), days: filtered.map(dayOf) };
+	});
+
+	// Phasen-Marker: erster Index je neuem Phase-Wert
+	function markersFor(serieDays: number[]): { atIndex: number; label: string }[] {
+		if (!serieDays.length) return [];
+		const filtered = chronCheckins.filter((_: CheckIn, i: number) => true);
+		// einfacherer Ansatz: für jeden Datenpunkt die Phase aus dem ursprünglichen Check-in nehmen
+		const all = chronCheckins;
+		const out: { atIndex: number; label: string }[] = [];
+		let lastPhase: string | null = null;
+		// Map serie-Index → all-Index via days-Match
+		serieDays.forEach((d, i) => {
+			const ci = all.find((c: CheckIn) => dayOf(c) === d);
+			const ph = (ci?.phase as string) || '';
+			if (ph && ph !== lastPhase) {
+				if (lastPhase !== null) out.push({ atIndex: i, label: ph });
+				lastPhase = ph;
+			}
+		});
+		return out;
+	}
+	let vpdMarkers = $derived(markersFor(vpdSeries.days));
+	let tempMarkers = $derived(markersFor(tempSeries.days));
+	let rhMarkers = $derived(markersFor(rhSeries.days));
+	let ecMarkers = $derived(markersFor(ecSeries.days));
+	let phMarkers = $derived(markersFor(phSeries.days));
+	let waterMarkers = $derived(markersFor(waterSeries.days));
+	let nutrientMarkers = $derived(markersFor(nutrientSeries.days));
+
+	// Phase-spezifische Targets — wissenschaftlich (Veg/Bloom/Flush unterscheiden sich!)
+	const PHASE_TARGETS = {
+		vpd: { Veg: { min: 0.8, max: 1.2 }, Bloom: { min: 1.2, max: 1.5 }, Flush: { min: 1.0, max: 1.4 } },
+		temp: { Veg: { min: 22, max: 28 }, Bloom: { min: 20, max: 26 }, Flush: { min: 18, max: 24 } },
+		rh: { Veg: { min: 55, max: 70 }, Bloom: { min: 40, max: 55 }, Flush: { min: 35, max: 50 } },
+		ec: { Veg: { min: 1.0, max: 1.6 }, Bloom: { min: 1.6, max: 2.2 }, Flush: { min: 0.0, max: 0.4 } },
+		ph: { Veg: { min: 5.8, max: 6.3 }, Bloom: { min: 5.8, max: 6.3 }, Flush: { min: 5.8, max: 6.3 } },
+	} as const;
+
+	function phaseTargetsFor(metric: keyof typeof PHASE_TARGETS, serieDays: number[]) {
+		if (!serieDays.length) return [];
+		const all = chronCheckins;
+		const segs: { atIndex: number; min: number; max: number }[] = [];
+		let lastPhase: string | null = null;
+		serieDays.forEach((d, i) => {
+			const ci = all.find((c: CheckIn) => dayOf(c) === d);
+			const ph = (ci?.phase as string) || 'Veg';
+			if (ph !== lastPhase) {
+				const t = (PHASE_TARGETS[metric] as any)[ph];
+				if (t) segs.push({ atIndex: i, min: t.min, max: t.max });
+				lastPhase = ph;
+			}
+		});
+		return segs;
+	}
+	let vpdPhaseTargets = $derived(phaseTargetsFor('vpd', vpdSeries.days));
+	let tempPhaseTargets = $derived(phaseTargetsFor('temp', tempSeries.days));
+	let rhPhaseTargets = $derived(phaseTargetsFor('rh', rhSeries.days));
+	let ecPhaseTargets = $derived(phaseTargetsFor('ec', ecSeries.days));
+	let phPhaseTargets = $derived(phaseTargetsFor('ph', phSeries.days));
 
 	// Aggregat-Statistiken
 	function avg(nums: number[]): number | null {
@@ -742,38 +828,76 @@
 			</div>
 		{/if}
 
-		<!-- Charts (Pro Feature) -->
-		{#if vpdData.length >= 2 || tempData.length >= 2}
+		<!-- Charts (Pro Feature mit Free-Preview) -->
+		{#if vpdData.length >= 2 || tempData.length >= 2 || waterSeries.values.length >= 2}
 			{#if userIsPro}
 				<div class="space-y-2">
 					<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">{tr('charts.title')}</h2>
 					{#if vpdData.length >= 2}
-						<MiniChart data={vpdData} color="#22c55e" label="VPD" unit=" kPa"
-							targets={{ min: 0.8, max: 1.3 }} />
+						<MiniChart data={vpdData} days={vpdSeries.days} phaseMarkers={vpdMarkers}
+							phaseTargets={vpdPhaseTargets} showMinMax
+							color="#22c55e" label="VPD" unit=" kPa" />
 					{/if}
 					{#if tempData.length >= 2}
-						<MiniChart data={tempData} color="#f59e0b" label={tr('checkin.temp')} unit="°C"
-							targets={{ min: 22, max: 28 }} />
+						<MiniChart data={tempData} days={tempSeries.days} phaseMarkers={tempMarkers}
+							phaseTargets={tempPhaseTargets} showMinMax
+							color="#f59e0b" label={tr('checkin.temp')} unit="°C" />
 					{/if}
 					{#if rhData.length >= 2}
-						<MiniChart data={rhData} color="#3b82f6" label={tr('checkin.rh')} unit="%"
-							targets={{ min: 45, max: 65 }} />
+						<MiniChart data={rhData} days={rhSeries.days} phaseMarkers={rhMarkers}
+							phaseTargets={rhPhaseTargets} showMinMax
+							color="#3b82f6" label={tr('checkin.rh')} unit="%" />
 					{/if}
 					{#if ecData.length >= 2}
-						<MiniChart data={ecData} color="#a855f7" label="EC" unit=" mS" />
+						<MiniChart data={ecData} days={ecSeries.days} phaseMarkers={ecMarkers}
+							phaseTargets={ecPhaseTargets} showMinMax
+							color="#a855f7" label="EC" unit=" mS" />
 					{/if}
 					{#if phData.length >= 2}
-						<MiniChart data={phData} color="#ef4444" label="pH" unit=""
-							targets={{ min: 5.5, max: 6.5 }} />
+						<MiniChart data={phData} days={phSeries.days} phaseMarkers={phMarkers}
+							phaseTargets={phPhaseTargets} showMinMax
+							color="#ef4444" label="pH" unit="" />
+					{/if}
+					{#if waterSeries.values.length >= 2}
+						<MiniChart data={waterSeries.values} days={waterSeries.days} phaseMarkers={waterMarkers}
+							showMinMax color="#0ea5e9" label="Wasser" unit=" ml" />
+					{/if}
+					{#if nutrientSeries.values.length >= 2}
+						<MiniChart data={nutrientSeries.values} days={nutrientSeries.days} phaseMarkers={nutrientMarkers}
+							showMinMax color="#84cc16" label="Dünger" unit=" ml" />
 					{/if}
 				</div>
 			{:else}
-				<div class="bg-gb-accent/10 border border-gb-accent/20 rounded-xl p-4 text-center">
-					<p class="font-semibold text-sm">{tr('charts.pro_title')}</p>
-					<p class="text-xs text-gb-text-muted mt-1">{tr('charts.pro_desc')}</p>
-					<a href="/pro" class="inline-block mt-3 bg-gb-accent text-white font-semibold text-xs px-4 py-2 rounded-lg">
-						{tr('grow.unlock_pro')}
-					</a>
+				<div class="space-y-2">
+					<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide flex items-center gap-2">
+						{tr('charts.title')}
+						<span class="text-[10px] bg-gb-accent/20 text-gb-accent px-2 py-0.5 rounded-full font-normal">Free Preview</span>
+					</h2>
+					{#if vpdData.length >= 2}
+						<MiniChart data={vpdData} days={vpdSeries.days} phaseMarkers={vpdMarkers}
+							phaseTargets={vpdPhaseTargets} showMinMax
+							color="#22c55e" label="VPD" unit=" kPa" />
+					{:else if tempData.length >= 2}
+						<MiniChart data={tempData} days={tempSeries.days} phaseMarkers={tempMarkers}
+							phaseTargets={tempPhaseTargets} showMinMax
+							color="#f59e0b" label={tr('checkin.temp')} unit="°C" />
+					{/if}
+
+					<div class="bg-gradient-to-br from-gb-accent/15 to-gb-accent/5 border border-gb-accent/30 rounded-xl p-4">
+						<div class="flex items-start gap-3">
+							<div class="text-2xl">📊</div>
+							<div class="flex-1">
+								<p class="font-semibold text-sm">+ 6 weitere Charts in Pro</p>
+								<p class="text-xs text-gb-text-muted mt-1 leading-relaxed">
+									Temp, RH, EC, pH, Wasser & Dünger — alle mit Phasen-Targets, Tap-Tooltips und Min/Max-Markern.
+								</p>
+								<a href="/pro" class="inline-block mt-3 bg-gb-accent text-white font-semibold text-xs px-4 py-2 rounded-lg"
+									style="min-height:36px; display:inline-flex; align-items:center;">
+									{tr('grow.unlock_pro')}
+								</a>
+							</div>
+						</div>
+					</div>
 				</div>
 			{/if}
 		{/if}

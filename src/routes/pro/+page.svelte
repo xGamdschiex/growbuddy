@@ -15,13 +15,24 @@
 	const BETA_CODE = 'GROWBUDDY2026';
 
 	function activateBeta() {
-		if (betaCode.trim().toUpperCase() === BETA_CODE) {
+		const code = betaCode.trim().toUpperCase();
+		if (!code) {
+			toastStore.warning('Bitte Code eingeben');
+			return;
+		}
+		if (code === BETA_CODE) {
 			proStore.activatePro('beta-tester');
 			toastStore.achievement('Pro aktiviert — Viel Spaß beim Testen! 🌱');
-			goto('/');
+			betaCode = '';
+			showBetaInput = false;
+			// Kurze Verzögerung damit der Store-Save abgeschlossen ist und Toast sichtbar bleibt
+			setTimeout(() => goto('/'), 800);
 		} else {
-			toastStore.warning('Ungültiger Code');
+			toastStore.warning('Ungültiger Code: ' + code);
 		}
+	}
+	function onBetaKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter') activateBeta();
 	}
 
 	function startTrial() {
@@ -138,6 +149,7 @@
 			{#if showBetaInput}
 				<div class="flex gap-2">
 					<input type="text" bind:value={betaCode} placeholder="Code eingeben"
+						onkeydown={onBetaKeydown} autocapitalize="characters" autocomplete="off"
 						class="flex-1 bg-gb-bg border border-gb-border rounded-lg px-3 py-2.5 text-sm uppercase" />
 					<button onclick={activateBeta}
 						class="bg-gb-accent text-white font-semibold text-sm px-4 rounded-lg">
