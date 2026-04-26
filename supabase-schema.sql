@@ -69,33 +69,41 @@ alter table checkins add column if not exists updated_at timestamptz not null de
 alter table grows enable row level security;
 alter table checkins enable row level security;
 
--- User sieht nur eigene Grows
+-- User sieht nur eigene Grows (idempotent — drop+recreate)
+drop policy if exists "Users see own grows" on grows;
 create policy "Users see own grows" on grows
   for select using (auth.uid() = user_id);
 
+drop policy if exists "Users insert own grows" on grows;
 create policy "Users insert own grows" on grows
   for insert with check (auth.uid() = user_id);
 
+drop policy if exists "Users update own grows" on grows;
 create policy "Users update own grows" on grows
   for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+drop policy if exists "Users delete own grows" on grows;
 create policy "Users delete own grows" on grows
   for delete using (auth.uid() = user_id);
 
 -- User sieht nur eigene Check-ins
+drop policy if exists "Users see own checkins" on checkins;
 create policy "Users see own checkins" on checkins
   for select using (auth.uid() = user_id);
 
 -- Hardening (RLS_AUDIT F2): grow_id muss zum eigenen User gehören
+drop policy if exists "Users insert own checkins" on checkins;
 create policy "Users insert own checkins" on checkins
   for insert with check (
     auth.uid() = user_id
     and exists (select 1 from grows g where g.id = grow_id and g.user_id = auth.uid())
   );
 
+drop policy if exists "Users update own checkins" on checkins;
 create policy "Users update own checkins" on checkins
   for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+drop policy if exists "Users delete own checkins" on checkins;
 create policy "Users delete own checkins" on checkins
   for delete using (auth.uid() = user_id);
 
@@ -114,18 +122,22 @@ values ('checkin-photos', 'checkin-photos', false)
 on conflict (id) do nothing;
 
 -- RLS für Storage: User darf nur eigene Fotos lesen/schreiben (Pfad: {userId}/{checkinId}.jpg)
+drop policy if exists "Users upload own photos" on storage.objects;
 create policy "Users upload own photos"
   on storage.objects for insert to authenticated
   with check (bucket_id = 'checkin-photos' and (storage.foldername(name))[1] = auth.uid()::text);
 
+drop policy if exists "Users read own photos" on storage.objects;
 create policy "Users read own photos"
   on storage.objects for select to authenticated
   using (bucket_id = 'checkin-photos' and (storage.foldername(name))[1] = auth.uid()::text);
 
+drop policy if exists "Users update own photos" on storage.objects;
 create policy "Users update own photos"
   on storage.objects for update to authenticated
   using (bucket_id = 'checkin-photos' and (storage.foldername(name))[1] = auth.uid()::text);
 
+drop policy if exists "Users delete own photos" on storage.objects;
 create policy "Users delete own photos"
   on storage.objects for delete to authenticated
   using (bucket_id = 'checkin-photos' and (storage.foldername(name))[1] = auth.uid()::text);
