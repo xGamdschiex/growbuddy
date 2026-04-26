@@ -14,13 +14,16 @@
 	let loginLoading = $state(false);
 	let loginMessage = $state('');
 	let oauthPending = $state(false);
+	let finishing = $state(false);
 	let auth = $derived.by(() => { let v: any = { user: null, loading: true }; authStore.subscribe(x => v = x)(); return v; });
 
 	const CLOUD_STEP = 6; // nach slides(4) + exp(1) + goal(1)
 
-	// Beim Empfang einer Session (z.B. nach OAuth-Callback) Onboarding finishen
+	// Beim Empfang einer Session NACH explizitem Login-Versuch (oauthPending) Onboarding finishen
+	// Ohne oauthPending: bestehende Session ignorieren, sonst loopt es wenn User bereits eingeloggt
 	$effect(() => {
-		if (auth.user && (oauthPending || step === CLOUD_STEP)) {
+		if (auth.user && oauthPending && !finishing) {
+			finishing = true;
 			oauthPending = false;
 			toastStore.success('Eingeloggt — Daten werden synchronisiert');
 			finish();
@@ -90,12 +93,12 @@
 
 	function finish() {
 		onboardingStore.complete(experience, goal);
-		setTimeout(() => goto('/'), 50);
+		goto('/', { replaceState: true });
 	}
 
 	function skip() {
 		onboardingStore.complete(null, null);
-		setTimeout(() => goto('/'), 50);
+		goto('/', { replaceState: true });
 	}
 
 	function startTrial() {
