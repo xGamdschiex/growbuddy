@@ -23,10 +23,23 @@ function getRedirectUrl(): string {
 	return VERCEL_CALLBACK;
 }
 
-function parseTokensFromUrl(url: string): { access_token: string; refresh_token: string } | null {
+function parseAuthCodeFromUrl(url: string): string | null {
 	try {
 		const u = new URL(url);
-		// Hash-Fragment hat Form #access_token=...&refresh_token=...
+		// PKCE: code als Query-Parameter (?code=...)
+		const code = u.searchParams.get('code');
+		if (code) return code;
+		// Fallback: Hash-Fragment (legacy implicit flow, kommt auf Android oft nicht durch)
+		const hash = u.hash.startsWith('#') ? u.hash.slice(1) : u.hash;
+		const params = new URLSearchParams(hash);
+		return params.get('code');
+	} catch {}
+	return null;
+}
+
+function parseImplicitTokens(url: string): { access_token: string; refresh_token: string } | null {
+	try {
+		const u = new URL(url);
 		const hash = u.hash.startsWith('#') ? u.hash.slice(1) : u.hash;
 		const params = new URLSearchParams(hash);
 		const access_token = params.get('access_token');
@@ -78,13 +91,28 @@ function createAuthStore() {
 	async function setupNativeUrlListener() {
 		if (!Capacitor.isNativePlatform()) return;
 		await CapacitorApp.addListener('appUrlOpen', async (event) => {
-			const tokens = parseTokensFromUrl(event.url);
-			if (!tokens) return;
-			try {
-				await supabase.auth.setSession(tokens);
-				await Browser.close().catch(() => {});
-			} catch (err) {
-				console.error('Auth setSession failed', err);
+			console.log('[auth] appUrlOpen', event.url);
+			// PKCE-Flow (preferred): Code aus Query-Parameter
+			const code = parseAuthCodeFromUrl(event.url);
+			if (code) {
+				try {
+					const { error } = await supabase.auth.exchangeCodeForSession(code);
+					if (error) console.error('[auth] exchangeCodeForSession failed', error);
+					await Browser.close().catch(() => {});
+					return;
+				} catch (err) {
+					console.error('[auth] exchange failed', err);
+				}
+			}
+			// Legacy Fallback: Hash-Fragment (implicit flow)
+			const tokens = parseImplicitTokens(event.url);
+			if (tokens) {
+				try {
+					await supabase.auth.setSession(tokens);
+					await Browser.close().catch(() => {});
+				} catch (err) {
+					console.error('[auth] setSession failed', err);
+				}
 			}
 		});
 	}
