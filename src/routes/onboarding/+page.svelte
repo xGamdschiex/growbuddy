@@ -13,15 +13,31 @@
 	let loginEmail = $state('');
 	let loginLoading = $state(false);
 	let loginMessage = $state('');
+	let oauthPending = $state(false);
+	let auth = $derived.by(() => { let v: any = { user: null, loading: true }; authStore.subscribe(x => v = x)(); return v; });
 
 	const CLOUD_STEP = 6; // nach slides(4) + exp(1) + goal(1)
+
+	// Beim Empfang einer Session (z.B. nach OAuth-Callback) Onboarding finishen
+	$effect(() => {
+		if (auth.user && (oauthPending || step === CLOUD_STEP)) {
+			oauthPending = false;
+			toastStore.success('Eingeloggt — Daten werden synchronisiert');
+			finish();
+		}
+	});
 
 	function goToCloud() { step = CLOUD_STEP; }
 
 	async function cloudGoogle() {
+		oauthPending = true;
 		const { error } = await authStore.loginWithGoogle();
-		if (error) toastStore.warning(error);
+		if (error) {
+			oauthPending = false;
+			toastStore.warning(error);
+		}
 		// Redirect passiert durch Supabase, OAuth-Callback kommt zurück
+		// $effect() oben fängt session-set ab und ruft finish()
 	}
 
 	async function cloudEmail() {
