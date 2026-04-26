@@ -211,6 +211,13 @@
 				<p class="font-medium text-sm">Insights</p>
 				<p class="text-xs text-gb-text-muted">Strain-Stats &amp; Trends</p>
 			</a>
+			<a href="/feed" class="bg-gb-info/10 border border-gb-info/20 rounded-xl p-4 hover:bg-gb-info/20 transition-colors">
+				<svg class="w-6 h-6 text-gb-info mb-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<path d="M17 8h2a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2v-8a2 2 0 012-2h2m10-4H7m10 4V4m-10 4V4" />
+				</svg>
+				<p class="font-medium text-sm">Feed</p>
+				<p class="text-xs text-gb-text-muted">Community Check-ins</p>
+			</a>
 		</div>
 	</div>
 

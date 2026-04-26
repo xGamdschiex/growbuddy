@@ -33,6 +33,8 @@ export interface Grow {
 	// Neu: Anbausystem + Substratverhältnis
 	system?: GrowSystem;                // default 'topf'
 	coco_perlite_ratio?: number;        // % Kokos (0-100), Rest = Perlite. Default 70.
+	/** Public im Community-Feed sichtbar (Phase 2) */
+	is_public?: boolean;
 	/** Last-Write-Wins Merge-Key für Sync */
 	updated_at?: string;
 }
@@ -55,6 +57,7 @@ export interface CheckIn {
 	nutrients_given: boolean;
 	water_ml: number | null;     // Wassermenge in mL (optional)
 	nutrient_ml: number | null;  // Düngermenge in mL (optional, Gesamt)
+	is_public?: boolean;         // Public im Community-Feed sichtbar (Phase 2)
 	training: string | null;     // 'lst', 'topping', etc.
 	notes: string;
 	created_at: string;          // ISO date

@@ -68,6 +68,7 @@ function createSyncStore() {
 						notes: g.notes,
 						system: g.system ?? 'topf',
 						coco_perlite_ratio: g.coco_perlite_ratio ?? null,
+						is_public: g.is_public ?? false,
 						updated_at: g.updated_at ?? g.started_at,
 					}));
 					const { error } = await supabase.from('grows').upsert(growRows, { onConflict: 'id' });
@@ -110,6 +111,7 @@ function createSyncStore() {
 							nutrient_ml: c.nutrient_ml ?? null,
 							training: c.training,
 							notes: c.notes,
+							is_public: c.is_public ?? false,
 							created_at: c.created_at,
 							updated_at: c.updated_at ?? c.created_at,
 							has_photo: hasPhoto,
@@ -168,6 +170,7 @@ function createSyncStore() {
 						notes: g.notes ?? '',
 						system: g.system ?? 'topf',
 						coco_perlite_ratio: g.coco_perlite_ratio ?? undefined,
+						is_public: g.is_public ?? false,
 						updated_at: g.updated_at ?? g.started_at,
 					})),
 					checkins: (checkins ?? []).map((c: any): CheckIn => ({
@@ -190,6 +193,7 @@ function createSyncStore() {
 						nutrient_ml: c.nutrient_ml ?? null,
 						training: c.training,
 						notes: c.notes ?? '',
+						is_public: c.is_public ?? false,
 						created_at: c.created_at,
 						updated_at: c.updated_at ?? c.created_at,
 					})),

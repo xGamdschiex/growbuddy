@@ -1,19 +1,39 @@
 /**
  * Auth Store — Supabase Auth mit Magic Link + Google OAuth.
  * Offline-first: App funktioniert ohne Login, Login ist optional für Cloud-Sync.
+ *
+ * Native (Capacitor): Custom-Scheme `growbuddy://auth/callback`
+ *   → AppUrlOpen Listener empfängt Hash-Token → setSession()
+ * Web: `${origin}/auth/callback` Route mit getSession()
  */
 
 import { writable, derived } from 'svelte/store';
 import { supabase } from '$lib/supabase';
 import type { User, Session } from '@supabase/supabase-js';
 import { Capacitor } from '@capacitor/core';
+import { App as CapacitorApp } from '@capacitor/app';
+import { Browser } from '@capacitor/browser';
 
+const NATIVE_CALLBACK = 'growbuddy://auth/callback';
 const VERCEL_CALLBACK = 'https://growbuddy-app.vercel.app/auth/callback';
 
 function getRedirectUrl(): string {
-	if (Capacitor.isNativePlatform()) return VERCEL_CALLBACK;
+	if (Capacitor.isNativePlatform()) return NATIVE_CALLBACK;
 	if (typeof window !== 'undefined') return `${window.location.origin}/auth/callback`;
 	return VERCEL_CALLBACK;
+}
+
+function parseTokensFromUrl(url: string): { access_token: string; refresh_token: string } | null {
+	try {
+		const u = new URL(url);
+		// Hash-Fragment hat Form #access_token=...&refresh_token=...
+		const hash = u.hash.startsWith('#') ? u.hash.slice(1) : u.hash;
+		const params = new URLSearchParams(hash);
+		const access_token = params.get('access_token');
+		const refresh_token = params.get('refresh_token');
+		if (access_token && refresh_token) return { access_token, refresh_token };
+	} catch {}
+	return null;
 }
 
 export interface AuthState {
@@ -54,9 +74,25 @@ function createAuthStore() {
 		});
 	}
 
+	// Native: AppUrlOpen-Listener für Custom-Scheme Redirects (growbuddy://auth/callback)
+	async function setupNativeUrlListener() {
+		if (!Capacitor.isNativePlatform()) return;
+		await CapacitorApp.addListener('appUrlOpen', async (event) => {
+			const tokens = parseTokensFromUrl(event.url);
+			if (!tokens) return;
+			try {
+				await supabase.auth.setSession(tokens);
+				await Browser.close().catch(() => {});
+			} catch (err) {
+				console.error('Auth setSession failed', err);
+			}
+		});
+	}
+
 	// SSR-safe: nur im Browser initialisieren
 	if (typeof window !== 'undefined') {
 		init();
+		setupNativeUrlListener();
 	}
 
 	return {
@@ -73,6 +109,17 @@ function createAuthStore() {
 
 		/** Google OAuth Login */
 		async loginWithGoogle(): Promise<{ error: string | null }> {
+			if (Capacitor.isNativePlatform()) {
+				const { data, error } = await supabase.auth.signInWithOAuth({
+					provider: 'google',
+					options: { redirectTo: NATIVE_CALLBACK, skipBrowserRedirect: true },
+				});
+				if (error) return { error: error.message };
+				if (data?.url) {
+					await Browser.open({ url: data.url, presentationStyle: 'popover' });
+				}
+				return { error: null };
+			}
 			const { error } = await supabase.auth.signInWithOAuth({
 				provider: 'google',
 				options: { redirectTo: getRedirectUrl() },

@@ -461,6 +461,22 @@
 			{#if grow.notes}<p><span class="text-gb-text-muted">{tr('grow.info_notes')}:</span> {grow.notes}</p>{/if}
 		</div>
 
+		<!-- Public-Toggle (Phase 2 Community) -->
+		<button onclick={() => growStore.updateGrow(grow.id, { is_public: !grow.is_public })}
+			class="w-full bg-gb-surface border border-gb-border rounded-xl p-3 flex items-center justify-between text-left"
+			style="min-height:48px">
+			<div class="min-w-0">
+				<p class="font-medium text-sm">{grow.is_public ? '🌍 Öffentlich' : '🔒 Privat'}</p>
+				<p class="text-xs text-gb-text-muted truncate">
+					{grow.is_public ? 'Im Community-Feed sichtbar' : 'Nur du siehst diesen Grow'}
+				</p>
+			</div>
+			<div class="relative h-6 w-11 rounded-full transition-colors" class:bg-gb-green={grow.is_public} class:bg-gb-bg={!grow.is_public}>
+				<div class="absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all"
+					class:left-0.5={!grow.is_public} class:left-[22px]={grow.is_public}></div>
+			</div>
+		</button>
+
 		<!-- Check-in Button -->
 		{#if grow.status === 'active'}
 			{#if !showCheckin}
