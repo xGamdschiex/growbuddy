@@ -252,3 +252,74 @@ on conflict (id) do nothing;
 create index if not exists idx_profiles_username on profiles(username);
 create index if not exists idx_grows_public on grows(is_public, created_at desc) where is_public = true;
 create index if not exists idx_checkins_public on checkins(is_public, created_at desc) where is_public = true;
+
+-- Phase 2 Beta: Check-in Likes
+create table if not exists checkin_likes (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  checkin_id uuid not null references checkins(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (user_id, checkin_id)
+);
+alter table checkin_likes enable row level security;
+
+drop policy if exists "Likes public read" on checkin_likes;
+create policy "Likes public read" on checkin_likes
+  for select to authenticated, anon
+  using (true);
+
+drop policy if exists "Likes own insert" on checkin_likes;
+create policy "Likes own insert" on checkin_likes
+  for insert with check (auth.uid() = user_id);
+
+drop policy if exists "Likes own delete" on checkin_likes;
+create policy "Likes own delete" on checkin_likes
+  for delete using (auth.uid() = user_id);
+
+create index if not exists idx_likes_checkin on checkin_likes(checkin_id);
+
+-- Phase 2 Beta: Follows
+create table if not exists follows (
+  follower_id uuid not null references auth.users(id) on delete cascade,
+  followee_id uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (follower_id, followee_id),
+  check (follower_id <> followee_id)
+);
+alter table follows enable row level security;
+
+drop policy if exists "Follows public read" on follows;
+create policy "Follows public read" on follows
+  for select to authenticated, anon
+  using (true);
+
+drop policy if exists "Follows own insert" on follows;
+create policy "Follows own insert" on follows
+  for insert with check (auth.uid() = follower_id);
+
+drop policy if exists "Follows own delete" on follows;
+create policy "Follows own delete" on follows
+  for delete using (auth.uid() = follower_id);
+
+create index if not exists idx_follows_follower on follows(follower_id);
+create index if not exists idx_follows_followee on follows(followee_id);
+
+-- Phase 2 Beta: Reports (Moderation, einfach)
+create table if not exists reports (
+  id uuid primary key default gen_random_uuid(),
+  reporter_id uuid not null references auth.users(id) on delete cascade,
+  checkin_id uuid references checkins(id) on delete cascade,
+  reason text not null,
+  details text,
+  created_at timestamptz not null default now()
+);
+alter table reports enable row level security;
+
+drop policy if exists "Reports own insert" on reports;
+create policy "Reports own insert" on reports
+  for insert with check (auth.uid() = reporter_id);
+
+drop policy if exists "Reports own read" on reports;
+create policy "Reports own read" on reports
+  for select using (auth.uid() = reporter_id);
+
+create index if not exists idx_reports_checkin on reports(checkin_id);

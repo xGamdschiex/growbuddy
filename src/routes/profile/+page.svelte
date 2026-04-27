@@ -5,6 +5,7 @@
 	import { reminderStore } from '$lib/stores/reminders';
 	import { authStore, isLoggedIn } from '$lib/stores/auth';
 	import { syncStore } from '$lib/stores/sync';
+	import { profileStore, myProfile } from '$lib/stores/profile';
 	import { t, locale } from '$lib/i18n';
 	import type { Locale } from '$lib/i18n';
 	import { ACHIEVEMENTS } from '$lib/data/achievements';
@@ -27,6 +28,44 @@
 	let loginEmail = $state('');
 	let loginLoading = $state(false);
 	let loginMessage = $state('');
+
+	// Username/Bio Editor (Phase 2 Beta)
+	let profile = $derived.by(() => { let v: any = null; myProfile.subscribe(x => v = x)(); return v; });
+	let editingProfile = $state(false);
+	let usernameInput = $state('');
+	let bioInput = $state('');
+	let savingProfile = $state(false);
+	let profileError = $state('');
+
+	function startEditProfile() {
+		usernameInput = profile?.username ?? '';
+		bioInput = profile?.bio ?? '';
+		profileError = '';
+		editingProfile = true;
+	}
+	function cancelEditProfile() {
+		editingProfile = false;
+		profileError = '';
+	}
+	async function saveProfile() {
+		if (savingProfile) return;
+		profileError = '';
+		savingProfile = true;
+		try {
+			if (usernameInput.trim() !== profile?.username) {
+				const res = await profileStore.updateUsername(usernameInput);
+				if (res.error) { profileError = res.error; return; }
+			}
+			if (bioInput !== (profile?.bio ?? '')) {
+				const res = await profileStore.updateBio(bioInput);
+				if (res.error) { profileError = res.error; return; }
+			}
+			toastStore.success('Profil aktualisiert');
+			editingProfile = false;
+		} finally {
+			savingProfile = false;
+		}
+	}
 
 	async function sendMagicLink() {
 		if (!loginEmail.trim()) return;
@@ -314,6 +353,53 @@
 						class="text-xs text-gb-danger bg-gb-danger/10 px-3 py-1.5 rounded-lg font-medium hover:bg-gb-danger/20">
 						{tr('auth.logout')}
 					</button>
+				</div>
+
+				<!-- Public-Profile Editor (Phase 2 Beta) -->
+				<div class="border-t border-gb-border pt-3">
+					{#if !editingProfile}
+						<div class="flex items-center justify-between">
+							<div class="min-w-0 flex-1">
+								<p class="text-xs text-gb-text-muted">Öffentliches Profil</p>
+								<p class="text-sm font-medium truncate">@{profile?.username ?? '—'}</p>
+								{#if profile?.bio}
+									<p class="text-xs text-gb-text-muted truncate mt-0.5">{profile.bio}</p>
+								{/if}
+							</div>
+							<button onclick={startEditProfile}
+								class="text-xs text-gb-info bg-gb-info/10 px-3 py-1.5 rounded-lg font-medium hover:bg-gb-info/20">
+								Bearbeiten
+							</button>
+						</div>
+					{:else}
+						<div class="space-y-2">
+							<label class="block">
+								<span class="text-xs text-gb-text-muted">Username (3–20 Zeichen, a-z 0-9 _)</span>
+								<input type="text" bind:value={usernameInput} maxlength="20"
+									autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false"
+									class="mt-1 w-full bg-gb-bg border border-gb-border rounded-lg px-3 py-2.5 text-sm" />
+							</label>
+							<label class="block">
+								<span class="text-xs text-gb-text-muted">Bio (optional, max 280 Zeichen)</span>
+								<textarea bind:value={bioInput} maxlength="280" rows="2"
+									class="mt-1 w-full bg-gb-bg border border-gb-border rounded-lg px-3 py-2 text-sm resize-none"></textarea>
+								<span class="text-[10px] text-gb-text-muted">{bioInput.length}/280</span>
+							</label>
+							{#if profileError}
+								<p class="text-xs text-gb-danger">{profileError}</p>
+							{/if}
+							<div class="flex gap-2">
+								<button onclick={saveProfile} disabled={savingProfile}
+									class="flex-1 bg-gb-green text-black font-medium text-sm py-2 rounded-lg disabled:opacity-50">
+									{savingProfile ? '...' : 'Speichern'}
+								</button>
+								<button onclick={cancelEditProfile} disabled={savingProfile}
+									class="flex-1 bg-gb-bg border border-gb-border text-gb-text font-medium text-sm py-2 rounded-lg">
+									Abbrechen
+								</button>
+							</div>
+						</div>
+					{/if}
 				</div>
 
 				<!-- Sync Buttons -->
