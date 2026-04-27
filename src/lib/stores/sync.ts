@@ -80,12 +80,16 @@ function createSyncStore() {
 					const checkinRows = await Promise.all(state.checkins.map(async c => {
 						// Mehrere Fotos uploaden (bevorzugt), sonst Legacy-Einzel
 						const rawPhotos = (c.photos_data ?? []).filter(p => p?.startsWith('data:'));
-						let photoUrls: string[] = [];
+						// Bestehende Cloud-URLs erhalten (verhindert Überschreiben mit leerem Array)
+						let photoUrls: string[] = c.photo_urls ?? [];
 						let photoUrl: string | null = c.photo_url ?? null;
 						if (rawPhotos.length > 0) {
-							photoUrls = await uploadCheckinPhotos(userId, c.id, rawPhotos);
-							if (photoUrls.length > 0) photoUrl = photoUrls[0];
-						} else if (c.photo_data && c.photo_data.startsWith('data:')) {
+							const newUrls = await uploadCheckinPhotos(userId, c.id, rawPhotos);
+							if (newUrls.length > 0) {
+								photoUrls = [...photoUrls, ...newUrls];
+								photoUrl = photoUrls[0];
+							}
+						} else if (c.photo_data && c.photo_data.startsWith('data:') && photoUrls.length === 0) {
 							const url = await uploadCheckinPhoto(userId, c.id, c.photo_data);
 							if (url) {
 								photoUrl = url;
@@ -179,9 +183,10 @@ function createSyncStore() {
 						phase: c.phase,
 						week: c.week,
 						day: c.day,
-						photo_data: null, // Base64 bleibt lokal, Cloud nutzt photo_url
-						photos_data: [],
+						photo_data: null, // Base64 bleibt lokal — nach Sync nicht mehr nötig
+						photos_data: [],  // base64 lokal — Anzeige läuft über photo_urls
 						photo_url: c.photo_url ?? null,
+						photo_urls: Array.isArray(c.photo_urls) ? c.photo_urls : (c.photo_url ? [c.photo_url] : []),
 						temp: c.temp,
 						rh: c.rh,
 						vpd: c.vpd,

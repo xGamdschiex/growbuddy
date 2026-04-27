@@ -299,7 +299,9 @@
 		ciNutrientMl = ci.nutrient_ml ?? null;
 		ciTraining = ci.training;
 		ciNotes = ci.notes;
-		ciPhotos = ci.photos_data?.length ? [...ci.photos_data] : (ci.photo_data ? [ci.photo_data] : []);
+		ciPhotos = ci.photo_urls?.length ? [...ci.photo_urls]
+			: ci.photos_data?.length ? [...ci.photos_data]
+			: (ci.photo_url ? [ci.photo_url] : (ci.photo_data ? [ci.photo_data] : []));
 		ciMore = true;
 		showCheckin = true;
 		hapticMedium();
@@ -350,12 +352,17 @@
 		const validDay = clampNumber(ciDay, RANGES.day.min, RANGES.day.max);
 		const validVpd = validTemp !== null && validRh !== null ? calcVPD(validTemp, validRh) : null;
 
+		// ciPhotos kann Mix aus base64 (data:) und URLs (https://...) sein
+		const newBase64 = ciPhotos.filter(p => p?.startsWith('data:'));
+		const existingUrls = ciPhotos.filter(p => p && !p.startsWith('data:'));
 		const patch = {
 			phase: ciPhase,
 			week: validWeek,
 			day: validDay,
-			photo_data: ciPhotos[0] ?? null,
-			photos_data: ciPhotos,
+			photo_data: newBase64[0] ?? null,
+			photos_data: newBase64,
+			photo_url: existingUrls[0] ?? null,
+			photo_urls: existingUrls,
 			temp: validTemp,
 			rh: validRh,
 			vpd: validVpd,
@@ -927,9 +934,11 @@
 					{tr('timeline.no_entries')}
 				</p>
 			{:else}
-				<!-- Foto Grid (alle Fotos aller Check-ins) -->
+				<!-- Foto Grid (alle Fotos aller Check-ins): erst Cloud-URLs, dann lokale Base64 -->
 				{@const allPhotos = checkins.flatMap((c: CheckIn) =>
-					(c.photos_data?.length ? c.photos_data : (c.photo_data ? [c.photo_data] : []))
+					(c.photo_urls?.length ? c.photo_urls
+						: c.photos_data?.length ? c.photos_data
+						: (c.photo_url ? [c.photo_url] : (c.photo_data ? [c.photo_data] : [])))
 				)}
 				{#if allPhotos.length > 0}
 					<div class="grid grid-cols-4 gap-1 rounded-xl overflow-hidden">
@@ -943,7 +952,9 @@
 
 				<!-- Check-in List -->
 				{#each checkins as ci}
-					{@const ciAllPhotos = ci.photos_data?.length ? ci.photos_data : (ci.photo_data ? [ci.photo_data] : [])}
+					{@const ciAllPhotos = ci.photo_urls?.length ? ci.photo_urls
+						: ci.photos_data?.length ? ci.photos_data
+						: (ci.photo_url ? [ci.photo_url] : (ci.photo_data ? [ci.photo_data] : []))}
 					<div class="bg-gb-surface rounded-xl p-3 space-y-2">
 						<div class="flex justify-between items-start">
 							<div>

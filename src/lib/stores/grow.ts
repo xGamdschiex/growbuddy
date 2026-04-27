@@ -46,8 +46,9 @@ export interface CheckIn {
 	week: number;
 	day: number;
 	photo_data: string | null;   // base64 data URL (legacy, single photo)
-	photos_data: string[];       // base64 array, max 5
-	photo_url?: string | null;   // Signed URL von Supabase Storage (nach Sync)
+	photos_data: string[];       // base64 array, max 5 (lokal vor Upload)
+	photo_url?: string | null;   // Signed URL von Supabase Storage (Single, legacy)
+	photo_urls?: string[];       // Signed URL Array von Supabase Storage (nach Sync)
 	temp: number | null;
 	rh: number | null;
 	vpd: number | null;
