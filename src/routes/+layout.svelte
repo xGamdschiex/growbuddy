@@ -15,6 +15,11 @@
 	import InstallPrompt from '$lib/components/InstallPrompt.svelte';
 	import type { Toast } from '$lib/stores/toast';
 	import type { Snippet } from 'svelte';
+	import { Capacitor } from '@capacitor/core';
+	import { App as CapacitorApp } from '@capacitor/app';
+	import { Browser } from '@capacitor/browser';
+	import { supabase } from '$lib/supabase';
+	import { onMount } from 'svelte';
 
 	let { children }: { children: Snippet } = $props();
 	let toasts = $derived.by(() => { let v: Toast[] = []; toastStore.subscribe(x => v = x)(); return v; });
@@ -102,6 +107,35 @@
 			syncStore.push(uid, snapshot).catch(() => {});
 		}, 2500);
 		return () => clearTimeout(pushTimer);
+	});
+
+	// Auth: AppUrlOpen-Listener für Custom-Scheme growbuddy://auth/callback
+	onMount(() => {
+		if (!Capacitor.isNativePlatform()) return;
+		const handle = CapacitorApp.addListener('appUrlOpen', async (event) => {
+			try {
+				const u = new URL(event.url);
+				const code = u.searchParams.get('code');
+				if (code) {
+					const { error } = await supabase.auth.exchangeCodeForSession(code);
+					if (error) toastStore.warning('Login-Fehler: ' + error.message);
+					await Browser.close().catch(() => {});
+					return;
+				}
+				// Legacy implicit flow Fallback
+				const hash = u.hash.startsWith('#') ? u.hash.slice(1) : u.hash;
+				const params = new URLSearchParams(hash);
+				const access_token = params.get('access_token');
+				const refresh_token = params.get('refresh_token');
+				if (access_token && refresh_token) {
+					await supabase.auth.setSession({ access_token, refresh_token });
+					await Browser.close().catch(() => {});
+				}
+			} catch (e: any) {
+				toastStore.warning('Auth-Fehler: ' + (e?.message ?? 'unbekannt'));
+			}
+		});
+		return () => { handle.then(h => h.remove()); };
 	});
 
 	// Reminder-Timer beim App-Start wiederherstellen + Missed-Check-in prüfen

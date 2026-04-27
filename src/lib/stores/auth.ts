@@ -87,40 +87,11 @@ function createAuthStore() {
 		});
 	}
 
-	// Native: AppUrlOpen-Listener für Custom-Scheme Redirects (growbuddy://auth/callback)
-	async function setupNativeUrlListener() {
-		if (!Capacitor.isNativePlatform()) return;
-		await CapacitorApp.addListener('appUrlOpen', async (event) => {
-			console.log('[auth] appUrlOpen', event.url);
-			// PKCE-Flow (preferred): Code aus Query-Parameter
-			const code = parseAuthCodeFromUrl(event.url);
-			if (code) {
-				try {
-					const { error } = await supabase.auth.exchangeCodeForSession(code);
-					if (error) console.error('[auth] exchangeCodeForSession failed', error);
-					await Browser.close().catch(() => {});
-					return;
-				} catch (err) {
-					console.error('[auth] exchange failed', err);
-				}
-			}
-			// Legacy Fallback: Hash-Fragment (implicit flow)
-			const tokens = parseImplicitTokens(event.url);
-			if (tokens) {
-				try {
-					await supabase.auth.setSession(tokens);
-					await Browser.close().catch(() => {});
-				} catch (err) {
-					console.error('[auth] setSession failed', err);
-				}
-			}
-		});
-	}
+	// AppUrlOpen-Listener wird in +layout.svelte registriert (frühere Mount-Garantie)
 
 	// SSR-safe: nur im Browser initialisieren
 	if (typeof window !== 'undefined') {
 		init();
-		setupNativeUrlListener();
 	}
 
 	return {
