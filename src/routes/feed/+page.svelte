@@ -46,12 +46,13 @@
 	async function load() {
 		loading = true;
 		error = null;
+
+		// Step 1: Check-ins + Grow joinen (FK existiert)
 		const { data, error: err } = await supabase
 			.from('checkins')
 			.select(`
 				id, grow_id, phase, week, day, temp, rh, vpd, notes, photo_urls, created_at, user_id,
-				grow:grows!inner(id, name, strain, is_public),
-				profile:profiles!inner(username)
+				grow:grows!inner(id, name, strain, is_public)
 			`)
 			.eq('is_public', true)
 			.order('created_at', { ascending: false })
@@ -63,27 +64,40 @@
 			return;
 		}
 
-		items = ((data as any[]) ?? [])
-			.filter(r => r.grow?.is_public)
-			.map(r => ({
-				id: r.id,
-				grow_id: r.grow_id,
-				user_id: r.user_id,
-				phase: r.phase,
-				week: r.week,
-				day: r.day,
-				temp: r.temp,
-				rh: r.rh,
-				vpd: r.vpd,
-				notes: r.notes ?? '',
-				photo_urls: r.photo_urls ?? [],
-				created_at: r.created_at,
-				grow_name: r.grow?.name ?? null,
-				grow_strain: r.grow?.strain ?? null,
-				username: r.profile?.username ?? 'Anonym',
-			}));
+		const rows = ((data as any[]) ?? []).filter(r => r.grow?.is_public);
 
-		// Likes + Follows parallel laden
+		// Step 2: Profiles separat laden (kein direkter FK checkins.user_id → profiles.id)
+		const userIds = Array.from(new Set(rows.map(r => r.user_id).filter(Boolean)));
+		const profileMap = new Map<string, string>();
+		if (userIds.length > 0) {
+			const { data: profs } = await supabase
+				.from('profiles')
+				.select('id, username')
+				.in('id', userIds);
+			for (const p of (profs as { id: string; username: string }[]) ?? []) {
+				profileMap.set(p.id, p.username);
+			}
+		}
+
+		items = rows.map(r => ({
+			id: r.id,
+			grow_id: r.grow_id,
+			user_id: r.user_id,
+			phase: r.phase,
+			week: r.week,
+			day: r.day,
+			temp: r.temp,
+			rh: r.rh,
+			vpd: r.vpd,
+			notes: r.notes ?? '',
+			photo_urls: r.photo_urls ?? [],
+			created_at: r.created_at,
+			grow_name: r.grow?.name ?? null,
+			grow_strain: r.grow?.strain ?? null,
+			username: profileMap.get(r.user_id) ?? 'Anonym',
+		}));
+
+		// Step 3: Likes + Follows parallel laden
 		const ids = items.map(i => i.id);
 		const [counts, mine, fIds] = await Promise.all([
 			fetchLikeCounts(ids),
