@@ -59,6 +59,48 @@
 		else toastStore.warning(tr('sync.error'));
 	}
 
+	let repairing = $state(false);
+	async function repairPhotos() {
+		if (!auth.user || repairing) return;
+		repairing = true;
+		try {
+			const { supabase } = await import('$lib/supabase');
+			const userId = auth.user.id;
+			// Liste alle Storage-Files unter {userId}/
+			const { data: files, error: listErr } = await supabase.storage.from('checkin-photos').list(userId);
+			if (listErr) throw listErr;
+			// Map von checkinId → URLs (Multi: {checkinId}-{idx}.jpg, Single: {checkinId}.jpg)
+			const checkinFiles = new Map<string, string[]>();
+			for (const f of files ?? []) {
+				const m = f.name.match(/^([0-9a-f-]+?)(?:-(\d+))?\.jpg$/i);
+				if (!m) continue;
+				const cid = m[1];
+				if (!checkinFiles.has(cid)) checkinFiles.set(cid, []);
+				checkinFiles.get(cid)!.push(`${userId}/${f.name}`);
+			}
+			let repaired = 0;
+			for (const [cid, paths] of checkinFiles.entries()) {
+				paths.sort();
+				const signed = await Promise.all(paths.map(p =>
+					supabase.storage.from('checkin-photos').createSignedUrl(p, 60 * 60 * 24 * 7).then(r => r.data?.signedUrl)
+				));
+				const urls = signed.filter((u): u is string => !!u);
+				if (urls.length === 0) continue;
+				const { error } = await supabase.from('checkins').update({
+					photo_url: urls[0],
+					photo_urls: urls,
+					has_photo: true,
+				}).eq('id', cid).eq('user_id', userId);
+				if (!error) repaired++;
+			}
+			toastStore.success(`${repaired} Check-ins repariert — jetzt herunterladen`);
+		} catch (e: any) {
+			toastStore.warning('Repair fehlgeschlagen: ' + (e?.message ?? 'unbekannt'));
+		} finally {
+			repairing = false;
+		}
+	}
+
 	async function pullSync() {
 		if (!auth.user) return;
 		const data = await syncStore.pull(auth.user.id);
@@ -82,8 +124,16 @@
 				const local = checkinsById.get(cc.id);
 				if (local) {
 					const winner = pickNewer(local, cc);
-					// Lokale Foto-Base64 bewahren, auch wenn Cloud gewinnt
-					checkinsById.set(cc.id, local.photo_data && winner === cc ? { ...cc, photo_data: local.photo_data } : winner);
+					// Bei Cloud-Sieg lokale Foto-Base64 bewahren (sonst gehen unsynced Bilder verloren)
+					if (winner === cc) {
+						checkinsById.set(cc.id, {
+							...cc,
+							photo_data: local.photo_data ?? cc.photo_data,
+							photos_data: local.photos_data?.length ? local.photos_data : (cc.photos_data ?? []),
+						});
+					} else {
+						checkinsById.set(cc.id, winner);
+					}
 				} else {
 					checkinsById.set(cc.id, cc);
 				}
@@ -287,6 +337,12 @@
 						{tr('sync.never')}
 					{/if}
 				</p>
+
+				<!-- Photo-Repair (One-Off) -->
+				<button onclick={repairPhotos} disabled={repairing}
+					class="w-full text-xs text-gb-text-muted hover:text-gb-text py-2 disabled:opacity-50">
+					{repairing ? '⏳ Repariere...' : '🔧 Cloud-Fotos reparieren'}
+				</button>
 			</div>
 		{:else}
 			<!-- Nicht eingeloggt -->

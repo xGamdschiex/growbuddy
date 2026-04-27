@@ -47,6 +47,7 @@
 	let lastPulledUserId = $state<string | null>(null);
 	let pushTimer: any = null;
 	let pushReady = $state(false);
+	let initialPullPending = $state(false);
 
 	// Hydration + Onboarding-Redirect in einem Effect (vermeidet Doppel-Triggering)
 	$effect(() => {
@@ -65,9 +66,10 @@
 		if (lastPulledUserId === auth.user.id) return;
 		lastPulledUserId = auth.user.id;
 		const uid = auth.user.id;
+		initialPullPending = true;
 
 		syncStore.pull(uid).then(cloud => {
-			if (!cloud) { pushReady = true; return; }
+			if (!cloud) { pushReady = true; initialPullPending = false; return; }
 			const pickNewer = <T extends { updated_at?: string }>(a: T, b: T): T => {
 				const ta = a.updated_at ? new Date(a.updated_at).getTime() : 0;
 				const tb = b.updated_at ? new Date(b.updated_at).getTime() : 0;
@@ -84,7 +86,15 @@
 				const l = checkinsById.get(cc.id);
 				if (l) {
 					const winner = pickNewer(l, cc);
-					checkinsById.set(cc.id, l.photo_data && winner === cc ? { ...cc, photo_data: l.photo_data } : winner);
+					if (winner === cc) {
+						checkinsById.set(cc.id, {
+							...cc,
+							photo_data: l.photo_data ?? cc.photo_data,
+							photos_data: l.photos_data?.length ? l.photos_data : (cc.photos_data ?? []),
+						});
+					} else {
+						checkinsById.set(cc.id, winner);
+					}
 				} else {
 					checkinsById.set(cc.id, cc);
 				}
@@ -93,8 +103,8 @@
 				grows: Array.from(growsById.values()),
 				checkins: Array.from(checkinsById.values()),
 			});
-			setTimeout(() => { pushReady = true; }, 500);
-		}).catch(() => { pushReady = true; });
+			setTimeout(() => { pushReady = true; initialPullPending = false; }, 500);
+		}).catch(() => { pushReady = true; initialPullPending = false; });
 	});
 
 	// Auto-Push debounced bei Store-Änderungen (nur wenn eingeloggt + Pull durch)
@@ -232,6 +242,17 @@
 {#if isOffline}
 	<div class="fixed top-0 inset-x-0 z-[110] bg-gb-warning text-black text-center py-1.5 text-xs font-medium animate-[slideDown_0.3s_ease-out]">
 		📡 Offline — Daten werden lokal gespeichert
+	</div>
+{/if}
+
+<!-- Initial Cloud-Pull Loading Overlay -->
+{#if initialPullPending && !isOnboardingPage}
+	<div class="fixed inset-0 z-[150] bg-gb-bg/95 backdrop-blur-sm flex items-center justify-center animate-[fadeIn_0.2s_ease-out]">
+		<div class="text-center space-y-4">
+			<div class="w-12 h-12 border-3 border-gb-green border-t-transparent rounded-full animate-spin mx-auto"></div>
+			<p class="font-semibold">Daten werden geladen…</p>
+			<p class="text-xs text-gb-text-muted">Cloud-Sync mit deinem Konto</p>
+		</div>
 	</div>
 {/if}
 
