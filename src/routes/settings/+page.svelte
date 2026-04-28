@@ -9,7 +9,9 @@
 	import { xpStore } from '$lib/stores/xp';
 	import { streakStore } from '$lib/stores/streak';
 	import { growStore } from '$lib/stores/grow';
+	import { onboardingStore } from '$lib/stores/onboarding';
 	import { supabase } from '$lib/supabase';
+	import { goto } from '$app/navigation';
 
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
 	let reminder = $derived.by(() => { let v: any = { enabled: false, time: '19:00', permission: 'default', streak_alerts: true }; reminderStore.subscribe(x => v = x)(); return v; });
@@ -33,6 +35,13 @@
 		xpStore.reset();
 		streakStore.reset();
 		toastStore.success('XP zurückgesetzt');
+	}
+
+	function resetOnboarding() {
+		if (!confirm('Onboarding zurücksetzen? Du wirst zum Onboarding-Bildschirm geleitet.')) return;
+		onboardingStore.reset();
+		toastStore.success('Onboarding zurückgesetzt');
+		setTimeout(() => goto('/onboarding', { replaceState: true }), 300);
 	}
 
 	function resetAll() {
@@ -244,6 +253,11 @@
 		</button>
 		{#if showDangerZone}
 			<div class="bg-gb-danger/5 border border-gb-danger/20 rounded-xl p-4 space-y-3">
+				<button onclick={resetOnboarding}
+					class="w-full bg-gb-warning/10 text-gb-warning font-medium text-sm py-2 rounded-lg hover:bg-gb-warning/20 transition-colors"
+					style="min-height:44px">
+					🔄 Onboarding erneut anzeigen
+				</button>
 				<button onclick={resetXP}
 					class="w-full bg-gb-danger/10 text-gb-danger font-medium text-sm py-2 rounded-lg hover:bg-gb-danger/20 transition-colors"
 					style="min-height:44px">

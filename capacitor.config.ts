@@ -7,6 +7,11 @@ const config: CapacitorConfig = {
   server: {
     androidScheme: 'https',
   },
+  // Beta-Phase: WebView-Inspection erlauben für chrome://inspect Live-Diagnose
+  // TODO vor Play-Store-Submission: auf false setzen
+  android: {
+    webContentsDebuggingEnabled: true,
+  },
   plugins: {
     SplashScreen: {
       launchAutoHide: true,
