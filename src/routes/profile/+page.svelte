@@ -67,6 +67,36 @@
 		}
 	}
 
+	// Avatar-Upload (Phase 2 Beta)
+	let uploadingAvatar = $state(false);
+	async function handleAvatarUpload(e: Event) {
+		const input = e.target as HTMLInputElement;
+		const file = input.files?.[0];
+		input.value = ''; // reset für nächstes Mal
+		if (!file || uploadingAvatar) return;
+		uploadingAvatar = true;
+		try {
+			const { compressImage } = await import('$lib/utils/photo');
+			// 256x256, q=0.7 → typisch <30KB Base64
+			const dataUrl = await compressImage(file, 256, 0.7);
+			const res = await profileStore.updateAvatar(dataUrl);
+			if (res.error) toastStore.warning(res.error);
+			else toastStore.success('Avatar aktualisiert');
+		} catch (err: any) {
+			toastStore.warning('Bild konnte nicht verarbeitet werden');
+		} finally {
+			uploadingAvatar = false;
+		}
+	}
+	async function removeAvatar() {
+		if (uploadingAvatar) return;
+		uploadingAvatar = true;
+		const res = await profileStore.updateAvatar(null);
+		if (res.error) toastStore.warning(res.error);
+		else toastStore.success('Avatar entfernt');
+		uploadingAvatar = false;
+	}
+
 	async function sendMagicLink() {
 		if (!loginEmail.trim()) return;
 		loginLoading = true;
@@ -358,7 +388,22 @@
 				<!-- Public-Profile Editor (Phase 2 Beta) -->
 				<div class="border-t border-gb-border pt-3">
 					{#if !editingProfile}
-						<div class="flex items-center justify-between">
+						<div class="flex items-center gap-3">
+							<!-- Avatar mit Upload-Overlay -->
+							<label class="relative w-14 h-14 rounded-full bg-gb-green/10 border-2 border-gb-green flex items-center justify-center overflow-hidden cursor-pointer shrink-0"
+								class:opacity-60={uploadingAvatar}>
+								{#if profile?.avatar_url}
+									<img src={profile.avatar_url} alt="" class="w-full h-full object-cover" />
+								{:else}
+									<span class="text-2xl">🌱</span>
+								{/if}
+								{#if uploadingAvatar}
+									<div class="absolute inset-0 bg-black/40 flex items-center justify-center">
+										<div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+									</div>
+								{/if}
+								<input type="file" accept="image/*" class="hidden" onchange={handleAvatarUpload} disabled={uploadingAvatar} />
+							</label>
 							<div class="min-w-0 flex-1">
 								<p class="text-xs text-gb-text-muted">Öffentliches Profil</p>
 								<p class="text-sm font-medium truncate">@{profile?.username ?? '—'}</p>
@@ -367,10 +412,18 @@
 								{/if}
 							</div>
 							<button onclick={startEditProfile}
-								class="text-xs text-gb-info bg-gb-info/10 px-3 py-1.5 rounded-lg font-medium hover:bg-gb-info/20">
+								class="text-xs text-gb-info bg-gb-info/10 px-3 py-1.5 rounded-lg font-medium hover:bg-gb-info/20 shrink-0">
 								Bearbeiten
 							</button>
 						</div>
+						{#if profile?.avatar_url}
+							<button onclick={removeAvatar} disabled={uploadingAvatar}
+								class="text-[11px] text-gb-text-muted hover:text-gb-danger mt-2 disabled:opacity-50">
+								Avatar entfernen
+							</button>
+						{:else}
+							<p class="text-[11px] text-gb-text-muted mt-2">Tippe auf 🌱 um ein Avatar-Bild hochzuladen</p>
+						{/if}
 					{:else}
 						<div class="space-y-2">
 							<label class="block">

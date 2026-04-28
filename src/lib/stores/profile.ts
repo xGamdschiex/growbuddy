@@ -78,6 +78,21 @@ function createProfileStore() {
 			await loadMyProfile(auth.user.id);
 			return { error: null };
 		},
+		async updateAvatar(dataUrl: string | null): Promise<{ error: string | null }> {
+			const { data: auth } = await supabase.auth.getUser();
+			if (!auth.user) return { error: 'Nicht eingeloggt' };
+			// Cap auf ~50KB damit Profile-Row nicht aufbläht
+			if (dataUrl && dataUrl.length > 60_000) {
+				return { error: 'Bild zu groß — max 50KB nach Komprimierung' };
+			}
+			const { error } = await supabase
+				.from('profiles')
+				.update({ avatar_url: dataUrl, updated_at: new Date().toISOString() })
+				.eq('id', auth.user.id);
+			if (error) return { error: error.message };
+			await loadMyProfile(auth.user.id);
+			return { error: null };
+		},
 	};
 }
 
