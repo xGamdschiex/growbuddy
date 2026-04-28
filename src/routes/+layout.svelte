@@ -49,11 +49,22 @@
 	let pushReady = $state(false);
 	let initialPullPending = $state(false);
 
-	// Hydration + Onboarding-Redirect in einem Effect (vermeidet Doppel-Triggering)
+	// Hydration einmalig setzen
 	$effect(() => {
-		hydrated = true;
+		if (!hydrated) hydrated = true;
+	});
+
+	// Onboarding-Redirect nur bei tatsächlichem Bedarf — re-runs minimieren
+	let lastRedirectFor = $state<string | null>(null);
+	$effect(() => {
+		if (!hydrated) return;
 		if (isOnboardingPage) return;
-		if (!onboarding.completed) goto('/onboarding');
+		if (onboarding.completed) return;
+		const key = currentPath;
+		if (lastRedirectFor === key) return; // bereits in dieser Session umgeleitet
+		lastRedirectFor = key;
+		console.log('[onboarding] redirect from', currentPath, '→ /onboarding');
+		goto('/onboarding', { replaceState: true });
 	});
 
 	// Auto-Pull bei Login-Event (Cloud → Local Merge)
@@ -120,15 +131,38 @@
 	});
 
 	// Auth: AppUrlOpen-Listener für Custom-Scheme growbuddy://auth/callback
+	// Idempotent: gleicher Code wird nie zweimal exchanged (Doppel-Trigger durch Custom-Tab)
 	onMount(() => {
 		if (!Capacitor.isNativePlatform()) return;
+		const processedCodes = new Set<string>();
+		let exchanging = false;
+
 		const handle = CapacitorApp.addListener('appUrlOpen', async (event) => {
+			console.log('[auth] appUrlOpen', event.url);
 			try {
 				const u = new URL(event.url);
 				const code = u.searchParams.get('code');
 				if (code) {
+					if (processedCodes.has(code)) {
+						console.log('[auth] code already processed, skip');
+						await Browser.close().catch(() => {});
+						return;
+					}
+					if (exchanging) {
+						console.log('[auth] another exchange in flight, skip');
+						return;
+					}
+					exchanging = true;
+					processedCodes.add(code);
+					console.log('[auth] exchangeCodeForSession start');
 					const { error } = await supabase.auth.exchangeCodeForSession(code);
-					if (error) toastStore.warning('Login-Fehler: ' + error.message);
+					exchanging = false;
+					if (error) {
+						console.warn('[auth] exchangeCodeForSession error', error.message);
+						toastStore.warning('Login-Fehler: ' + error.message);
+					} else {
+						console.log('[auth] exchangeCodeForSession ok');
+					}
 					await Browser.close().catch(() => {});
 					return;
 				}
@@ -138,10 +172,12 @@
 				const access_token = params.get('access_token');
 				const refresh_token = params.get('refresh_token');
 				if (access_token && refresh_token) {
+					console.log('[auth] setSession from implicit hash');
 					await supabase.auth.setSession({ access_token, refresh_token });
 					await Browser.close().catch(() => {});
 				}
 			} catch (e: any) {
+				console.warn('[auth] appUrlOpen error', e);
 				toastStore.warning('Auth-Fehler: ' + (e?.message ?? 'unbekannt'));
 			}
 		});

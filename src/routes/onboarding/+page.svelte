@@ -23,6 +23,7 @@
 	// Ohne oauthPending: bestehende Session ignorieren, sonst loopt es wenn User bereits eingeloggt
 	$effect(() => {
 		if (auth.user && oauthPending && !finishing) {
+			console.log('[onboarding] auth received → finish');
 			finishing = true;
 			oauthPending = false;
 			toastStore.success('Eingeloggt — Daten werden synchronisiert');
@@ -33,15 +34,30 @@
 	function goToCloud() { step = CLOUD_STEP; }
 
 	async function cloudGoogle() {
+		console.log('[onboarding] cloudGoogle clicked');
 		oauthPending = true;
 		const { error } = await authStore.loginWithGoogle();
 		if (error) {
+			console.warn('[onboarding] cloudGoogle error', error);
 			oauthPending = false;
 			toastStore.warning(error);
 		}
 		// Redirect passiert durch Supabase, OAuth-Callback kommt zurück
 		// $effect() oben fängt session-set ab und ruft finish()
 	}
+
+	// Safety-Net: Wenn 30s nach OAuth-Klick nichts passiert, Reset
+	$effect(() => {
+		if (!oauthPending) return;
+		const t = setTimeout(() => {
+			if (oauthPending && !auth.user) {
+				console.warn('[onboarding] OAuth timeout — reset oauthPending');
+				oauthPending = false;
+				toastStore.warning('Login-Versuch abgebrochen — bitte erneut versuchen');
+			}
+		}, 30000);
+		return () => clearTimeout(t);
+	});
 
 	async function cloudEmail() {
 		if (!loginEmail.trim()) return;
@@ -91,12 +107,19 @@
 		}
 	}
 
+	let navigatedAway = $state(false);
 	function finish() {
+		if (navigatedAway) return;
+		navigatedAway = true;
+		console.log('[onboarding] finish exp=', experience, 'goal=', goal);
 		onboardingStore.complete(experience, goal);
 		goto('/', { replaceState: true });
 	}
 
 	function skip() {
+		if (navigatedAway) return;
+		navigatedAway = true;
+		console.log('[onboarding] skip');
 		onboardingStore.complete(null, null);
 		goto('/', { replaceState: true });
 	}

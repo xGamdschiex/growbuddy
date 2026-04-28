@@ -68,17 +68,20 @@ function createAuthStore() {
 	async function init() {
 		try {
 			const { data: { session } } = await supabase.auth.getSession();
+			console.log('[auth] init session=', session?.user?.id ?? null);
 			set({
 				user: session?.user ?? null,
 				session: session ?? null,
 				loading: false,
 			});
-		} catch {
+		} catch (e) {
+			console.warn('[auth] init failed', e);
 			set({ ...DEFAULTS, loading: false });
 		}
 
 		// Auth-State-Changes lauschen (Login, Logout, Token-Refresh)
-		supabase.auth.onAuthStateChange((_event, session) => {
+		supabase.auth.onAuthStateChange((event, session) => {
+			console.log('[auth] state', event, 'user=', session?.user?.id ?? null);
 			set({
 				user: session?.user ?? null,
 				session: session ?? null,
@@ -99,22 +102,29 @@ function createAuthStore() {
 
 		/** Magic Link Login (E-Mail) */
 		async loginWithEmail(email: string): Promise<{ error: string | null }> {
+			console.log('[auth] loginWithEmail to', email, 'redirect=', getRedirectUrl());
 			const { error } = await supabase.auth.signInWithOtp({
 				email,
 				options: { emailRedirectTo: getRedirectUrl() },
 			});
+			if (error) console.warn('[auth] loginWithEmail error', error.message);
 			return { error: error?.message ?? null };
 		},
 
 		/** Google OAuth Login */
 		async loginWithGoogle(): Promise<{ error: string | null }> {
+			console.log('[auth] loginWithGoogle native=', Capacitor.isNativePlatform());
 			if (Capacitor.isNativePlatform()) {
 				const { data, error } = await supabase.auth.signInWithOAuth({
 					provider: 'google',
 					options: { redirectTo: NATIVE_CALLBACK, skipBrowserRedirect: true },
 				});
-				if (error) return { error: error.message };
+				if (error) {
+					console.warn('[auth] loginWithGoogle native error', error.message);
+					return { error: error.message };
+				}
 				if (data?.url) {
+					console.log('[auth] opening Browser →', data.url.slice(0, 80) + '…');
 					await Browser.open({ url: data.url, presentationStyle: 'popover' });
 				}
 				return { error: null };
@@ -123,11 +133,13 @@ function createAuthStore() {
 				provider: 'google',
 				options: { redirectTo: getRedirectUrl() },
 			});
+			if (error) console.warn('[auth] loginWithGoogle web error', error.message);
 			return { error: error?.message ?? null };
 		},
 
 		/** Logout */
 		async logout(): Promise<void> {
+			console.log('[auth] logout');
 			await supabase.auth.signOut();
 			set({ user: null, session: null, loading: false });
 		},
