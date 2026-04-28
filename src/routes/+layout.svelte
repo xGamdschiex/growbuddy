@@ -23,10 +23,19 @@
 
 	let { children }: { children: Snippet } = $props();
 	let toasts = $derived.by(() => { let v: Toast[] = []; toastStore.subscribe(x => v = x)(); return v; });
-	let onboarding = $derived.by(() => { let v = { completed: false }; onboardingStore.subscribe(x => v = x)(); return v; });
+	let onboarding = $state<any>({ completed: false });
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
-	let auth = $derived.by(() => { let v: any = { user: null, loading: true }; authStore.subscribe(x => v = x)(); return v; });
-	let growState = $derived.by(() => { let v: GrowState = { grows: [], checkins: [] }; growStore.subscribe(x => v = x)(); return v; });
+	// Reaktive Subscriptions (Tab-Wechsel-Bug: $derived.by sah Store-Updates nicht)
+	let auth = $state<any>({ user: null, loading: true });
+	let growState = $state<GrowState>({ grows: [], checkins: [] });
+	onMount(() => {
+		const subs = [
+			onboardingStore.subscribe(v => onboarding = v),
+			authStore.subscribe(v => auth = v),
+			growStore.subscribe(v => growState = v),
+		];
+		return () => subs.forEach(u => u());
+	});
 
 	let showUpdateBanner = $state(false);
 	let waitingSW: ServiceWorker | null = null;

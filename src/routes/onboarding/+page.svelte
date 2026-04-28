@@ -5,6 +5,7 @@
 	import { authStore } from '$lib/stores/auth';
 	import { toastStore } from '$lib/stores/toast';
 	import { t } from '$lib/i18n';
+	import { onMount } from 'svelte';
 
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
 	let step = $state(0);
@@ -15,26 +16,42 @@
 	let loginMessage = $state('');
 	let oauthPending = $state(false);
 	let finishing = $state(false);
-	let auth = $derived.by(() => { let v: any = { user: null, loading: true }; authStore.subscribe(x => v = x)(); return v; });
+	// Reaktive Auth-Subscription
+	let auth = $state<any>({ user: null, loading: true });
+	let preLoginUserId = $state<string | null>(null);
+	onMount(() => authStore.subscribe(v => auth = v));
 
 	const CLOUD_STEP = 6; // nach slides(4) + exp(1) + goal(1)
 
 	// Beim Empfang einer Session NACH explizitem Login-Versuch (oauthPending) Onboarding finishen
-	// Ohne oauthPending: bestehende Session ignorieren, sonst loopt es wenn User bereits eingeloggt
+	// Race-Fix: nur dann, wenn die User-ID NACH dem Click anders ist als VORHER
+	// (User war evtl. schon eingeloggt nach Onboarding-Reset)
 	$effect(() => {
-		if (auth.user && oauthPending && !finishing) {
-			console.log('[onboarding] auth received → finish');
-			finishing = true;
-			oauthPending = false;
-			toastStore.success('Eingeloggt — Daten werden synchronisiert');
-			finish();
+		if (!auth.user || !oauthPending || finishing) return;
+		if (preLoginUserId === auth.user.id) {
+			// User war schon eingeloggt mit dieser ID — kein neuer Login → ignorieren
+			return;
 		}
+		console.log('[onboarding] auth changed → finish (was', preLoginUserId, 'now', auth.user.id, ')');
+		finishing = true;
+		oauthPending = false;
+		toastStore.success('Eingeloggt — Daten werden synchronisiert');
+		finish();
 	});
 
 	function goToCloud() { step = CLOUD_STEP; }
 
 	async function cloudGoogle() {
-		console.log('[onboarding] cloudGoogle clicked');
+		// Wenn bereits eingeloggt → direkt finish (kein OAuth-Flow nötig)
+		if (auth.user && !finishing) {
+			console.log('[onboarding] already logged in → direct finish');
+			finishing = true;
+			toastStore.success('Bereits eingeloggt — App wird vorbereitet');
+			finish();
+			return;
+		}
+		console.log('[onboarding] cloudGoogle clicked, current user=', auth.user?.id ?? null);
+		preLoginUserId = auth.user?.id ?? null;
 		oauthPending = true;
 		const { error } = await authStore.loginWithGoogle();
 		if (error) {
@@ -42,8 +59,6 @@
 			oauthPending = false;
 			toastStore.warning(error);
 		}
-		// Redirect passiert durch Supabase, OAuth-Callback kommt zurück
-		// $effect() oben fängt session-set ab und ruft finish()
 	}
 
 	// Safety-Net: Wenn 30s nach OAuth-Klick nichts passiert, Reset
@@ -61,6 +76,14 @@
 
 	async function cloudEmail() {
 		if (!loginEmail.trim()) return;
+		// Wenn bereits eingeloggt → direkt finish
+		if (auth.user && !finishing) {
+			console.log('[onboarding] already logged in → direct finish (email path)');
+			finishing = true;
+			finish();
+			return;
+		}
+		preLoginUserId = auth.user?.id ?? null;
 		loginLoading = true;
 		const { error } = await authStore.loginWithEmail(loginEmail.trim());
 		loginLoading = false;

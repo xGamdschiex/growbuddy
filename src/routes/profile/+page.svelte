@@ -6,6 +6,7 @@
 	import { authStore, isLoggedIn } from '$lib/stores/auth';
 	import { syncStore } from '$lib/stores/sync';
 	import { profileStore, myProfile } from '$lib/stores/profile';
+	import { onMount } from 'svelte';
 	import { t, locale } from '$lib/i18n';
 	import type { Locale } from '$lib/i18n';
 	import { ACHIEVEMENTS } from '$lib/data/achievements';
@@ -21,8 +22,10 @@
 	let state = $derived.by(() => { let v: GrowState = { grows: [], checkins: [] }; growStore.subscribe(x => v = x)(); return v; });
 	let grows = $derived.by(() => { let v = 0; totalGrows.subscribe(x => v = x)(); return v; });
 	let harvests = $derived.by(() => { let v = 0; totalHarvests.subscribe(x => v = x)(); return v; });
-	let auth = $derived.by(() => { let v: any = { user: null, loading: true }; authStore.subscribe(x => v = x)(); return v; });
-	let loggedIn = $derived.by(() => { let v = false; isLoggedIn.subscribe(x => v = x)(); return v; });
+	// Reaktive Auth-Subscription (überlebt Store-Updates ohne Tab-Wechsel)
+	let auth = $state<any>({ user: null, loading: true });
+	let loggedIn = $derived(auth.user !== null);
+	onMount(() => authStore.subscribe(v => auth = v));
 	let sync = $derived.by(() => { let v: any = { status: 'idle', last_synced: null }; syncStore.subscribe(x => v = x)(); return v; });
 
 	let loginEmail = $state('');
