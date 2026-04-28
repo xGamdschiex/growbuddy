@@ -427,7 +427,7 @@
 								<a href="/calc" class="fp-link">zu Calc →</a>
 							</div>
 						{/if}
-						{#if watered || nutrients}
+						{#if watered || (nutrients && !watered)}
 							<div class="grid-2 mt10">
 								{#if watered}
 									<label class="field">
@@ -435,7 +435,7 @@
 										<input class="input" type="number" min="0" step="100" placeholder="1000" bind:value={waterMl} />
 									</label>
 								{/if}
-								{#if nutrients}
+								{#if nutrients && !watered}
 									<label class="field">
 										<span class="field-label">Dünger (mL)</span>
 										<input class="input" type="number" min="0" step="1" placeholder="10" bind:value={nutrientMl} />

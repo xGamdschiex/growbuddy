@@ -146,10 +146,17 @@ function createGrowStore() {
 
 		updateGrow(id: string, patch: Partial<Grow>): void {
 			const now = new Date().toISOString();
-			update(s => ({
-				...s,
-				grows: s.grows.map(g => g.id === id ? { ...g, ...patch, updated_at: now } : g),
-			}));
+			update(s => {
+				const newGrows = s.grows.map(g => g.id === id ? { ...g, ...patch, updated_at: now } : g);
+				// Wenn is_public geändert wurde → propagiere auf alle Check-ins des Grows
+				let newCheckins = s.checkins;
+				if (patch.is_public !== undefined) {
+					newCheckins = s.checkins.map(c =>
+						c.grow_id === id ? { ...c, is_public: patch.is_public, updated_at: now } : c
+					);
+				}
+				return { ...s, grows: newGrows, checkins: newCheckins };
+			});
 		},
 
 		harvestGrow(id: string, yield_g: number): void {
@@ -188,14 +195,20 @@ function createGrowStore() {
 		addCheckIn(checkin: Omit<CheckIn, 'id' | 'created_at'>): string {
 			const id = crypto.randomUUID();
 			const now = new Date().toISOString();
-			const newCheckin: CheckIn = {
-				...checkin,
-				id,
-				created_at: now,
-				updated_at: now,
-			};
-			update(s => ({ ...s, checkins: [...s.checkins, newCheckin] }));
-			return id;
+			let newId = id;
+			update(s => {
+				// Erbt is_public vom zugehörigen Grow falls nicht explizit gesetzt
+				const parentGrow = s.grows.find(g => g.id === checkin.grow_id);
+				const newCheckin: CheckIn = {
+					...checkin,
+					id,
+					created_at: now,
+					updated_at: now,
+					is_public: checkin.is_public ?? parentGrow?.is_public ?? false,
+				};
+				return { ...s, checkins: [...s.checkins, newCheckin] };
+			});
+			return newId;
 		},
 
 		updateCheckIn(id: string, patch: Partial<Omit<CheckIn, 'id' | 'grow_id' | 'created_at'>>): void {

@@ -547,7 +547,7 @@
 <!-- Apply-Modal -->
 {#if showApply}
 	<div
-		class="fixed inset-0 z-50 bg-black/80 flex items-end sm:items-center justify-center p-4"
+		class="fixed inset-0 z-[60] bg-black/80 flex items-end sm:items-center justify-center px-4 pt-4 pb-24 sm:p-4"
 		role="dialog"
 		aria-modal="true"
 		onclick={() => (showApply = false)}
@@ -555,7 +555,7 @@
 		tabindex="-1"
 	>
 		<div
-			class="bg-gb-surface rounded-2xl p-5 w-full max-w-sm space-y-4 border border-gb-border"
+			class="bg-gb-surface rounded-2xl p-5 w-full max-w-sm space-y-4 border border-gb-border max-h-[85vh] overflow-y-auto"
 			onclick={(e) => e.stopPropagation()}
 			role="document"
 		>

@@ -135,10 +135,15 @@
 	let ecData = $derived(ecSeries.values);
 	let phData = $derived(phSeries.values);
 
-	// Wasser/Dünger-Verlauf
+	// Wasser kumulativ in Liter (X = Tage, Y = gesamt L die in den Grow gingen)
 	let waterSeries = $derived.by(() => {
 		const filtered = chronCheckins.filter((c: CheckIn) => c.water_ml != null && c.water_ml > 0);
-		return { values: filtered.map((c: CheckIn) => c.water_ml as number), days: filtered.map(dayOf) };
+		let cum = 0;
+		const points = filtered.map((c: CheckIn) => {
+			cum += (c.water_ml as number) / 1000; // mL → L
+			return { day: dayOf(c), value: Math.round(cum * 10) / 10 };
+		});
+		return { values: points.map(p => p.value), days: points.map(p => p.day) };
 	});
 	let nutrientSeries = $derived.by(() => {
 		const filtered = chronCheckins.filter((c: CheckIn) => c.nutrient_ml != null && c.nutrient_ml > 0);
@@ -652,7 +657,7 @@
 										<a href="/calc" class="ci-fp-link">zu Calc →</a>
 									</div>
 								{/if}
-								{#if ciWatered || ciNutrients}
+								{#if ciWatered || (ciNutrients && !ciWatered)}
 									<div class="ci-grid2 ci-mt10">
 										{#if ciWatered}
 											<label class="ci-field">
@@ -660,7 +665,7 @@
 												<input class="ci-input" type="number" min="0" step="100" placeholder="1000" bind:value={ciWaterMl} />
 											</label>
 										{/if}
-										{#if ciNutrients}
+										{#if ciNutrients && !ciWatered}
 											<label class="ci-field">
 												<span class="ci-field-label">Dünger (mL)</span>
 												<input class="ci-input" type="number" min="0" step="1" placeholder="10" bind:value={ciNutrientMl} />
@@ -883,7 +888,7 @@
 					{/if}
 					{#if waterSeries.values.length >= 2}
 						<MiniChart data={waterSeries.values} days={waterSeries.days} phaseMarkers={waterMarkers}
-							showMinMax color="#0ea5e9" label="Wasser" unit=" ml" />
+							showMinMax color="#0ea5e9" label="Wasser kumulativ" unit=" L" />
 					{/if}
 					{#if nutrientSeries.values.length >= 2}
 						<MiniChart data={nutrientSeries.values} days={nutrientSeries.days} phaseMarkers={nutrientMarkers}
