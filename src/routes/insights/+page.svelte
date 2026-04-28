@@ -3,10 +3,19 @@
 	import type { Grow, CheckIn, GrowState } from '$lib/stores/grow';
 	import { isPro } from '$lib/stores/pro';
 	import { t } from '$lib/i18n';
+	import { onMount } from 'svelte';
 
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
-	let state = $derived.by(() => { let v: GrowState = { grows: [], checkins: [] }; growStore.subscribe(x => v = x)(); return v; });
-	let userIsPro = $derived.by(() => { let v = false; isPro.subscribe(x => v = x)(); return v; });
+	let state = $state<GrowState>({ grows: [], checkins: [] });
+	let userIsPro = $state(false);
+
+	onMount(() => {
+		const subs = [
+			growStore.subscribe(v => state = v),
+			isPro.subscribe(v => userIsPro = v),
+		];
+		return () => subs.forEach(u => u());
+	});
 
 	type StrainStat = {
 		strain: string;

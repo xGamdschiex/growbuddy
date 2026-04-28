@@ -1,7 +1,10 @@
 <script lang="ts">
 	import { t } from '$lib/i18n';
-	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
+	import { onMount } from 'svelte';
+	let tr = $state<any>((k: string) => k);
 	let tab = $state<'impressum' | 'datenschutz'>('impressum');
+
+	onMount(() => t.subscribe(v => tr = v));
 </script>
 
 <div class="px-4 pt-6 max-w-lg mx-auto space-y-6 pb-24">

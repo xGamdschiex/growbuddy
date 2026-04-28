@@ -25,7 +25,9 @@
 		username: string;
 	};
 
-	let auth = $derived.by(() => { let v: any = { user: null }; authStore.subscribe(x => v = x)(); return v; });
+	let auth = $state<any>({ user: null });
+
+	onMount(() => authStore.subscribe(v => auth = v));
 	let likeCounts = $state<Record<string, number>>({});
 	let myLikes = $state<Set<string>>(new Set());
 	let likingNow = $state<Set<string>>(new Set());

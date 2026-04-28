@@ -3,11 +3,21 @@
 	import { goto } from '$app/navigation';
 	import { toastStore } from '$lib/stores/toast';
 	import { t } from '$lib/i18n';
+	import { onMount } from 'svelte';
 
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
-	let pro = $derived.by(() => { let v: any = {}; proStore.subscribe(x => v = x)(); return v; });
-	let userIsPro = $derived.by(() => { let v = false; isPro.subscribe(x => v = x)(); return v; });
-	let trialing = $derived.by(() => { let v = false; isTrialing.subscribe(x => v = x)(); return v; });
+	let pro = $state<any>({});
+	let userIsPro = $state(false);
+	let trialing = $state(false);
+
+	onMount(() => {
+		const subs = [
+			proStore.subscribe(v => pro = v),
+			isPro.subscribe(v => userIsPro = v),
+			isTrialing.subscribe(v => trialing = v),
+		];
+		return () => subs.forEach(u => u());
+	});
 	let billing = $state<'monthly' | 'yearly'>('yearly');
 	let betaCode = $state('');
 	let showBetaInput = $state(false);

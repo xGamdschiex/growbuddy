@@ -34,12 +34,14 @@
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 
-	let auth = $derived.by(() => { let v: any = { user: null }; authStore.subscribe(x => v = x)(); return v; });
+	let auth = $state<any>({ user: null });
 	let following = $state(false);
 	let followerCount = $state(0);
 	let followingCount = $state(0);
 	let followBusy = $state(false);
 	let isOwnProfile = $derived(auth.user && profile && auth.user.id === profile.id);
+
+	onMount(() => authStore.subscribe(v => auth = v));
 
 	async function load() {
 		loading = true;

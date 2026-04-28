@@ -1,9 +1,12 @@
 <script lang="ts">
 	import { xpStore } from '$lib/stores/xp';
 	import { t } from '$lib/i18n';
+	import { onMount } from 'svelte';
 	xpStore.awardToolUse('training');
 
-	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
+	let tr = $state<any>((k: string) => k);
+
+	onMount(() => t.subscribe(v => tr = v));
 
 	interface Technique {
 		id: string;

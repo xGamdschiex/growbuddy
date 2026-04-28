@@ -2,10 +2,13 @@
 	import { PESTS } from '$lib/data/ipm';
 	import { xpStore } from '$lib/stores/xp';
 	import { t } from '$lib/i18n';
+	import { onMount } from 'svelte';
 
 	xpStore.awardToolUse('ipm');
 
-	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
+	let tr = $state<any>((k: string) => k);
+
+	onMount(() => t.subscribe(v => tr = v));
 
 	function pestIcon(id: string): string {
 		if (id.includes('mite')) return '🕷️';

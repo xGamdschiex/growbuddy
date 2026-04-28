@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { t } from '$lib/i18n';
-	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
+	import { onMount } from 'svelte';
+	let tr = $state<any>((k: string) => k);
+
+	onMount(() => t.subscribe(v => tr = v));
 
 	const tools = [
 		{ href: '/tools/doctor', icon: '🤖', key: 'tools.doctor', descKey: 'tools.doctor_desc', pro: true },

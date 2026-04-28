@@ -8,11 +8,21 @@
 	import { diagnosePlant } from '$lib/utils/gemini';
 	import type { Diagnosis, DiagnosisContext } from '$lib/utils/gemini';
 	import type { Grow, CheckIn, GrowState } from '$lib/stores/grow';
+	import { onMount } from 'svelte';
 
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
-	let userIsPro = $derived.by(() => { let v = false; isPro.subscribe(x => v = x)(); return v; });
-	let state = $derived.by(() => { let v: GrowState = { grows: [], checkins: [] }; growStore.subscribe(x => v = x)(); return v; });
-	let active = $derived.by(() => { let v: Grow[] = []; activeGrows.subscribe(x => v = x)(); return v; });
+	let userIsPro = $state(false);
+	let state = $state<GrowState>({ grows: [], checkins: [] });
+	let active = $state<Grow[]>([]);
+
+	onMount(() => {
+		const subs = [
+			isPro.subscribe(v => userIsPro = v),
+			growStore.subscribe(v => state = v),
+			activeGrows.subscribe(v => active = v),
+		];
+		return () => subs.forEach(u => u());
+	});
 
 	let photo = $state<string | null>(null);
 	let userNote = $state('');

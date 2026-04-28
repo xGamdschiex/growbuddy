@@ -17,10 +17,19 @@
 	import { hapticSuccess } from '$lib/utils/haptic';
 	import { toMsPerCm } from '$lib/calc/units';
 	import { goto } from '$app/navigation';
+	import { onMount } from 'svelte';
 
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
-	let userIsPro = $derived.by(() => { let v = false; isPro.subscribe(x => v = x)(); return v; });
-	let lim = $derived.by(() => { let v: any = {}; limits.subscribe(x => v = x)(); return v; });
+	let userIsPro = $state(false);
+	let lim = $state<any>({});
+
+	onMount(() => {
+		const subs = [
+			isPro.subscribe(v => userIsPro = v),
+			limits.subscribe(v => lim = v),
+		];
+		return () => subs.forEach(u => u());
+	});
 	const allFeedlines = getAllFeedLines();
 	let feedlines = $derived(userIsPro ? allFeedlines : allFeedlines.slice(0, lim.max_feedlines ?? 2));
 

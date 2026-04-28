@@ -1,12 +1,21 @@
 <script lang="ts">
 	import { growStore, activeGrows, harvestedGrows } from '$lib/stores/grow';
 	import { t } from '$lib/i18n';
+	import { onMount } from 'svelte';
 	import type { Grow } from '$lib/stores/grow';
 
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
-	let active = $derived.by(() => { let v: Grow[] = []; activeGrows.subscribe(x => v = x)(); return v; });
-	let harvested = $derived.by(() => { let v: Grow[] = []; harvestedGrows.subscribe(x => v = x)(); return v; });
+	let active = $state<Grow[]>([]);
+	let harvested = $state<Grow[]>([]);
 	let hasGrows = $derived(active.length > 0 || harvested.length > 0);
+
+	onMount(() => {
+		const subs = [
+			activeGrows.subscribe(v => active = v),
+			harvestedGrows.subscribe(v => harvested = v),
+		];
+		return () => subs.forEach(u => u());
+	});
 
 	function daysSince(dateStr: string): number {
 		return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);

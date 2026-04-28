@@ -1,8 +1,11 @@
 <script lang="ts">
 	import { DRYING_PARAMS, CURING_PARAMS } from '$lib/data/science';
 	import { t } from '$lib/i18n';
+	import { onMount } from 'svelte';
 
-	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
+	let tr = $state<any>((k: string) => k);
+
+	onMount(() => t.subscribe(v => tr = v));
 	let mode = $state<'drying' | 'curing'>('drying');
 	let startedAt = $state<string | null>(null);
 	let temp = $state<number | null>(null);

@@ -5,22 +5,38 @@
 	import { syncStore } from '$lib/stores/sync';
 	import DailyCheckin from '$lib/components/DailyCheckin.svelte';
 	import { t } from '$lib/i18n';
+	import { onMount } from 'svelte';
 	import type { Grow, CheckIn } from '$lib/stores/grow';
 
 	interface GrowState { grows: (Grow & { checkins: CheckIn[] })[] }
 
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
-	let storeVal = $derived.by(() => { let v: GrowState = { grows: [] }; growStore.subscribe(x => v = x)(); return v; });
-	let active = $derived.by(() => { let v: Grow[] = []; activeGrows.subscribe(x => v = x)(); return v; });
-	let harvested = $derived.by(() => { let v: Grow[] = []; harvestedGrows.subscribe(x => v = x)(); return v; });
-	let harvestCount = $derived.by(() => { let v = 0; totalHarvests.subscribe(x => v = x)(); return v; });
-	let loggedIn = $derived.by(() => { let v = false; isLoggedIn.subscribe(x => v = x)(); return v; });
-	let sync = $derived.by(() => { let v: any = { status: 'idle' }; syncStore.subscribe(x => v = x)(); return v; });
+	let storeVal = $state<GrowState>({ grows: [] });
+	let active = $state<Grow[]>([]);
+	let harvested = $state<Grow[]>([]);
+	let harvestCount = $state(0);
+	let loggedIn = $state(false);
+	let sync = $state<any>({ status: 'idle' });
+	let streakInfo = $state({ current: 0, graceActive: false, lastCheckinDate: null as string | null });
+	let doneToday = $state(false);
+	let multiplier = $state(1);
+	let danger = $state(false);
 
-	let streakInfo = $derived.by(() => { let v = { current: 0, graceActive: false, lastCheckinDate: null as string | null }; currentStreak.subscribe(x => v = x)(); return v; });
-	let doneToday = $derived.by(() => { let v = false; hasCheckinToday.subscribe(x => v = x)(); return v; });
-	let multiplier = $derived.by(() => { let v = 1; streakMultiplier.subscribe(x => v = x)(); return v; });
-	let danger = $derived.by(() => { let v = false; streakInDanger.subscribe(x => v = x)(); return v; });
+	onMount(() => {
+		const subs = [
+			growStore.subscribe(v => storeVal = v),
+			activeGrows.subscribe(v => active = v),
+			harvestedGrows.subscribe(v => harvested = v),
+			totalHarvests.subscribe(v => harvestCount = v),
+			isLoggedIn.subscribe(v => loggedIn = v),
+			syncStore.subscribe(v => sync = v),
+			currentStreak.subscribe(v => streakInfo = v),
+			hasCheckinToday.subscribe(v => doneToday = v),
+			streakMultiplier.subscribe(v => multiplier = v),
+			streakInDanger.subscribe(v => danger = v),
+		];
+		return () => subs.forEach(u => u());
+	});
 
 	let showCheckin = $state(false);
 

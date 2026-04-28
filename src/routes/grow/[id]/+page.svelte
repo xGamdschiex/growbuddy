@@ -21,10 +21,21 @@
 	import { toMsPerCm, fromMsPerCm, type ECEinheit } from '$lib/calc/units';
 	import { getFeedLine } from '$lib/calc/feedlines/registry';
 
+	import { onMount } from 'svelte';
+
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
 	let growId = $derived($page.params.id);
-	let state = $derived.by<any>(() => { let v: any = { grows: [], checkins: [] }; growStore.subscribe(x => v = x)(); return v; });
+	let state = $state<any>({ grows: [], checkins: [] });
 	let grow = $derived(state?.grows?.find((g: any) => g.id === growId));
+
+	onMount(() => {
+		const subs = [
+			growStore.subscribe(v => state = v),
+			isPro.subscribe(v => userIsPro = v),
+			streakMultiplier.subscribe(v => multiplierValue = v),
+		];
+		return () => subs.forEach(u => u());
+	});
 	let checkins = $derived(
 		(state?.checkins ?? [])
 			.filter((c: CheckIn) => c.grow_id === growId)
@@ -103,7 +114,7 @@
 	}
 
 	// Pro-Status
-	let userIsPro = $derived.by(() => { let v = false; isPro.subscribe(x => v = x)(); return v; });
+	let userIsPro = $state(false);
 
 	// Chart-Daten (chronologisch sortiert)
 	let chronCheckins = $derived(
@@ -344,7 +355,7 @@
 		{ v: 'ppm700', l: 'ppm·700' },
 	];
 
-	let multiplierValue = $derived.by(() => { let v = 1; streakMultiplier.subscribe(x => v = x)(); return v; });
+	let multiplierValue = $state(1);
 
 	function submitCheckin() {
 		if (!grow) return;

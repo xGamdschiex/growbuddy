@@ -4,6 +4,7 @@
 	import { xpStore } from '$lib/stores/xp';
 	import { proStore, isPro, limits } from '$lib/stores/pro';
 	import { t } from '$lib/i18n';
+	import { onMount } from 'svelte';
 	import { getAllFeedLines } from '$lib/calc/feedlines/registry';
 	import type { StrainType, GrowSystem } from '$lib/stores/grow';
 	import type { Medium } from '$lib/data/science';
@@ -12,10 +13,20 @@
 
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
 	const feedlines = getAllFeedLines();
-	let activeCount = $derived.by(() => { let v: any[] = []; activeGrows.subscribe(x => v = x)(); return v.length; });
-	let lim = $derived.by(() => { let v: any = {}; limits.subscribe(x => v = x)(); return v; });
-	let userIsPro = $derived.by(() => { let v = false; isPro.subscribe(x => v = x)(); return v; });
+	let activeCount = $state(0);
+	let lim = $state<any>({});
+	let userIsPro = $state(false);
 	let atLimit = $derived(activeCount >= (lim.max_active_grows ?? 1));
+
+	onMount(() => {
+		const subs = [
+			activeGrows.subscribe(v => activeCount = v.length),
+			limits.subscribe(v => lim = v),
+			isPro.subscribe(v => userIsPro = v),
+			totalGrows.subscribe(v => growCount = v),
+		];
+		return () => subs.forEach(u => u());
+	});
 
 	let name = $state('');
 	let strain = $state('');
@@ -42,7 +53,7 @@
 		{ value: 'outdoor', label: tr('grow.space_outdoor') },
 	]);
 
-	let growCount = $derived.by(() => { let v = 0; totalGrows.subscribe(x => v = x)(); return v; });
+	let growCount = $state(0);
 
 	// Pro-Gate für Hydro-Systeme (AutoPot/DWC/RDWC)
 	function selectSystem(s: GrowSystem) {

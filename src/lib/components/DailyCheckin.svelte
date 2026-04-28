@@ -16,6 +16,7 @@
 	import { compressBatch, MAX_PHOTOS } from '$lib/utils/photo';
 	import { getFeedLine } from '$lib/calc/feedlines/registry';
 	import type { Grow } from '$lib/stores/grow';
+	import { onMount } from 'svelte';
 
 	interface Props {
 		/** Optional: fester Grow. Wenn leer → User wählt aus aktiven Grows */
@@ -30,10 +31,20 @@
 
 	let { growId, onDone, onCancel, compact = false }: Props = $props();
 
-	let active = $derived.by(() => { let v: Grow[] = []; activeGrows.subscribe(x => v = x)(); return v; });
-	let multiplier = $derived.by(() => { let v = 1; streakMultiplier.subscribe(x => v = x)(); return v; });
-	let streakInfo = $derived.by(() => { let v = { current: 0, graceActive: false, lastCheckinDate: null as string | null }; currentStreak.subscribe(x => v = x)(); return v; });
-	let alreadyToday = $derived.by(() => { let v = false; hasCheckinToday.subscribe(x => v = x)(); return v; });
+	let active = $state<Grow[]>([]);
+	let multiplier = $state(1);
+	let streakInfo = $state({ current: 0, graceActive: false, lastCheckinDate: null as string | null });
+	let alreadyToday = $state(false);
+
+	onMount(() => {
+		const subs = [
+			activeGrows.subscribe(v => active = v),
+			streakMultiplier.subscribe(v => multiplier = v),
+			currentStreak.subscribe(v => streakInfo = v),
+			hasCheckinToday.subscribe(v => alreadyToday = v),
+		];
+		return () => subs.forEach(u => u());
+	});
 
 	let selectedGrowId = $state(growId ?? '');
 	let selectedGrow = $derived(active.find(g => g.id === selectedGrowId));

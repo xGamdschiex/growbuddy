@@ -2,9 +2,12 @@
 	import { calcVPD, getVPDStatus, VPD_TARGETS, PHASE_LABELS } from '$lib/data/science';
 	import { xpStore } from '$lib/stores/xp';
 	import { t } from '$lib/i18n';
+	import { onMount } from 'svelte';
 	xpStore.awardToolUse('vpd');
 
-	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
+	let tr = $state<any>((k: string) => k);
+
+	onMount(() => t.subscribe(v => tr = v));
 	let temp = $state(25);
 	let rh = $state(60);
 	let leafOffset = $state(-2);

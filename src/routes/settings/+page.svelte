@@ -12,13 +12,25 @@
 	import { onboardingStore } from '$lib/stores/onboarding';
 	import { supabase } from '$lib/supabase';
 	import { goto } from '$app/navigation';
+	import { onMount } from 'svelte';
 
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
-	let reminder = $derived.by(() => { let v: any = { enabled: false, time: '19:00', permission: 'default', streak_alerts: true }; reminderStore.subscribe(x => v = x)(); return v; });
-	let currentLocale = $derived.by(() => { let v: Locale = 'de'; locale.subscribe(x => v = x)(); return v; });
-	let userIsPro = $derived.by(() => { let v = false; isPro.subscribe(x => v = x)(); return v; });
-	let loggedIn = $derived.by(() => { let v = false; isLoggedIn.subscribe(x => v = x)(); return v; });
-	let auth = $derived.by(() => { let v: any = { user: null }; authStore.subscribe(x => v = x)(); return v; });
+	let reminder = $state<any>({ enabled: false, time: '19:00', permission: 'default', streak_alerts: true });
+	let currentLocale = $state<Locale>('de');
+	let userIsPro = $state(false);
+	let loggedIn = $state(false);
+	let auth = $state<any>({ user: null });
+
+	onMount(() => {
+		const subs = [
+			reminderStore.subscribe(v => reminder = v),
+			locale.subscribe(v => currentLocale = v),
+			isPro.subscribe(v => userIsPro = v),
+			isLoggedIn.subscribe(v => loggedIn = v),
+			authStore.subscribe(v => auth = v),
+		];
+		return () => subs.forEach(u => u());
+	});
 
 	let showDangerZone = $state(false);
 	let showDeleteAccount = $state(false);
