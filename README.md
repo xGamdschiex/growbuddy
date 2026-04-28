@@ -1,7 +1,20 @@
 # GrowBuddy
 
 Smarter Grow-Assistent — wissenschaftlich korrekt, KI-gestützt, offline-fähig.
-Svelte 5 + SvelteKit + Supabase + Capacitor (Android).
+Svelte 5 (Runes) + SvelteKit 2 + Supabase + Capacitor 8 (Android).
+
+**Aktuelle Version:** 1.3.25 (versionCode 28) · **Letzter Release:** 2026-04-28
+
+## Features
+
+- **Daily Check-in** — Foto, Werte (VPD/Temp/RH/EC/pH), Wasser/Dünger
+- **Grow-Tracking** — Phasen (Keimung → Veg → Blüte → Trocknung → Curing), Charts mit Phasen-Targets
+- **Düngerrechner** — 11 Feedlines (Athena Pro/Blended, Hesi, BioBizz, GH, Atami, Canna, AN)
+- **Tools** — VPD, DLI, Dry-Calc, AI Plant-Doctor (Gemini)
+- **Cloud-Sync** — Supabase mit PKCE-Auth (Magic Link + Google OAuth), Last-Write-Wins-Merge, Multi-Photo
+- **Community (Phase 2 Beta)** — Username/Avatar/Bio, Public-Profile `/u/[username]`, Likes, Follows, "Folge ich"-Filter, Reports
+- **Insights** — Strain-Stats (Yield, Dauer, Score), Phasen-Histogramme
+- **Pro** — Beta-Code: `GROWBUDDY2026`
 
 ## Quick Start
 
