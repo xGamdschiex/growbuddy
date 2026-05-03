@@ -197,9 +197,17 @@
 			<h1 class="text-2xl font-bold mt-1">🌱 Community Feed</h1>
 			<p class="text-sm text-gb-text-muted mt-1">Public Check-ins der Community.</p>
 		</div>
-		<button onclick={load} class="bg-gb-surface border border-gb-border rounded-lg px-3 py-2 text-xs"
+		<button onclick={load} disabled={loading}
+			class="bg-gb-surface border border-gb-border rounded-lg px-3 py-2 text-xs disabled:opacity-50"
 			style="min-height:36px">
-			⟳ Refresh
+			{#if loading}
+				<span class="inline-flex items-center gap-1.5">
+					<span class="w-3 h-3 border-2 border-gb-text-muted border-t-transparent rounded-full animate-spin"></span>
+					Lade…
+				</span>
+			{:else}
+				⟳ Refresh
+			{/if}
 		</button>
 	</div>
 

@@ -116,6 +116,36 @@
 	// Pro-Status
 	let userIsPro = $state(false);
 
+	// Public-Check-in Repair (für Bestandsdaten von vor v1.3.26)
+	let repairBusy = $state(false);
+	async function repairPublicCheckins() {
+		if (!grow || repairBusy) return;
+		repairBusy = true;
+		try {
+			// Lokal alle Check-ins dieses Grows auf grow.is_public setzen
+			const targetPublic = grow.is_public ?? false;
+			const affected = (state?.checkins ?? []).filter((c: CheckIn) =>
+				c.grow_id === grow.id && c.is_public !== targetPublic
+			);
+			for (const c of affected) {
+				growStore.updateCheckIn(c.id, { is_public: targetPublic });
+			}
+			// Cloud-Push wenn eingeloggt
+			let authState: any = { user: null };
+			authStore.subscribe(s => authState = s)();
+			let snapshot: any = state;
+			growStore.subscribe(s => snapshot = s)();
+			if (authState.user) {
+				await syncStore.push(authState.user.id, snapshot);
+			}
+			toastStore.success(`${affected.length} Check-ins nachsynchronisiert`);
+		} catch (e: any) {
+			toastStore.warning('Fehlgeschlagen: ' + (e?.message ?? 'unbekannt'));
+		} finally {
+			repairBusy = false;
+		}
+	}
+
 	// Chart-Daten (chronologisch sortiert)
 	let chronCheckins = $derived(
 		(state?.checkins ?? [])
@@ -234,16 +264,35 @@
 	let avgVpd = $derived(avg(vpdData));
 	let avgEc = $derived(avg(ecData));
 	let avgPh = $derived(avg(phData));
+	// Phase-Tage kalendarisch: erster Check-in einer neuen Phase startet sie,
+	// der letzte Check-in (oder heute bei aktiver Phase) beendet sie. Lücken zählen mit.
 	let phaseDays = $derived.by(() => {
-		const map = new Map<string, Set<string>>();
+		if (chronCheckins.length === 0) return [] as { phase: string; days: number }[];
+		// Phase-Segmente bilden basierend auf chronologischer Reihenfolge
+		type Seg = { phase: string; start: number; end: number };
+		const segs: Seg[] = [];
 		for (const c of chronCheckins) {
-			const day = c.created_at.slice(0, 10);
-			if (!map.has(c.phase)) map.set(c.phase, new Set());
-			map.get(c.phase)!.add(day);
+			const t = new Date(c.created_at).getTime();
+			const last = segs[segs.length - 1];
+			if (!last || last.phase !== c.phase) {
+				segs.push({ phase: c.phase, start: t, end: t });
+			} else {
+				last.end = t;
+			}
 		}
-		return Array.from(map.entries()).map(([phase, days]) => ({ phase, days: days.size }));
+		// Letzte Phase: bei aktivem Grow bis heute laufend
+		if (grow?.status === 'active' && segs.length) {
+			segs[segs.length - 1].end = Date.now();
+		}
+		// Pro Phase: Tage aufsummieren (mehrere Segmente einer Phase möglich)
+		const map = new Map<string, number>();
+		for (const s of segs) {
+			const days = Math.max(1, Math.round((s.end - s.start) / 86400000) + 1);
+			map.set(s.phase, (map.get(s.phase) ?? 0) + days);
+		}
+		return Array.from(map.entries()).map(([phase, days]) => ({ phase, days }));
 	});
-	let hasAggregates = $derived(totalWaterMl > 0 || totalNutrientMl > 0 || avgTemp !== null || phaseDays.length > 0);
+	let hasAggregates = $derived(totalWaterMl > 0 || avgTemp !== null || phaseDays.length > 0);
 
 	// Harvest Flow
 	let showHarvest = $state(false);
@@ -486,13 +535,20 @@
 
 		<!-- Public-Toggle (Phase 2 Community) -->
 		<button onclick={() => growStore.updateGrow(grow.id, { is_public: !grow.is_public })}
-			class="w-full bg-gb-surface border border-gb-border rounded-xl p-3 flex items-center justify-between text-left"
-			style="min-height:48px">
-			<div class="min-w-0">
+			class="w-full bg-gb-surface border border-gb-border rounded-xl p-3 flex items-center justify-between gap-3 text-left"
+			style="min-height:56px">
+			<div class="min-w-0 flex-1 space-y-0.5">
 				<p class="font-medium text-sm">{grow.is_public ? '🌍 Öffentlich' : '🔒 Privat'}</p>
-				<p class="text-xs text-gb-text-muted truncate">
+				<p class="text-xs text-gb-text-muted leading-snug">
 					{grow.is_public ? 'Im Community-Feed sichtbar' : 'Nur du siehst diesen Grow'}
 				</p>
+				{#if grow.is_public}
+					<button type="button" onclick={(e) => { e.stopPropagation(); repairPublicCheckins(); }}
+						disabled={repairBusy}
+						class="text-[11px] text-gb-info hover:underline disabled:opacity-50 mt-1">
+						{repairBusy ? 'Synchronisiere…' : '🔧 Alte Check-ins nachsynchronisieren'}
+					</button>
+				{/if}
 			</div>
 			<div class="relative h-6 w-11 rounded-full transition-colors" class:bg-gb-green={grow.is_public} class:bg-gb-bg={!grow.is_public}>
 				<div class="absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all"
@@ -514,6 +570,15 @@
 						<h2>{editingId ? 'Check-in bearbeiten' : tr('checkin.title')}</h2>
 						<button type="button" onclick={cancelCheckin} class="ci-close" aria-label={tr('checkin.cancel')}>✕</button>
 					</div>
+					{#if editingId}
+						{@const editingCi = (state?.checkins ?? []).find((c: CheckIn) => c.id === editingId)}
+						{#if editingCi}
+							<div class="bg-gb-warning/10 border border-gb-warning/20 rounded-lg px-3 py-2 text-xs text-gb-warning flex items-center gap-2">
+								<span>✏️</span>
+								<span>Bearbeitest Check-in vom {formatDate(editingCi.created_at)} ({editingCi.phase} W{editingCi.week}T{editingCi.day})</span>
+							</div>
+						{/if}
+					{/if}
 
 					<!-- Fotos -->
 					<div class="ci-card">
@@ -815,12 +880,6 @@
 							<p class="text-xl font-bold text-gb-info">{(totalWaterMl / 1000).toFixed(1)} L</p>
 						</div>
 					{/if}
-					{#if totalNutrientMl > 0}
-						<div class="bg-gb-surface rounded-xl p-3">
-							<p class="text-xs text-gb-text-muted">🧪 Dünger total</p>
-							<p class="text-xl font-bold text-gb-accent">{totalNutrientMl} mL</p>
-						</div>
-					{/if}
 					{#if avgTemp !== null}
 						<div class="bg-gb-surface rounded-xl p-3">
 							<p class="text-xs text-gb-text-muted">Ø Temp</p>
@@ -959,8 +1018,13 @@
 				{#if allPhotos.length > 0}
 					<div class="grid grid-cols-4 gap-1 rounded-xl overflow-hidden">
 						{#each allPhotos.slice(0, 8) as src, i}
-							<button type="button" onclick={() => openLightbox(allPhotos, i)} class="aspect-square overflow-hidden">
+							<button type="button" onclick={() => openLightbox(allPhotos, i)} class="aspect-square overflow-hidden relative">
 								<img {src} alt="Foto {i + 1}" class="aspect-square object-cover w-full hover:opacity-80 transition-opacity cursor-zoom-in" />
+								{#if i === 7 && allPhotos.length > 8}
+									<div class="absolute inset-0 bg-black/60 flex items-center justify-center pointer-events-none">
+										<span class="text-white text-lg font-bold">+{allPhotos.length - 8}</span>
+									</div>
+								{/if}
 							</button>
 						{/each}
 					</div>

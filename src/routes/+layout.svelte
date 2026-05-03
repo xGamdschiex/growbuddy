@@ -272,7 +272,7 @@
 	const navItems = [
 		{ href: '/', icon: 'home', key: 'nav.home' },
 		{ href: '/grow', icon: 'sprout', key: 'nav.grow' },
-		{ href: '/calc', icon: 'flask', key: 'nav.calc' },
+		{ href: '/feed', icon: 'feed', key: 'nav.feed' },
 		{ href: '/tools', icon: 'wrench', key: 'nav.tools' },
 		{ href: '/profile', icon: 'user', key: 'nav.profile' },
 	] as const;
@@ -368,6 +368,8 @@
 						<path d="M12 22V16m0 0c-2-4-6-6-10-6 4 0 8-2 10-6 2 4 6 6 10 6-4 0-8 2-10 6z" />
 					{:else if item.icon === 'flask'}
 						<path d="M9 3h6m-5 0v6.5L4 18a1 1 0 001 1h14a1 1 0 001-1l-6-8.5V3m-4 0h4" />
+					{:else if item.icon === 'feed'}
+						<circle cx="6" cy="18" r="2" /><path d="M3 11a9 9 0 0 1 9 9" /><path d="M3 5a15 15 0 0 1 15 15" />
 					{:else if item.icon === 'wrench'}
 						<path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" />
 					{:else if item.icon === 'user'}

@@ -3,6 +3,7 @@ export const en: Record<string, string> = {
 	'nav.home': 'Home',
 	'nav.grow': 'Grow',
 	'nav.calc': 'Calculator',
+	'nav.feed': 'Feed',
 	'nav.tools': 'Tools',
 	'nav.profile': 'Profile',
 
@@ -113,6 +114,8 @@ export const en: Record<string, string> = {
 
 	// Tools
 	'tools.title': 'Tools',
+	'tools.calc': 'Nutrient Calculator',
+	'tools.calc_desc': 'Mix nutrient solution for your phase + feedline',
 	'tools.vpd': 'VPD Calculator',
 	'tools.vpd_desc': 'Calculate Vapor Pressure Deficit',
 	'tools.dli': 'DLI Calculator',

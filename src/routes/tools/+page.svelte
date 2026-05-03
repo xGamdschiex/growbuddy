@@ -6,6 +6,7 @@
 	onMount(() => t.subscribe(v => tr = v));
 
 	const tools = [
+		{ href: '/calc', icon: '🧪', key: 'tools.calc', descKey: 'tools.calc_desc' },
 		{ href: '/tools/doctor', icon: '🤖', key: 'tools.doctor', descKey: 'tools.doctor_desc', pro: true },
 		{ href: '/tools/vpd', icon: '🌡️', key: 'tools.vpd', descKey: 'tools.vpd_desc' },
 		{ href: '/tools/dli', icon: '☀️', key: 'tools.dli', descKey: 'tools.dli_desc' },
