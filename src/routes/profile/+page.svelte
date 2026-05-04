@@ -15,25 +15,42 @@
 	import type { AchievementStats, Achievement } from '$lib/data/achievements';
 	import type { GrowState } from '$lib/stores/grow';
 
-	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
-	let xp = $derived.by(() => { let v: any = {}; xpStore.subscribe(x => v = x)(); return v; });
-	let level = $derived.by(() => { let v: any = LEVELS[0]; currentLevel.subscribe(x => v = x)(); return v; });
-	let progress = $derived.by(() => { let v = { current: 0, needed: 0, percent: 0 }; xpProgress.subscribe(x => v = x)(); return v; });
-	let state = $derived.by(() => { let v: GrowState = { grows: [], checkins: [] }; growStore.subscribe(x => v = x)(); return v; });
-	let grows = $derived.by(() => { let v = 0; totalGrows.subscribe(x => v = x)(); return v; });
-	let harvests = $derived.by(() => { let v = 0; totalHarvests.subscribe(x => v = x)(); return v; });
+	let tr = $state<any>((k: string) => k);
+	let xp = $state<any>({});
+	let level = $state<any>(LEVELS[0]);
+	let progress = $state({ current: 0, needed: 0, percent: 0 });
+	let state = $state<GrowState>({ grows: [], checkins: [] });
+	let grows = $state(0);
+	let harvests = $state(0);
 	// Reaktive Auth-Subscription (überlebt Store-Updates ohne Tab-Wechsel)
 	let auth = $state<any>({ user: null, loading: true });
 	let loggedIn = $derived(auth.user !== null);
-	onMount(() => authStore.subscribe(v => auth = v));
-	let sync = $derived.by(() => { let v: any = { status: 'idle', last_synced: null }; syncStore.subscribe(x => v = x)(); return v; });
+	let sync = $state<any>({ status: 'idle', last_synced: null });
+	onMount(() => {
+		const unsubs = [
+			t.subscribe(x => tr = x),
+			xpStore.subscribe(x => xp = x),
+			currentLevel.subscribe(x => level = x),
+			xpProgress.subscribe(x => progress = x),
+			growStore.subscribe(x => state = x),
+			totalGrows.subscribe(x => grows = x),
+			totalHarvests.subscribe(x => harvests = x),
+			syncStore.subscribe(x => sync = x),
+			myProfile.subscribe(x => profile = x),
+			authStore.subscribe(x => auth = x),
+			isPro.subscribe(x => userIsPro = x),
+			reminderStore.subscribe(x => reminder = x),
+			locale.subscribe(x => currentLocale = x),
+		];
+		return () => unsubs.forEach(u => u());
+	});
 
 	let loginEmail = $state('');
 	let loginLoading = $state(false);
 	let loginMessage = $state('');
 
 	// Username/Bio Editor (Phase 2 Beta)
-	let profile = $derived.by(() => { let v: any = null; myProfile.subscribe(x => v = x)(); return v; });
+	let profile = $state<any>(null);
 	let editingProfile = $state(false);
 	let usernameInput = $state('');
 	let bioInput = $state('');
@@ -253,9 +270,9 @@
 	});
 
 	let showHistory = $state(false);
-	let userIsPro = $derived.by(() => { let v = false; isPro.subscribe(x => v = x)(); return v; });
-	let reminder = $derived.by(() => { let v: any = { enabled: false, time: '19:00', permission: 'default' }; reminderStore.subscribe(x => v = x)(); return v; });
-	let currentLocale = $derived.by(() => { let v: Locale = 'de'; locale.subscribe(x => v = x)(); return v; });
+	let userIsPro = $state(false);
+	let reminder = $state<any>({ enabled: false, time: '19:00', permission: 'default' });
+	let currentLocale = $state<Locale>('de');
 </script>
 
 <div class="px-4 pt-6 max-w-lg mx-auto space-y-6 pb-24">

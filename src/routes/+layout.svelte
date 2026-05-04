@@ -22,9 +22,9 @@
 	import { onMount } from 'svelte';
 
 	let { children }: { children: Snippet } = $props();
-	let toasts = $derived.by(() => { let v: Toast[] = []; toastStore.subscribe(x => v = x)(); return v; });
+	let toasts = $state<Toast[]>([]);
 	let onboarding = $state<any>({ completed: false });
-	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
+	let tr = $state<any>((k: string) => k);
 	// Reaktive Subscriptions (Tab-Wechsel-Bug: $derived.by sah Store-Updates nicht)
 	let auth = $state<any>({ user: null, loading: true });
 	let growState = $state<GrowState>({ grows: [], checkins: [] });
@@ -33,6 +33,8 @@
 			onboardingStore.subscribe(v => onboarding = v),
 			authStore.subscribe(v => auth = v),
 			growStore.subscribe(v => growState = v),
+			toastStore.subscribe(v => toasts = v),
+			t.subscribe(v => tr = v),
 		];
 		return () => subs.forEach(u => u());
 	});
