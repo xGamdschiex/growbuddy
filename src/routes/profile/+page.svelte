@@ -149,8 +149,14 @@
 	async function pushSync() {
 		if (!auth.user) return;
 		const ok = await syncStore.push(auth.user.id, state);
-		if (ok) toastStore.success(tr('sync.success'));
-		else toastStore.warning(tr('sync.error'));
+		if (ok) {
+			toastStore.success(tr('sync.success'));
+		} else {
+			// Konkreten Fehler aus syncStore-State holen (wurde gerade gesetzt)
+			let errMsg = tr('sync.error');
+			syncStore.subscribe(s => { if (s.error) errMsg = `Sync-Fehler: ${s.error}`; })();
+			toastStore.warning(errMsg);
+		}
 	}
 
 	let repairing = $state(false);
@@ -237,7 +243,10 @@
 			growStore.replaceState({ grows: mergedGrows, checkins: mergedCheckins });
 			toastStore.success(tr('sync.success'));
 		} else {
-			toastStore.warning(tr('sync.error'));
+			// Konkreten Fehler aus syncStore-State holen (wurde gerade gesetzt)
+			let errMsg = tr('sync.error');
+			syncStore.subscribe(s => { if (s.error) errMsg = `Sync-Fehler: ${s.error}`; })();
+			toastStore.warning(errMsg);
 		}
 	}
 

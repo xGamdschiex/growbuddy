@@ -323,3 +323,7 @@ create policy "Reports own read" on reports
   for select using (auth.uid() = reporter_id);
 
 create index if not exists idx_reports_checkin on reports(checkin_id);
+
+-- ─── 2026-05-05 Migration: nutrient_ml + water_ml als real (war fälschlich integer) ───
+alter table checkins alter column nutrient_ml type real using nutrient_ml::real;
+alter table checkins alter column water_ml type real using water_ml::real;
