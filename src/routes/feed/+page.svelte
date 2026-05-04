@@ -6,6 +6,8 @@
 	import { fetchFollowingIds } from '$lib/stores/follows';
 	import { submitReport, REPORT_REASONS, type ReportReason } from '$lib/stores/reports';
 	import { toastStore } from '$lib/stores/toast';
+	import { syncStore } from '$lib/stores/sync';
+	import { growStore } from '$lib/stores/grow';
 
 	type FeedItem = {
 		id: string;
@@ -23,6 +25,8 @@
 		grow_name: string | null;
 		grow_strain: string | null;
 		username: string;
+		is_public: boolean;
+		is_own: boolean;
 	};
 
 	let auth = $state<any>({ user: null });
@@ -49,14 +53,25 @@
 		loading = true;
 		error = null;
 
+		// Auto-Sync: eigene Daten pushen bevor Feed geladen wird
+		if (auth.user) {
+			try {
+				const snapshot = await new Promise<any>(resolve => {
+					const unsub = growStore.subscribe(v => { resolve(v); unsub(); });
+				});
+				await syncStore.push(auth.user.id, snapshot);
+			} catch {
+				// Sync-Fehler blockieren Feed nicht
+			}
+		}
+
 		// Step 1: Check-ins + Grow joinen (FK existiert)
 		const { data, error: err } = await supabase
 			.from('checkins')
 			.select(`
-				id, grow_id, phase, week, day, temp, rh, vpd, notes, photo_urls, created_at, user_id,
+				id, grow_id, phase, week, day, temp, rh, vpd, notes, photo_urls, created_at, user_id, is_public,
 				grow:grows!inner(id, name, strain, is_public)
 			`)
-			.eq('is_public', true)
 			.order('created_at', { ascending: false })
 			.limit(50);
 
@@ -66,7 +81,11 @@
 			return;
 		}
 
-		const rows = ((data as any[]) ?? []).filter(r => r.grow?.is_public);
+		const rows = ((data as any[]) ?? []).filter(r => {
+			const isOwn = auth.user && r.user_id === auth.user.id;
+			const growPub = r.grow?.is_public === true;
+			return isOwn || (growPub && r.is_public === true);
+		});
 
 		// Step 2: Profiles separat laden (kein direkter FK checkins.user_id → profiles.id)
 		const userIds = Array.from(new Set(rows.map(r => r.user_id).filter(Boolean)));
@@ -97,6 +116,8 @@
 			grow_name: r.grow?.name ?? null,
 			grow_strain: r.grow?.strain ?? null,
 			username: profileMap.get(r.user_id) ?? 'Anonym',
+			is_public: r.is_public === true,
+			is_own: !!(auth.user && r.user_id === auth.user.id),
 		}));
 
 		// Step 3: Likes + Follows parallel laden
@@ -114,7 +135,7 @@
 
 	let visibleItems = $derived(
 		filterMode === 'following'
-			? items.filter(i => followingIds.has(i.user_id))
+			? items.filter(i => followingIds.has(i.user_id) || i.is_own)
 			: items
 	);
 
@@ -244,8 +265,8 @@
 				<p>Du folgst noch niemandem mit Public-Posts.</p>
 				<p class="text-xs">Wechsle auf "Alle" und folge anderen Growern.</p>
 			{:else}
-				<p>Noch keine öffentlichen Check-ins.</p>
-				<p class="text-xs">Sei der Erste — markiere deine Grows als öffentlich in den Grow-Einstellungen.</p>
+				<p>Noch keine Posts.</p>
+				<p class="text-xs">Erstelle einen Check-in oder folge anderen Growern.</p>
 			{/if}
 		</div>
 	{:else}
@@ -257,7 +278,10 @@
 							<a href="/u/{item.username}" class="font-semibold text-sm truncate text-gb-green hover:underline">@{item.username}</a>
 							<span class="text-[11px] text-gb-text-muted whitespace-nowrap">{relativeTime(item.created_at)}</span>
 						</div>
-						<span class="text-[10px] bg-gb-bg px-2 py-0.5 rounded-full text-gb-text-muted whitespace-nowrap">{item.phase} W{item.week}D{item.day}</span>
+						{#if item.is_own && !item.is_public}
+						<span class="text-[10px] bg-gb-warning/15 text-gb-warning px-2 py-0.5 rounded-full whitespace-nowrap">🔒 Privat</span>
+					{/if}
+					<span class="text-[10px] bg-gb-bg px-2 py-0.5 rounded-full text-gb-text-muted whitespace-nowrap">{item.phase} W{item.week}D{item.day}</span>
 					</header>
 
 					{#if item.grow_strain}

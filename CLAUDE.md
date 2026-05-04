@@ -24,10 +24,28 @@
 
 ## Store-Pattern (Svelte 5 Runes)
 
+**REAKTIV** (UI updated bei Store-Änderung):
 ```typescript
-// So werden Svelte Stores in Runes-Mode gelesen:
+import { onMount } from 'svelte';
+let tr = $state<(k: string) => string>((k) => k);
+onMount(() => t.subscribe(x => tr = x));
+
+let userIsPro = $state(false);
+onMount(() => isPro.subscribe(v => userIsPro = v));
+```
+
+**ANTIPATTERN — verursacht Reactivity-Bug** (Subscriber sofort unsubscribed, reagiert NIE auf Updates):
+```typescript
+// ❌ NICHT mehr nutzen — gefixt in v1.3.24/v1.3.27 in 22+ Files
 let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
-let userIsPro = $derived.by(() => { let v = false; isPro.subscribe(x => v = x)(); return v; });
+```
+
+**One-Shot-Read in Funktions-Body** (z.B. async Handler) ist OK:
+```typescript
+async function save() {
+  let snap; growStore.subscribe(s => snap = s)();
+  // snap ist ein Snapshot, keine Reactivity nötig
+}
 ```
 
 ## Wissenschaftliche Korrektheit
