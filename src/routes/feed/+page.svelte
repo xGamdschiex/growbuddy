@@ -336,7 +336,9 @@
 {#if reportingItem}
 	<div role="presentation" onclick={closeReport}
 		class="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-4">
-		<div role="dialog" onclick={(e) => e.stopPropagation()}
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<!-- svelte-ignore a11y_interactive_supports_focus -->
+		<div role="dialog" tabindex="-1" onclick={(e) => e.stopPropagation()}
 			class="bg-gb-surface rounded-t-2xl sm:rounded-2xl p-5 w-full max-w-md space-y-4 max-h-[90vh] overflow-y-auto">
 			<header class="flex items-center justify-between">
 				<h2 class="font-bold text-base">Check-in melden</h2>

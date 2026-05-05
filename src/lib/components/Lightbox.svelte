@@ -6,6 +6,8 @@
 	}
 	let { photos, startIndex = 0, onClose }: Props = $props();
 
+	// startIndex nur initial nehmen (Prev/Next override später)
+	// svelte-ignore state_referenced_locally
 	let current = $state(startIndex);
 	let touchStartX = $state(0);
 	let touchEndX = $state(0);
@@ -65,6 +67,8 @@
 	{/if}
 
 	<!-- Main Image -->
+	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<img
 		src={photos[current]}
 		alt="Foto {current + 1}"

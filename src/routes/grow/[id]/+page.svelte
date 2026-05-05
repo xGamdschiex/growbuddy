@@ -539,15 +539,25 @@
 			{#if grow.notes}<p><span class="text-gb-text-muted">{tr('grow.info_notes')}:</span> {grow.notes}</p>{/if}
 		</div>
 
-		<!-- Public-Toggle (Phase 2 Community) -->
-		<button onclick={() => {
+		<!-- Public-Toggle (Phase 2 Community) — div statt button damit inneres Repair-button valid HTML ist -->
+		<div role="button" tabindex="0"
+			onclick={() => {
 				const newVal = !grow.is_public;
 				growStore.updateGrow(grow.id, { is_public: newVal });
 				// Force re-read damit UI sicher reagiert (Workaround für Reactivity-Edge-Case)
 				growStore.subscribe(s => growState = s)();
 				toastStore.success(newVal ? '🌍 Grow ist jetzt öffentlich' : '🔒 Grow ist jetzt privat');
 			}}
-			class="w-full bg-gb-surface border border-gb-border rounded-xl p-3 flex items-center justify-between gap-3 text-left"
+			onkeydown={(e) => {
+				if (e.key === 'Enter' || e.key === ' ') {
+					e.preventDefault();
+					const newVal = !grow.is_public;
+					growStore.updateGrow(grow.id, { is_public: newVal });
+					growStore.subscribe(s => growState = s)();
+					toastStore.success(newVal ? '🌍 Grow ist jetzt öffentlich' : '🔒 Grow ist jetzt privat');
+				}
+			}}
+			class="w-full bg-gb-surface border border-gb-border rounded-xl p-3 flex items-center justify-between gap-3 text-left cursor-pointer"
 			style="min-height:56px">
 			<div class="min-w-0 flex-1 space-y-0.5">
 				<p class="font-medium text-sm">{grow.is_public ? '🌍 Öffentlich' : '🔒 Privat'}</p>
@@ -566,7 +576,7 @@
 				<div class="absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all"
 					class:left-0.5={!grow.is_public} class:left-[22px]={grow.is_public}></div>
 			</div>
-		</button>
+		</div>
 
 		<!-- Check-in Button -->
 		{#if grow.status === 'active'}
@@ -840,8 +850,8 @@
 
 					<!-- Yield Input -->
 					<div>
-						<label class="block text-xs text-gb-text-muted mb-1">{tr('harvest.yield')}</label>
-						<input type="number" bind:value={harvestYield} min="0" step="1" placeholder="0"
+						<label for="harvest-yield" class="block text-xs text-gb-text-muted mb-1">{tr('harvest.yield')}</label>
+						<input id="harvest-yield" type="number" bind:value={harvestYield} min="0" step="1" placeholder="0"
 							class="w-full bg-gb-bg border border-gb-border rounded-lg px-3 py-2.5 text-sm" />
 					</div>
 

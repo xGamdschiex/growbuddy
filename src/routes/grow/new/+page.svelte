@@ -110,7 +110,7 @@
 
 	<!-- Strain Type -->
 	<div>
-		<label class="block text-xs text-gb-text-muted mb-2">{tr('grow.type')}</label>
+		<span class="block text-xs text-gb-text-muted mb-2">{tr('grow.type')}</span>
 		<div class="grid grid-cols-2 gap-2">
 			<button onclick={() => strainType = 'auto'}
 				class="px-3 py-2.5 rounded-lg text-sm transition-colors
@@ -127,7 +127,7 @@
 
 	<!-- Medium -->
 	<div>
-		<label class="block text-xs text-gb-text-muted mb-2">{tr('grow.medium')}</label>
+		<span class="block text-xs text-gb-text-muted mb-2">{tr('grow.medium')}</span>
 		<div class="grid grid-cols-3 gap-2">
 			{#each [['soil', tr('grow.medium_soil')], ['coco', tr('grow.medium_coco')], ['hydro', tr('grow.medium_hydro')]] as [val, label]}
 				<button onclick={() => medium = val as Medium}
@@ -142,10 +142,10 @@
 	<!-- Coco / Perlite Verhältnis (nur bei Coco) -->
 	{#if medium === 'coco'}
 		<div>
-			<label class="block text-xs text-gb-text-muted mb-2">
+			<label for="grow-cocoperlite" class="block text-xs text-gb-text-muted mb-2">
 				Kokos/Perlite-Mix: <span class="text-gb-text">{cocoPerliteRatio}% Kokos · {100 - cocoPerliteRatio}% Perlite</span>
 			</label>
-			<input type="range" min="50" max="100" step="5" bind:value={cocoPerliteRatio}
+			<input id="grow-cocoperlite" type="range" min="50" max="100" step="5" bind:value={cocoPerliteRatio}
 				class="w-full accent-gb-green" />
 			<p class="text-xs text-gb-text-muted mt-1">
 				Empfehlung: 70/30 für ausgeglichen, 60/40 bei viel Wasser, 80/20 bei trockener Umgebung. Relevant für Diagnose.
@@ -155,7 +155,7 @@
 
 	<!-- Anbausystem -->
 	<div>
-		<label class="block text-xs text-gb-text-muted mb-2">Anbausystem</label>
+		<span class="block text-xs text-gb-text-muted mb-2">Anbausystem</span>
 		<div class="grid grid-cols-2 gap-2">
 			{#each [
 				{ val: 'topf', label: '🪴 Topf', desc: 'Klassisch' },

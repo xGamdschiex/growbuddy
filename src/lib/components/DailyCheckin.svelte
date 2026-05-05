@@ -46,6 +46,8 @@
 		return () => subs.forEach(u => u());
 	});
 
+	// Initial-Value aus Prop, danach unabhängig (User kann selbst auswählen)
+	// svelte-ignore state_referenced_locally
 	let selectedGrowId = $state(growId ?? '');
 	let selectedGrow = $derived(active.find(g => g.id === selectedGrowId));
 	let feedlineLabel = $derived.by(() => {

@@ -269,8 +269,8 @@
 
 	<!-- Feedline -->
 	<div>
-		<label class="block text-xs text-gb-text-muted mb-1">{tr('calc.feedline')}</label>
-		<select value={calcState.feedline_id} onchange={(e) => switchFeedline(e.currentTarget.value)} class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm">
+		<label for="calc-feedline" class="block text-xs text-gb-text-muted mb-1">{tr('calc.feedline')}</label>
+		<select id="calc-feedline" value={calcState.feedline_id} onchange={(e) => switchFeedline(e.currentTarget.value)} class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm">
 			{#each feedlines as fl}
 				<option value={fl.id}>{fl.name} ({fl.hersteller})</option>
 			{/each}
@@ -285,24 +285,24 @@
 	<!-- Phase / Woche / Tag (auto aus aktivem Grow, manuell überschreibbar) -->
 	<div class="grid grid-cols-3 gap-3">
 		<div>
-			<label class="block text-xs text-gb-text-muted mb-1">{tr('calc.phase')}</label>
-			<select value={calcState.phase} onchange={(e) => { autoFillFromGrow = false; updateState({ phase: e.currentTarget.value, woche: 1 }); }} class="w-full bg-gb-surface border border-gb-border rounded-lg px-2 py-2.5 text-sm">
+			<label for="calc-phase" class="block text-xs text-gb-text-muted mb-1">{tr('calc.phase')}</label>
+			<select id="calc-phase" value={calcState.phase} onchange={(e) => { autoFillFromGrow = false; updateState({ phase: e.currentTarget.value, woche: 1 }); }} class="w-full bg-gb-surface border border-gb-border rounded-lg px-2 py-2.5 text-sm">
 				{#each phasen as p}
 					<option value={p}>{p}</option>
 				{/each}
 			</select>
 		</div>
 		<div>
-			<label class="block text-xs text-gb-text-muted mb-1">{tr('calc.week')}</label>
-			<select value={calcState.woche} onchange={(e) => { autoFillFromGrow = false; updateState({ woche: Number(e.currentTarget.value) }); }} class="w-full bg-gb-surface border border-gb-border rounded-lg px-2 py-2.5 text-sm">
+			<label for="calc-week" class="block text-xs text-gb-text-muted mb-1">{tr('calc.week')}</label>
+			<select id="calc-week" value={calcState.woche} onchange={(e) => { autoFillFromGrow = false; updateState({ woche: Number(e.currentTarget.value) }); }} class="w-full bg-gb-surface border border-gb-border rounded-lg px-2 py-2.5 text-sm">
 				{#each wochen as w}
 					<option value={w}>{w}</option>
 				{/each}
 			</select>
 		</div>
 		<div>
-			<label class="block text-xs text-gb-text-muted mb-1">{tr('calc.day')}</label>
-			<select value={calcState.tag} onchange={(e) => { autoFillFromGrow = false; updateState({ tag: Number(e.currentTarget.value) }); }} class="w-full bg-gb-surface border border-gb-border rounded-lg px-2 py-2.5 text-sm">
+			<label for="calc-day" class="block text-xs text-gb-text-muted mb-1">{tr('calc.day')}</label>
+			<select id="calc-day" value={calcState.tag} onchange={(e) => { autoFillFromGrow = false; updateState({ tag: Number(e.currentTarget.value) }); }} class="w-full bg-gb-surface border border-gb-border rounded-lg px-2 py-2.5 text-sm">
 				{#each [1,2,3,4,5,6,7] as d}
 					<option value={d}>{d}</option>
 				{/each}
@@ -318,13 +318,13 @@
 	<!-- Reservoir + Medium -->
 	<div class="grid grid-cols-2 gap-3">
 		<div>
-			<label class="block text-xs text-gb-text-muted mb-1">{tr('calc.reservoir')}</label>
-			<input type="number" value={calcState.reservoir} oninput={(e) => updateState({ reservoir: Number(e.currentTarget.value) })} min="1" max="1000" step="1"
+			<label for="calc-reservoir" class="block text-xs text-gb-text-muted mb-1">{tr('calc.reservoir')}</label>
+			<input id="calc-reservoir" type="number" value={calcState.reservoir} oninput={(e) => updateState({ reservoir: Number(e.currentTarget.value) })} min="1" max="1000" step="1"
 				class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm" />
 		</div>
 		<div>
-			<label class="block text-xs text-gb-text-muted mb-1">{tr('calc.medium')}</label>
-			<select value={calcState.medium} onchange={(e) => updateState({ medium: e.currentTarget.value as any })} class="w-full bg-gb-surface border border-gb-border rounded-lg px-2 py-2.5 text-sm">
+			<label for="calc-medium" class="block text-xs text-gb-text-muted mb-1">{tr('calc.medium')}</label>
+			<select id="calc-medium" value={calcState.medium} onchange={(e) => updateState({ medium: e.currentTarget.value as any })} class="w-full bg-gb-surface border border-gb-border rounded-lg px-2 py-2.5 text-sm">
 				<option value="coco">{tr('grow.medium_coco')}</option>
 				<option value="hydro">{tr('grow.medium_hydro')}</option>
 				<option value="erde">{tr('grow.medium_soil')}</option>
@@ -335,7 +335,7 @@
 	<!-- Anbausystem (nur im Voll-Modus ODER wenn nicht topf) -->
 	{#if !calcState.einfach_modus || calcState.system !== 'topf'}
 	<div>
-		<label class="block text-xs text-gb-text-muted mb-1">{tr('calc.system_label')}</label>
+		<span class="block text-xs text-gb-text-muted mb-1">{tr('calc.system_label')}</span>
 		<div class="grid grid-cols-4 gap-2">
 			{#each [
 				{ val: 'topf', label: '🪴 Topf', pro: false },
@@ -383,9 +383,9 @@
 				<!-- Wasserprofil / Standort -->
 				<div class="space-y-3">
 					<div>
-						<label class="block text-xs text-gb-text-muted mb-1">{tr('calc.city_lookup')}</label>
+						<label for="calc-city" class="block text-xs text-gb-text-muted mb-1">{tr('calc.city_lookup')}</label>
 						<div class="flex gap-2">
-							<input type="text" bind:value={stadtInput} placeholder={tr('calc.city_placeholder')}
+							<input id="calc-city" type="text" bind:value={stadtInput} placeholder={tr('calc.city_placeholder')}
 								onkeydown={(e) => { if (e.key === 'Enter') lookupCity(); }}
 								class="flex-1 bg-gb-bg border border-gb-border rounded-lg px-3 py-2.5 text-sm" />
 							<button onclick={lookupCity} disabled={lookupLoading || !stadtInput.trim()}
@@ -408,8 +408,8 @@
 					{/if}
 
 					<div>
-						<label class="block text-xs text-gb-text-muted mb-1">{tr('calc.water_profile')}</label>
-						<select value={calcState.wasserprofil} onchange={(e) => updateState({ wasserprofil: e.currentTarget.value })} class="w-full bg-gb-bg border border-gb-border rounded-lg px-3 py-2.5 text-sm">
+						<label for="calc-waterprofile" class="block text-xs text-gb-text-muted mb-1">{tr('calc.water_profile')}</label>
+						<select id="calc-waterprofile" value={calcState.wasserprofil} onchange={(e) => updateState({ wasserprofil: e.currentTarget.value })} class="w-full bg-gb-bg border border-gb-border rounded-lg px-3 py-2.5 text-sm">
 							{#each WASSER_PROFILE as p}
 								<option value={p.name}>{p.name}</option>
 							{/each}
@@ -420,23 +420,23 @@
 				{#if isCustomWater}
 					<div class="grid grid-cols-2 gap-3">
 						<div>
-							<label class="block text-xs text-gb-text-muted mb-1">Ca (mg/L)</label>
-							<input type="number" value={calcState.custom_ca} oninput={(e) => updateState({ custom_ca: Number(e.currentTarget.value) })} min="0" max="300" step="1"
+							<label for="calc-ca" class="block text-xs text-gb-text-muted mb-1">Ca (mg/L)</label>
+							<input id="calc-ca" type="number" value={calcState.custom_ca} oninput={(e) => updateState({ custom_ca: Number(e.currentTarget.value) })} min="0" max="300" step="1"
 								class="w-full bg-gb-bg border border-gb-border rounded-lg px-3 py-2.5 text-sm" />
 						</div>
 						<div>
-							<label class="block text-xs text-gb-text-muted mb-1">Mg (mg/L)</label>
-							<input type="number" value={calcState.custom_mg} oninput={(e) => updateState({ custom_mg: Number(e.currentTarget.value) })} min="0" max="100" step="1"
+							<label for="calc-mg" class="block text-xs text-gb-text-muted mb-1">Mg (mg/L)</label>
+							<input id="calc-mg" type="number" value={calcState.custom_mg} oninput={(e) => updateState({ custom_mg: Number(e.currentTarget.value) })} min="0" max="100" step="1"
 								class="w-full bg-gb-bg border border-gb-border rounded-lg px-3 py-2.5 text-sm" />
 						</div>
 						<div>
-							<label class="block text-xs text-gb-text-muted mb-1">EC (mS/cm)</label>
-							<input type="number" value={calcState.custom_ec} oninput={(e) => updateState({ custom_ec: Number(e.currentTarget.value) })} min="0" max="3" step="0.01"
+							<label for="calc-customec" class="block text-xs text-gb-text-muted mb-1">EC (mS/cm)</label>
+							<input id="calc-customec" type="number" value={calcState.custom_ec} oninput={(e) => updateState({ custom_ec: Number(e.currentTarget.value) })} min="0" max="3" step="0.01"
 								class="w-full bg-gb-bg border border-gb-border rounded-lg px-3 py-2.5 text-sm" />
 						</div>
 						<div>
-							<label class="block text-xs text-gb-text-muted mb-1">pH</label>
-							<input type="number" value={calcState.custom_ph} oninput={(e) => updateState({ custom_ph: Number(e.currentTarget.value) })} min="4" max="9" step="0.1"
+							<label for="calc-ph" class="block text-xs text-gb-text-muted mb-1">pH</label>
+							<input id="calc-ph" type="number" value={calcState.custom_ph} oninput={(e) => updateState({ custom_ph: Number(e.currentTarget.value) })} min="4" max="9" step="0.1"
 								class="w-full bg-gb-bg border border-gb-border rounded-lg px-3 py-2.5 text-sm" />
 						</div>
 					</div>
@@ -445,7 +445,7 @@
 
 				<!-- EC-Einheit Selector -->
 				<div>
-					<label class="block text-xs text-gb-text-muted mb-1">EC-Einheit</label>
+					<span class="block text-xs text-gb-text-muted mb-1">EC-Einheit</span>
 					<div class="grid grid-cols-3 gap-2">
 						{#each [{v:'mS/cm',l:'mS/cm'},{v:'ppm500',l:'ppm (500)'},{v:'ppm700',l:'ppm (700)'}] as opt}
 							<button
@@ -459,7 +459,7 @@
 				<!-- Faktor -->
 				<div>
 					<div class="flex items-center gap-3 mb-2">
-						<label class="text-xs text-gb-text-muted">{tr('calc.factor_label')}</label>
+						<span class="text-xs text-gb-text-muted">{tr('calc.factor_label')}</span>
 						<button
 							onclick={() => updateState({ faktor_modus: calcState.faktor_modus === 'Auto' ? 'Manuell' : 'Auto' })}
 							class="text-xs px-2 py-0.5 rounded {calcState.faktor_modus === 'Auto' ? 'bg-gb-green/20 text-gb-green' : 'bg-gb-surface-2 text-gb-text-muted'}"
@@ -600,6 +600,8 @@
 		onkeydown={(e) => e.key === 'Escape' && (showApply = false)}
 		tabindex="-1"
 	>
+		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<div
 			class="bg-gb-surface rounded-2xl p-5 w-full max-w-sm space-y-4 border border-gb-border max-h-[85vh] overflow-y-auto"
 			onclick={(e) => e.stopPropagation()}
@@ -613,8 +615,9 @@
 			</div>
 
 			<div>
-				<label class="block text-xs text-gb-text-muted mb-1">Grow auswählen</label>
+				<label for="calc-applygrow" class="block text-xs text-gb-text-muted mb-1">Grow auswählen</label>
 				<select
+					id="calc-applygrow"
 					bind:value={applyGrowId}
 					class="w-full bg-gb-bg border border-gb-border rounded-lg px-3 py-2.5 text-sm"
 				>
