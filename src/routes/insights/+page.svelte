@@ -5,13 +5,14 @@
 	import { t } from '$lib/i18n';
 	import { onMount } from 'svelte';
 
-	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
-	let state = $state<GrowState>({ grows: [], checkins: [] });
+	let tr: (key: string, params?: Record<string, string | number>) => string = $state((k: string) => k);
+	let growState: GrowState = $state({ grows: [], checkins: [] });
 	let userIsPro = $state(false);
 
 	onMount(() => {
 		const subs = [
-			growStore.subscribe(v => state = v),
+			t.subscribe(v => tr = v),
+			growStore.subscribe(v => growState = v),
 			isPro.subscribe(v => userIsPro = v),
 		];
 		return () => subs.forEach(u => u());
@@ -35,7 +36,7 @@
 
 	let strainStats = $derived.by<StrainStat[]>(() => {
 		const map = new Map<string, Grow[]>();
-		for (const g of state.grows) {
+		for (const g of growState.grows) {
 			const key = (g.strain || 'Unbekannt').trim();
 			if (!key) continue;
 			if (!map.has(key)) map.set(key, []);
@@ -67,10 +68,10 @@
 	});
 
 	let totals = $derived.by(() => {
-		const grows = state.grows;
+		const grows = growState.grows;
 		const harvested = grows.filter(g => g.status === 'harvested' && g.yield_g != null);
 		const totalYield = harvested.reduce((s, g) => s + (g.yield_g ?? 0), 0);
-		const totalCheckins = state.checkins.length;
+		const totalCheckins = growState.checkins.length;
 		const uniqueStrains = strainStats.length;
 		const avgScore = grows.map(g => g.grow_score).filter((v): v is number => v != null);
 		return {
@@ -85,7 +86,7 @@
 
 	let activePhase = $derived.by(() => {
 		const counts = new Map<string, number>();
-		for (const c of state.checkins) {
+		for (const c of growState.checkins) {
 			counts.set(c.phase, (counts.get(c.phase) ?? 0) + 1);
 		}
 		return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);

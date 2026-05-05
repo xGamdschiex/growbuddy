@@ -3,7 +3,7 @@
 	import { t } from '$lib/i18n';
 	import { onMount } from 'svelte';
 
-	let tr = $state<any>((k: string) => k);
+	let tr: (key: string, params?: Record<string, string | number>) => string = $state((k: string) => k);
 
 	onMount(() => t.subscribe(v => tr = v));
 	let mode = $state<'drying' | 'curing'>('drying');
@@ -90,8 +90,8 @@
 		<!-- Messwerte -->
 		<div class="grid grid-cols-2 gap-3">
 			<div>
-				<label class="block text-xs text-gb-text-muted mb-1">{tr('checkin.temp')}</label>
-				<input type="number" bind:value={temp} step="0.5" placeholder="20"
+				<label for="dry-temp" class="block text-xs text-gb-text-muted mb-1">{tr('checkin.temp')}</label>
+				<input id="dry-temp" type="number" bind:value={temp} step="0.5" placeholder="20"
 					class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm" />
 				{#if temp !== null}
 					<p class="text-xs mt-1 {tempOk ? 'text-gb-green' : 'text-gb-danger'}">
@@ -100,8 +100,8 @@
 				{/if}
 			</div>
 			<div>
-				<label class="block text-xs text-gb-text-muted mb-1">{tr('checkin.rh')}</label>
-				<input type="number" bind:value={rh} step="1" placeholder="60"
+				<label for="dry-rh" class="block text-xs text-gb-text-muted mb-1">{tr('checkin.rh')}</label>
+				<input id="dry-rh" type="number" bind:value={rh} step="1" placeholder="60"
 					class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm" />
 				{#if rh !== null}
 					<p class="text-xs mt-1 {rhOk ? 'text-gb-green' : 'text-gb-danger'}">

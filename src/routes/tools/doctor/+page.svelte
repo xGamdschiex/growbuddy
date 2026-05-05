@@ -12,36 +12,36 @@
 
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
 	let userIsPro = $state(false);
-	let state = $state<GrowState>({ grows: [], checkins: [] });
-	let active = $state<Grow[]>([]);
+	let growState: GrowState = $state({ grows: [], checkins: [] });
+	let active: Grow[] = $state([]);
 
 	onMount(() => {
 		const subs = [
 			isPro.subscribe(v => userIsPro = v),
-			growStore.subscribe(v => state = v),
+			growStore.subscribe(v => growState = v),
 			activeGrows.subscribe(v => active = v),
 		];
 		return () => subs.forEach(u => u());
 	});
 
-	let photo = $state<string | null>(null);
+	let photo: string | null = $state(null);
 	let userNote = $state('');
 	let loading = $state(false);
-	let diagnosis = $state<Diagnosis | null>(null);
-	let error = $state<string | null>(null);
+	let diagnosis: Diagnosis | null = $state(null);
+	let error: string | null = $state(null);
 	let includeContext = $state(true);
-	let selectedGrowId = $state<string>('');
+	let selectedGrowId: string = $state('');
 
 	$effect(() => {
 		if (!selectedGrowId && active.length > 0) selectedGrowId = active[0]!.id;
 	});
 
 	let selectedGrow = $derived(active.find(g => g.id === selectedGrowId));
-	let latestCheckin = $derived.by<CheckIn | undefined>(() => {
+	let latestCheckin: CheckIn | undefined = $derived.by(() => {
 		if (!selectedGrowId) return undefined;
-		const growCheckins = state.checkins
-			.filter(c => c.grow_id === selectedGrowId)
-			.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+		const growCheckins = growState.checkins
+			.filter((c: CheckIn) => c.grow_id === selectedGrowId)
+			.sort((a: CheckIn, b: CheckIn) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 		return growCheckins[0];
 	});
 
@@ -98,7 +98,7 @@
 			diagnosis = await diagnosePlant(photo, ctx, userNote);
 			hapticSuccess();
 			xpStore.awardToolUse('doctor');
-			toastStore.xp('+5 XP — Diagnose abgeschlossen');
+			toastStore.xp(5, 'Diagnose abgeschlossen');
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Unbekannter Fehler';
 			hapticError();
@@ -208,8 +208,8 @@
 		<!-- Textfeld — immer sichtbar -->
 		{#if !diagnosis}
 			<div>
-				<label class="block text-xs text-gb-text-muted mb-1">Frage oder Beschreibung (optional)</label>
-				<textarea bind:value={userNote} rows="2"
+				<label for="doctor-note" class="block text-xs text-gb-text-muted mb-1">Frage oder Beschreibung (optional)</label>
+				<textarea id="doctor-note" bind:value={userNote} rows="2"
 					placeholder="z.B. &quot;Blätter rollen sich ein&quot; oder &quot;Was fehlt der Pflanze?&quot;"
 					class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2 text-sm placeholder:text-gb-border resize-none"></textarea>
 			</div>

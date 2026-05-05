@@ -8,10 +8,8 @@
 	import { onMount } from 'svelte';
 	import type { Grow, CheckIn } from '$lib/stores/grow';
 
-	interface GrowState { grows: (Grow & { checkins: CheckIn[] })[] }
-
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
-	let storeVal = $state<GrowState>({ grows: [] });
+	let storeVal: any = $state({ grows: [] });
 	let active = $state<Grow[]>([]);
 	let harvested = $state<Grow[]>([]);
 	let harvestCount = $state(0);

@@ -96,15 +96,15 @@
 
 	<!-- Strain -->
 	<div>
-		<label class="block text-xs text-gb-text-muted mb-1">{tr('grow.strain')} *</label>
-		<input type="text" bind:value={strain} placeholder={tr('grow.strain_placeholder')}
+		<label for="grow-strain" class="block text-xs text-gb-text-muted mb-1">{tr('grow.strain')} *</label>
+		<input id="grow-strain" type="text" bind:value={strain} placeholder={tr('grow.strain_placeholder')}
 			class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm placeholder:text-gb-border" />
 	</div>
 
 	<!-- Name (optional) -->
 	<div>
-		<label class="block text-xs text-gb-text-muted mb-1">{tr('grow.name')}</label>
-		<input type="text" bind:value={name} placeholder={tr('grow.name_placeholder')}
+		<label for="grow-name" class="block text-xs text-gb-text-muted mb-1">{tr('grow.name')}</label>
+		<input id="grow-name" type="text" bind:value={name} placeholder={tr('grow.name_placeholder')}
 			class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm placeholder:text-gb-border" />
 	</div>
 
@@ -189,24 +189,24 @@
 	<!-- Space + Plants -->
 	<div class="grid grid-cols-2 gap-3">
 		<div>
-			<label class="block text-xs text-gb-text-muted mb-1">{tr('grow.space')}</label>
-			<select bind:value={space} class="w-full bg-gb-surface border border-gb-border rounded-lg px-2 py-2.5 text-sm">
+			<label for="grow-space" class="block text-xs text-gb-text-muted mb-1">{tr('grow.space')}</label>
+			<select id="grow-space" bind:value={space} class="w-full bg-gb-surface border border-gb-border rounded-lg px-2 py-2.5 text-sm">
 				{#each spaces as s}
 					<option value={s.value}>{s.label}</option>
 				{/each}
 			</select>
 		</div>
 		<div>
-			<label class="block text-xs text-gb-text-muted mb-1">{tr('grow.plants')}</label>
-			<input type="number" bind:value={plantCount} min="1" max="50" step="1"
+			<label for="grow-plants" class="block text-xs text-gb-text-muted mb-1">{tr('grow.plants')}</label>
+			<input id="grow-plants" type="number" bind:value={plantCount} min="1" max="50" step="1"
 				class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm" />
 		</div>
 	</div>
 
 	<!-- Feedline -->
 	<div>
-		<label class="block text-xs text-gb-text-muted mb-1">{tr('grow.feedline')}</label>
-		<select bind:value={feedlineId} class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm">
+		<label for="grow-feedline" class="block text-xs text-gb-text-muted mb-1">{tr('grow.feedline')}</label>
+		<select id="grow-feedline" bind:value={feedlineId} class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm">
 			{#each feedlines as fl}
 				<option value={fl.id}>{fl.name}</option>
 			{/each}
@@ -215,22 +215,22 @@
 
 	<!-- Licht -->
 	<div>
-		<label class="block text-xs text-gb-text-muted mb-1">{tr('grow.light')}</label>
-		<input type="text" bind:value={lightInfo} placeholder={tr('grow.light_placeholder')}
+		<label for="grow-light" class="block text-xs text-gb-text-muted mb-1">{tr('grow.light')}</label>
+		<input id="grow-light" type="text" bind:value={lightInfo} placeholder={tr('grow.light_placeholder')}
 			class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm placeholder:text-gb-border" />
 	</div>
 
 	<!-- Notizen -->
 	<div>
-		<label class="block text-xs text-gb-text-muted mb-1">{tr('grow.notes')}</label>
-		<textarea bind:value={notes} rows="2" placeholder={tr('grow.notes_placeholder')}
+		<label for="grow-notes" class="block text-xs text-gb-text-muted mb-1">{tr('grow.notes')}</label>
+		<textarea id="grow-notes" bind:value={notes} rows="2" placeholder={tr('grow.notes_placeholder')}
 			class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm placeholder:text-gb-border resize-none"></textarea>
 	</div>
 
 	<!-- Startdatum -->
 	<div>
-		<label class="block text-xs text-gb-text-muted mb-1">Startdatum (retroaktiv möglich)</label>
-		<input type="date" bind:value={startDate} max={new Date().toISOString().slice(0, 10)}
+		<label for="grow-startdate" class="block text-xs text-gb-text-muted mb-1">Startdatum (retroaktiv möglich)</label>
+		<input id="grow-startdate" type="date" bind:value={startDate} max={new Date().toISOString().slice(0, 10)}
 			class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm" />
 	</div>
 

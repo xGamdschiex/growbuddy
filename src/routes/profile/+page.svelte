@@ -13,26 +13,26 @@
 	import { downloadBackup, importBackup, readFileAsText } from '$lib/utils/backup';
 	import { toastStore } from '$lib/stores/toast';
 	import type { AchievementStats, Achievement } from '$lib/data/achievements';
-	import type { GrowState } from '$lib/stores/grow';
+	import type { GrowState, Grow, CheckIn } from '$lib/stores/grow';
 
-	let tr = $state<any>((k: string) => k);
-	let xp = $state<any>({});
-	let level = $state<any>(LEVELS[0]);
+	let tr: (key: string, params?: Record<string, string | number>) => string = $state((k: string) => k);
+	let xp: any = $state({});
+	let level: any = $state(LEVELS[0]);
 	let progress = $state({ current: 0, needed: 0, percent: 0 });
-	let state = $state<GrowState>({ grows: [], checkins: [] });
+	let growState: GrowState = $state({ grows: [], checkins: [] });
 	let grows = $state(0);
 	let harvests = $state(0);
 	// Reaktive Auth-Subscription (überlebt Store-Updates ohne Tab-Wechsel)
-	let auth = $state<any>({ user: null, loading: true });
+	let auth: any = $state({ user: null, loading: true });
 	let loggedIn = $derived(auth.user !== null);
-	let sync = $state<any>({ status: 'idle', last_synced: null });
+	let sync: any = $state({ status: 'idle', last_synced: null });
 	onMount(() => {
 		const unsubs = [
 			t.subscribe(x => tr = x),
 			xpStore.subscribe(x => xp = x),
 			currentLevel.subscribe(x => level = x),
 			xpProgress.subscribe(x => progress = x),
-			growStore.subscribe(x => state = x),
+			growStore.subscribe(x => growState = x),
 			totalGrows.subscribe(x => grows = x),
 			totalHarvests.subscribe(x => harvests = x),
 			syncStore.subscribe(x => sync = x),
@@ -50,7 +50,7 @@
 	let loginMessage = $state('');
 
 	// Username/Bio Editor (Phase 2 Beta)
-	let profile = $state<any>(null);
+	let profile: any = $state(null);
 	let editingProfile = $state(false);
 	let usernameInput = $state('');
 	let bioInput = $state('');
@@ -148,7 +148,7 @@
 
 	async function pushSync() {
 		if (!auth.user) return;
-		const ok = await syncStore.push(auth.user.id, state);
+		const ok = await syncStore.push(auth.user.id, growState);
 		if (ok) {
 			toastStore.success(tr('sync.success'));
 		} else {
@@ -216,15 +216,15 @@
 				return ta >= tb ? a : b;
 			};
 
-			const growsById = new Map(state.grows.map(g => [g.id, g]));
-			for (const cg of data.grows) {
+			const growsById = new Map(growState.grows.map((g: Grow) => [g.id, g]));
+			for (const cg of data.grows as Grow[]) {
 				const local = growsById.get(cg.id);
 				growsById.set(cg.id, local ? pickNewer(local, cg) : cg);
 			}
 			const mergedGrows = Array.from(growsById.values());
 
-			const checkinsById = new Map(state.checkins.map(c => [c.id, c]));
-			for (const cc of data.checkins) {
+			const checkinsById = new Map(growState.checkins.map((c: CheckIn) => [c.id, c]));
+			for (const cc of data.checkins as CheckIn[]) {
 				const local = checkinsById.get(cc.id);
 				if (local) {
 					const winner = pickNewer(local, cc);
@@ -244,7 +244,7 @@
 			}
 			const mergedCheckins = Array.from(checkinsById.values());
 
-			growStore.replaceState({ grows: mergedGrows, checkins: mergedCheckins });
+			growStore.replaceState({ grows: mergedGrows as Grow[], checkins: mergedCheckins as CheckIn[] });
 			toastStore.success(tr('sync.success'));
 		} else {
 			// Konkreten Fehler aus syncStore-State holen (wurde gerade gesetzt)
@@ -254,16 +254,16 @@
 		}
 	}
 
-	let stats = $derived<AchievementStats>({
+	let stats: AchievementStats = $derived({
 		total_grows: grows,
 		total_harvests: harvests,
-		total_checkins: state.checkins.length,
-		total_photos: state.checkins.filter(c => c.photo_data).length,
-		best_score: state.grows.reduce((best, g) => {
+		total_checkins: growState.checkins.length,
+		total_photos: growState.checkins.filter((c: CheckIn) => c.photo_data).length,
+		best_score: growState.grows.reduce((best: number | null, g: Grow) => {
 			if (g.grow_score !== null && (best === null || g.grow_score > best)) return g.grow_score;
 			return best;
 		}, null as number | null),
-		unique_strains: new Set(state.grows.map(g => g.strain.toLowerCase())).size,
+		unique_strains: new Set(growState.grows.map((g: Grow) => g.strain.toLowerCase())).size,
 		longest_streak: 0,
 		total_xp: xp.total_xp ?? 0,
 		calc_uses: Object.keys(xp.daily_checkins ?? {}).filter((k: string) => k.startsWith('calc_')).length,
@@ -284,8 +284,8 @@
 
 	let showHistory = $state(false);
 	let userIsPro = $state(false);
-	let reminder = $state<any>({ enabled: false, time: '19:00', permission: 'default' });
-	let currentLocale = $state<Locale>('de');
+	let reminder: any = $state({ enabled: false, time: '19:00', permission: 'default' });
+	let currentLocale: Locale = $state('de');
 </script>
 
 <div class="px-4 pt-6 max-w-lg mx-auto space-y-6 pb-24">
@@ -322,7 +322,7 @@
 			<p class="text-xs text-gb-text-muted">{tr('profile.harvests')}</p>
 		</div>
 		<div class="bg-gb-surface rounded-xl p-3 text-center">
-			<p class="text-2xl font-bold">{state.checkins.length}</p>
+			<p class="text-2xl font-bold">{growState.checkins.length}</p>
 			<p class="text-xs text-gb-text-muted">{tr('grow.checkins')}</p>
 		</div>
 	</div>

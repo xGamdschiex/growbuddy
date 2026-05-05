@@ -23,29 +23,29 @@
 
 	import { onMount } from 'svelte';
 
-	let tr = $state<(k: string) => string>((k) => k);
+	let tr: (key: string, params?: Record<string, string | number>) => string = $state((k: string) => k);
 	let growId = $derived($page.params.id);
-	let state = $state<any>({ grows: [], checkins: [] });
-	let grow = $derived(state?.grows?.find((g: any) => g.id === growId));
+	let growState: any = $state({ grows: [], checkins: [] });
+	let grow = $derived(growState?.grows?.find((g: any) => g.id === growId));
 
 	onMount(() => {
 		const subs = [
 			t.subscribe(v => tr = v),
-			growStore.subscribe(v => state = v),
+			growStore.subscribe(v => growState = v),
 			isPro.subscribe(v => userIsPro = v),
 			streakMultiplier.subscribe(v => multiplierValue = v),
 		];
 		return () => subs.forEach(u => u());
 	});
 	let checkins = $derived(
-		(state?.checkins ?? [])
+		(growState?.checkins ?? [])
 			.filter((c: CheckIn) => c.grow_id === growId)
 			.sort((a: CheckIn, b: CheckIn) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 	);
 
 	// Check-in Form State
 	let showCheckin = $state(false);
-	let editingId = $state<string | null>(null);
+	let editingId: string | null = $state(null);
 	let ciPhase = $state('Veg');
 	let ciWeek = $state(1);
 	let ciDay = $state(1);
@@ -60,10 +60,10 @@
 		ciWeek = Math.max(1, Math.ceil(daysSince / 7));
 		ciDay = ((daysSince - 1) % 7) + 1;
 	});
-	let ciTemp = $state<number | null>(null);
-	let ciRh = $state<number | null>(null);
-	let ciEc = $state<number | null>(null);
-	let ciEcUnit = $state<ECEinheit>(
+	let ciTemp: number | null = $state(null);
+	let ciRh: number | null = $state(null);
+	let ciEc: number | null = $state(null);
+	let ciEcUnit: ECEinheit = $state(
 		(typeof localStorage !== 'undefined' ? (localStorage.getItem('growbuddy_ec_unit') as ECEinheit | null) : null) ?? 'mS/cm'
 	);
 	$effect(() => {
@@ -71,14 +71,14 @@
 	});
 	let ciEcStep = $derived(ciEcUnit === 'mS/cm' ? '0.1' : '10');
 	let ciEcPlaceholder = $derived(ciEcUnit === 'mS/cm' ? '1.5' : ciEcUnit === 'ppm500' ? '750' : '1050');
-	let ciPh = $state<number | null>(null);
+	let ciPh: number | null = $state(null);
 	let ciWatered = $state(false);
 	let ciNutrients = $state(false);
-	let ciWaterMl = $state<number | null>(null);
-	let ciNutrientMl = $state<number | null>(null);
-	let ciTraining = $state<string | null>(null);
+	let ciWaterMl: number | null = $state(null);
+	let ciNutrientMl: number | null = $state(null);
+	let ciTraining: string | null = $state(null);
 	let ciNotes = $state('');
-	let ciPhotos = $state<string[]>([]);
+	let ciPhotos: string[] = $state([]);
 	let ciMore = $state(false);
 
 	let ciVpd = $derived(ciTemp !== null && ciRh !== null ? calcVPD(ciTemp, ciRh) : null);
@@ -125,7 +125,7 @@
 		try {
 			// Lokal alle Check-ins dieses Grows auf grow.is_public setzen
 			const targetPublic = grow.is_public ?? false;
-			const affected = (state?.checkins ?? []).filter((c: CheckIn) =>
+			const affected = (growState?.checkins ?? []).filter((c: CheckIn) =>
 				c.grow_id === grow.id && c.is_public !== targetPublic
 			);
 			for (const c of affected) {
@@ -134,7 +134,7 @@
 			// Cloud-Push wenn eingeloggt
 			let authState: any = { user: null };
 			authStore.subscribe(s => authState = s)();
-			let snapshot: any = state;
+			let snapshot: any = growState;
 			growStore.subscribe(s => snapshot = s)();
 			if (authState.user) {
 				await syncStore.push(authState.user.id, snapshot);
@@ -149,7 +149,7 @@
 
 	// Chart-Daten (chronologisch sortiert)
 	let chronCheckins = $derived(
-		(state?.checkins ?? [])
+		(growState?.checkins ?? [])
 			.filter((c: CheckIn) => c.grow_id === growId)
 			.sort((a: CheckIn, b: CheckIn) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
 	);
@@ -185,7 +185,7 @@
 			cum += (c.water_ml as number) / 1000; // mL → L
 			return { day: dayOf(c), value: Math.round(cum * 10) / 10 };
 		});
-		return { values: points.map(p => p.value), days: points.map(p => p.day) };
+		return { values: points.map((p: { day: number; value: number }) => p.value), days: points.map((p: { day: number; value: number }) => p.day) };
 	});
 	let nutrientSeries = $derived.by(() => {
 		const filtered = chronCheckins.filter((c: CheckIn) => c.nutrient_ml != null && c.nutrient_ml > 0);
@@ -297,10 +297,10 @@
 
 	// Harvest Flow
 	let showHarvest = $state(false);
-	let harvestYield = $state<number>(0);
+	let harvestYield: number = $state(0);
 	let scoreBreakdown = $derived.by<ScoreBreakdown | null>(() => {
 		if (!grow || !showHarvest) return null;
-		const sortedCheckins = (state?.checkins ?? [])
+		const sortedCheckins = (growState?.checkins ?? [])
 			.filter((c: CheckIn) => c.grow_id === growId)
 			.sort((a: CheckIn, b: CheckIn) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 		return calculateGrowScore(grow, sortedCheckins);
@@ -346,7 +346,7 @@
 	}
 
 	function removePhoto(idx: number) {
-		ciPhotos = ciPhotos.filter((_, i) => i !== idx);
+		ciPhotos = ciPhotos.filter((_: string, i: number) => i !== idx);
 	}
 
 	function startEdit(ci: CheckIn) {
@@ -419,8 +419,8 @@
 		const validVpd = validTemp !== null && validRh !== null ? calcVPD(validTemp, validRh) : null;
 
 		// ciPhotos kann Mix aus base64 (data:) und URLs (https://...) sein
-		const newBase64 = ciPhotos.filter(p => p?.startsWith('data:'));
-		const existingUrls = ciPhotos.filter(p => p && !p.startsWith('data:'));
+		const newBase64 = ciPhotos.filter((p: string) => p?.startsWith('data:'));
+		const existingUrls = ciPhotos.filter((p: string) => p && !p.startsWith('data:'));
 		const patch = {
 			phase: ciPhase,
 			week: validWeek,
@@ -473,7 +473,7 @@
 	}
 
 	// Lightbox State
-	let lightboxPhotos = $state<string[]>([]);
+	let lightboxPhotos: string[] = $state([]);
 	let lightboxIndex = $state(0);
 	let lightboxOpen = $state(false);
 	function openLightbox(photos: string[], idx: number) {
@@ -483,7 +483,7 @@
 	}
 
 	// Custom Delete-Confirm-Sheet (statt nativem confirm)
-	let pendingDeleteId = $state<string | null>(null);
+	let pendingDeleteId: string | null = $state(null);
 	function askDeleteCheckin(id: string) {
 		pendingDeleteId = id;
 		hapticMedium();
@@ -544,7 +544,7 @@
 				const newVal = !grow.is_public;
 				growStore.updateGrow(grow.id, { is_public: newVal });
 				// Force re-read damit UI sicher reagiert (Workaround für Reactivity-Edge-Case)
-				growStore.subscribe(s => state = s)();
+				growStore.subscribe(s => growState = s)();
 				toastStore.success(newVal ? '🌍 Grow ist jetzt öffentlich' : '🔒 Grow ist jetzt privat');
 			}}
 			class="w-full bg-gb-surface border border-gb-border rounded-xl p-3 flex items-center justify-between gap-3 text-left"
@@ -583,7 +583,7 @@
 						<button type="button" onclick={cancelCheckin} class="ci-close" aria-label={tr('checkin.cancel')}>✕</button>
 					</div>
 					{#if editingId}
-						{@const editingCi = (state?.checkins ?? []).find((c: CheckIn) => c.id === editingId)}
+						{@const editingCi = (growState?.checkins ?? []).find((c: CheckIn) => c.id === editingId)}
 						{#if editingCi}
 							<div class="bg-gb-warning/10 border border-gb-warning/20 rounded-lg px-3 py-2 text-xs text-gb-warning flex items-center gap-2">
 								<span>✏️</span>

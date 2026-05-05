@@ -128,8 +128,9 @@ function createReminderStore() {
 					icon: '/icon-192.png',
 					badge: '/icon-192.png',
 					tag: 'daily-checkin',
-					renotify: true,
 					data: { url: '/' },
+					// renotify ist Chrome-spezifisch, fehlt in Standard NotificationOptions
+					...({ renotify: true } as Record<string, unknown>),
 				});
 				return;
 			}

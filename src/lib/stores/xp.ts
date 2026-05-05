@@ -75,7 +75,7 @@ export const XP_REWARDS: Record<XPAction, number> = {
 // ─── HELPERS ────────────────────────────────────────────────────────────
 
 export function getLevelForXP(xp: number) {
-	let current = LEVELS[0];
+	let current: typeof LEVELS[number] = LEVELS[0];
 	for (const lvl of LEVELS) {
 		if (xp >= lvl.min_xp) current = lvl;
 		else break;

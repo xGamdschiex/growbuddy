@@ -5,13 +5,13 @@
 	import { onMount } from 'svelte';
 	xpStore.awardToolUse('vpd');
 
-	let tr = $state<any>((k: string) => k);
+	let tr: (key: string, params?: Record<string, string | number>) => string = $state((k: string) => k);
 
 	onMount(() => t.subscribe(v => tr = v));
 	let temp = $state(25);
 	let rh = $state(60);
 	let leafOffset = $state(-2);
-	let phase = $state<string>('vegetative');
+	let phase: string = $state('vegetative');
 
 	let vpd = $derived(calcVPD(temp, rh, leafOffset));
 	let status = $derived(getVPDStatus(vpd, phase));
@@ -53,7 +53,7 @@
 
 	<!-- Phase -->
 	<div>
-		<label class="block text-sm text-gb-text-muted mb-2">{tr('vpd.phase')}</label>
+		<p class="block text-sm text-gb-text-muted mb-2">{tr('vpd.phase')}</p>
 		<div class="grid grid-cols-2 gap-2">
 			{#each phases as p}
 				<button

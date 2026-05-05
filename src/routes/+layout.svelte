@@ -368,8 +368,6 @@
 						<path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1" />
 					{:else if item.icon === 'sprout'}
 						<path d="M12 22V16m0 0c-2-4-6-6-10-6 4 0 8-2 10-6 2 4 6 6 10 6-4 0-8 2-10 6z" />
-					{:else if item.icon === 'flask'}
-						<path d="M9 3h6m-5 0v6.5L4 18a1 1 0 001 1h14a1 1 0 001-1l-6-8.5V3m-4 0h4" />
 					{:else if item.icon === 'feed'}
 						<circle cx="6" cy="18" r="2" /><path d="M3 11a9 9 0 0 1 9 9" /><path d="M3 5a15 15 0 0 1 15 15" />
 					{:else if item.icon === 'wrench'}

@@ -5,12 +5,12 @@
 	import { onMount } from 'svelte';
 	xpStore.awardToolUse('dli');
 
-	let tr = $state<any>((k: string) => k);
+	let tr: (k: string, opts?: Record<string, string | number>) => string = $state((k: string) => k);
 
 	onMount(() => t.subscribe(v => tr = v));
 	let ppfd = $state(600);
 	let hours = $state(18);
-	let phase = $state<string>('vegetative');
+	let phase: string = $state('vegetative');
 
 	let dli = $derived(calcDLI(ppfd, hours));
 	let target = $derived(DLI_TARGETS[phase]);
@@ -47,7 +47,7 @@
 
 	<!-- Phase -->
 	<div>
-		<label class="block text-sm text-gb-text-muted mb-2">{tr('dli.phase')}</label>
+		<p class="block text-sm text-gb-text-muted mb-2">{tr('dli.phase')}</p>
 		<div class="grid grid-cols-2 gap-2">
 			{#each phases as p}
 				<button
