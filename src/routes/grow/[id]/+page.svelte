@@ -23,13 +23,14 @@
 
 	import { onMount } from 'svelte';
 
-	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
+	let tr = $state<(k: string) => string>((k) => k);
 	let growId = $derived($page.params.id);
 	let state = $state<any>({ grows: [], checkins: [] });
 	let grow = $derived(state?.grows?.find((g: any) => g.id === growId));
 
 	onMount(() => {
 		const subs = [
+			t.subscribe(v => tr = v),
 			growStore.subscribe(v => state = v),
 			isPro.subscribe(v => userIsPro = v),
 			streakMultiplier.subscribe(v => multiplierValue = v),
@@ -514,6 +515,11 @@
 			<div class="bg-gb-surface rounded-xl p-3 text-center">
 				<p class="text-2xl font-bold text-gb-green">{daysSince(grow.started_at)}</p>
 				<p class="text-xs text-gb-text-muted">{tr('grow.days')}</p>
+				{#if phaseDays.length >= 1}
+					<p class="text-[10px] text-gb-text-muted mt-0.5 leading-tight">
+						{phaseDays.map(p => `${p.phase} ${p.days}`).join(' · ')}
+					</p>
+				{/if}
 			</div>
 			<div class="bg-gb-surface rounded-xl p-3 text-center">
 				<p class="text-2xl font-bold">{checkins.length}</p>
@@ -534,7 +540,13 @@
 		</div>
 
 		<!-- Public-Toggle (Phase 2 Community) -->
-		<button onclick={() => growStore.updateGrow(grow.id, { is_public: !grow.is_public })}
+		<button onclick={() => {
+				const newVal = !grow.is_public;
+				growStore.updateGrow(grow.id, { is_public: newVal });
+				// Force re-read damit UI sicher reagiert (Workaround für Reactivity-Edge-Case)
+				growStore.subscribe(s => state = s)();
+				toastStore.success(newVal ? '🌍 Grow ist jetzt öffentlich' : '🔒 Grow ist jetzt privat');
+			}}
 			class="w-full bg-gb-surface border border-gb-border rounded-xl p-3 flex items-center justify-between gap-3 text-left"
 			style="min-height:56px">
 			<div class="min-w-0 flex-1 space-y-0.5">

@@ -22,7 +22,7 @@ function dataUrlToBlob(dataUrl: string): Blob {
 
 /**
  * Lädt ein Check-in-Foto hoch. Pfad: `{userId}/{checkinId}.jpg`
- * @returns Signed URL (7 Tage gültig) oder null bei Fehler
+ * @returns Signed URL (1 Jahr gültig) oder null bei Fehler
  */
 export async function uploadCheckinPhoto(userId: string, checkinId: string, dataUrl: string): Promise<string | null> {
 	try {
@@ -34,7 +34,7 @@ export async function uploadCheckinPhoto(userId: string, checkinId: string, data
 		});
 		if (error) throw error;
 
-		const { data, error: signErr } = await supabase.storage.from(BUCKET).createSignedUrl(path, 60 * 60 * 24 * 7);
+		const { data, error: signErr } = await supabase.storage.from(BUCKET).createSignedUrl(path, 60 * 60 * 24 * 365);
 		if (signErr) throw signErr;
 		return data.signedUrl;
 	} catch (e) {
@@ -57,7 +57,7 @@ export async function uploadCheckinPhotos(userId: string, checkinId: string, dat
 				upsert: true,
 			});
 			if (error) throw error;
-			const { data, error: signErr } = await supabase.storage.from(BUCKET).createSignedUrl(path, 60 * 60 * 24 * 7);
+			const { data, error: signErr } = await supabase.storage.from(BUCKET).createSignedUrl(path, 60 * 60 * 24 * 365);
 			if (signErr) throw signErr;
 			return data.signedUrl;
 		} catch (e) {
@@ -73,7 +73,7 @@ export async function uploadCheckinPhotos(userId: string, checkinId: string, dat
  */
 export async function getCheckinPhotoUrl(userId: string, checkinId: string): Promise<string | null> {
 	const path = `${userId}/${checkinId}.jpg`;
-	const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 60 * 60 * 24 * 7);
+	const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 60 * 60 * 24 * 365);
 	if (error) return null;
 	return data.signedUrl;
 }

@@ -19,12 +19,13 @@
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 
-	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
+	let tr = $state<(k: string) => string>((k) => k);
 	let userIsPro = $state(false);
 	let lim = $state<any>({});
 
 	onMount(() => {
 		const subs = [
+			t.subscribe(v => tr = v),
 			isPro.subscribe(v => userIsPro = v),
 			limits.subscribe(v => lim = v),
 		];
@@ -106,6 +107,37 @@
 	let activeGrows = $derived((growState?.grows ?? []).filter((g: any) => g.status === 'active'));
 	let authUser = $state<any>(null);
 	$effect(() => authStore.subscribe(a => { authUser = a?.user ?? null; }));
+
+	// Auto-Fill: Phase + Woche + Tag aus aktivem Grow übernehmen.
+	// Lauri stellt im Check-in z.B. auf Bloom W1T1 → der Calc folgt automatisch.
+	// Bei manuellem Override (User ändert phase/woche/tag selbst) → autoFill aus.
+	let autoFillFromGrow = $state(true);
+	$effect(() => {
+		if (!autoFillFromGrow) return;
+		const grow = activeGrows[0];
+		if (!grow?.started_at) return;
+		const startMs = new Date(grow.started_at).getTime();
+		if (Number.isNaN(startMs)) return;
+		const lastCi = (growState?.checkins ?? [])
+			.filter((c: any) => c.grow_id === grow.id)
+			.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+		let phase: string;
+		let week: number;
+		let day: number;
+		if (lastCi) {
+			phase = lastCi.phase;
+			week = lastCi.week;
+			day = lastCi.day;
+		} else {
+			const daysSince = Math.max(1, Math.floor((Date.now() - startMs) / 86400000) + 1);
+			phase = 'Veg';
+			week = Math.max(1, Math.ceil(daysSince / 7));
+			day = ((daysSince - 1) % 7) + 1;
+		}
+		if (calcState.phase !== phase || calcState.woche !== week || calcState.tag !== day) {
+			updateState({ phase, woche: week, tag: day });
+		}
+	});
 
 	let showApply = $state(false);
 	let applyGrowId = $state<string>('');
@@ -250,11 +282,11 @@
 		{/if}
 	</div>
 
-	<!-- Phase / Woche / Tag -->
+	<!-- Phase / Woche / Tag (auto aus aktivem Grow, manuell überschreibbar) -->
 	<div class="grid grid-cols-3 gap-3">
 		<div>
 			<label class="block text-xs text-gb-text-muted mb-1">{tr('calc.phase')}</label>
-			<select value={calcState.phase} onchange={(e) => updateState({ phase: e.currentTarget.value, woche: 1 })} class="w-full bg-gb-surface border border-gb-border rounded-lg px-2 py-2.5 text-sm">
+			<select value={calcState.phase} onchange={(e) => { autoFillFromGrow = false; updateState({ phase: e.currentTarget.value, woche: 1 }); }} class="w-full bg-gb-surface border border-gb-border rounded-lg px-2 py-2.5 text-sm">
 				{#each phasen as p}
 					<option value={p}>{p}</option>
 				{/each}
@@ -262,7 +294,7 @@
 		</div>
 		<div>
 			<label class="block text-xs text-gb-text-muted mb-1">{tr('calc.week')}</label>
-			<select value={calcState.woche} onchange={(e) => updateState({ woche: Number(e.currentTarget.value) })} class="w-full bg-gb-surface border border-gb-border rounded-lg px-2 py-2.5 text-sm">
+			<select value={calcState.woche} onchange={(e) => { autoFillFromGrow = false; updateState({ woche: Number(e.currentTarget.value) }); }} class="w-full bg-gb-surface border border-gb-border rounded-lg px-2 py-2.5 text-sm">
 				{#each wochen as w}
 					<option value={w}>{w}</option>
 				{/each}
@@ -270,13 +302,18 @@
 		</div>
 		<div>
 			<label class="block text-xs text-gb-text-muted mb-1">{tr('calc.day')}</label>
-			<select value={calcState.tag} onchange={(e) => updateState({ tag: Number(e.currentTarget.value) })} class="w-full bg-gb-surface border border-gb-border rounded-lg px-2 py-2.5 text-sm">
+			<select value={calcState.tag} onchange={(e) => { autoFillFromGrow = false; updateState({ tag: Number(e.currentTarget.value) }); }} class="w-full bg-gb-surface border border-gb-border rounded-lg px-2 py-2.5 text-sm">
 				{#each [1,2,3,4,5,6,7] as d}
 					<option value={d}>{d}</option>
 				{/each}
 			</select>
 		</div>
 	</div>
+	{#if !autoFillFromGrow && activeGrows.length > 0}
+		<button onclick={() => { autoFillFromGrow = true; }} class="text-[11px] text-gb-info hover:underline -mt-2 mb-1">
+			↻ Wieder mit Grow synchronisieren
+		</button>
+	{/if}
 
 	<!-- Reservoir + Medium -->
 	<div class="grid grid-cols-2 gap-3">

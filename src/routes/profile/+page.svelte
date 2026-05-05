@@ -182,7 +182,7 @@
 			for (const [cid, paths] of checkinFiles.entries()) {
 				paths.sort();
 				const signed = await Promise.all(paths.map(p =>
-					supabase.storage.from('checkin-photos').createSignedUrl(p, 60 * 60 * 24 * 7).then(r => r.data?.signedUrl)
+					supabase.storage.from('checkin-photos').createSignedUrl(p, 60 * 60 * 24 * 365).then(r => r.data?.signedUrl)
 				));
 				const urls = signed.filter((u): u is string => !!u);
 				if (urls.length === 0) continue;
@@ -191,9 +191,13 @@
 					photo_urls: urls,
 					has_photo: true,
 				}).eq('id', cid).eq('user_id', userId);
-				if (!error) repaired++;
+				if (!error) {
+					repaired++;
+					// Auch lokales State updaten — sonst sieht User die alten/leeren URLs bis zum Pull
+					growStore.updateCheckIn(cid, { photo_url: urls[0], photo_urls: urls });
+				}
 			}
-			toastStore.success(`${repaired} Check-ins repariert — jetzt herunterladen`);
+			toastStore.success(`${repaired} Check-ins repariert`);
 		} catch (e: any) {
 			toastStore.warning('Repair fehlgeschlagen: ' + (e?.message ?? 'unbekannt'));
 		} finally {
