@@ -42,8 +42,13 @@ export interface PhaseBoundary {
 
 /**
  * Phase-Boundaries chronologisch sortiert.
- * - Erste Phase: Start aus erstem Check-in zurückgerechnet (oder grow.started_at fallback)
- * - Folge-Phasen: Start aus erstem Check-in dieser Phase zurückgerechnet
+ *
+ * Wichtig: Phase-Start wird aus dem JÜNGSTEN Check-in dieser Phase zurückgerechnet
+ * (nicht ältesten). So gewinnt User's letzte Eingabe — wenn er heute "Bloom W1T1"
+ * loggt, weiß System: heute = Tag 1 in Bloom, egal was alte Check-ins sagten.
+ *
+ * - Erste Phase: Reihenfolge des ersten Auftretens, Start aus jüngstem Check-in
+ * - Folge-Phasen: gleiche Logik
  */
 export function phaseBoundaries(grow: Grow, checkins: CheckIn[]): PhaseBoundary[] {
 	const sorted = checkins
@@ -59,20 +64,18 @@ export function phaseBoundaries(grow: Grow, checkins: CheckIn[]): PhaseBoundary[
 		];
 	}
 
-	const out: PhaseBoundary[] = [];
-	// Erste Phase: Start aus erstem Check-in zurückgerechnet
-	out.push({ phase: sorted[0].phase, start_ms: phaseStartFromCheckin(sorted[0]) });
-
-	// Folge-Phasen: nur bei Phase-Wechsel
-	for (let i = 1; i < sorted.length; i++) {
-		const c = sorted[i];
-		const last = out[out.length - 1];
-		if (c.phase !== last.phase) {
-			out.push({ phase: c.phase, start_ms: phaseStartFromCheckin(c) });
-		}
+	// Phasen in Reihenfolge ihres ersten Auftretens, jüngsten Check-in pro Phase merken
+	const phasesInOrder: string[] = [];
+	const latestCheckinPerPhase = new Map<string, CheckIn>();
+	for (const c of sorted) {
+		if (!phasesInOrder.includes(c.phase)) phasesInOrder.push(c.phase);
+		latestCheckinPerPhase.set(c.phase, c); // wird mit jüngstem überschrieben
 	}
 
-	return out;
+	return phasesInOrder.map((phase) => ({
+		phase,
+		start_ms: phaseStartFromCheckin(latestCheckinPerPhase.get(phase)!),
+	}));
 }
 
 export interface PhaseSummary {
