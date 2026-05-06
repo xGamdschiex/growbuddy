@@ -249,9 +249,24 @@
 	{/if}
 
 	{#if loading}
-		<div class="bg-gb-surface rounded-xl p-4 text-center text-sm text-gb-text-muted">
-			<div class="w-6 h-6 border-2 border-gb-green border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-			Lade Feed…
+		<!-- Loading-Skeletons -->
+		<div class="space-y-3">
+			{#each Array(3) as _, i (i)}
+				<article class="bg-gb-surface rounded-xl p-4 space-y-3 animate-pulse">
+					<div class="flex items-center gap-2">
+						<div class="w-8 h-8 rounded-full bg-gb-surface-2"></div>
+						<div class="flex-1 space-y-1.5">
+							<div class="h-3 w-24 bg-gb-surface-2 rounded"></div>
+							<div class="h-2 w-16 bg-gb-surface-2 rounded"></div>
+						</div>
+					</div>
+					<div class="h-40 bg-gb-surface-2 rounded-lg"></div>
+					<div class="space-y-1.5">
+						<div class="h-3 w-3/4 bg-gb-surface-2 rounded"></div>
+						<div class="h-3 w-1/2 bg-gb-surface-2 rounded"></div>
+					</div>
+				</article>
+			{/each}
 		</div>
 	{:else if error}
 		<div class="bg-gb-danger/10 border border-gb-danger/20 rounded-xl p-4 text-sm">

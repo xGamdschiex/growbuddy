@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { growStore, activeGrows, harvestedGrows, totalHarvests } from '$lib/stores/grow';
-	import { currentStreak, hasCheckinToday, streakMultiplier, streakInDanger } from '$lib/stores/streak';
+	import { currentStreak, hasCheckinToday, streakMultiplier, streakInDanger, streakStore } from '$lib/stores/streak';
 	import { isLoggedIn } from '$lib/stores/auth';
 	import { syncStore } from '$lib/stores/sync';
 	import DailyCheckin from '$lib/components/DailyCheckin.svelte';
@@ -21,6 +21,7 @@
 	let doneToday = $state(false);
 	let multiplier = $state(1);
 	let danger = $state(false);
+	let longestStreak = $state(0);
 
 	onMount(() => {
 		const subs = [
@@ -34,9 +35,16 @@
 			hasCheckinToday.subscribe(v => doneToday = v),
 			streakMultiplier.subscribe(v => multiplier = v),
 			streakInDanger.subscribe(v => danger = v),
+			streakStore.subscribe(v => longestStreak = v.longest_streak),
 		];
 		return () => subs.forEach(u => u());
 	});
+
+	let bestYield = $derived(
+		harvested
+			.map(g => g.yield_g ?? 0)
+			.reduce((max, y) => y > max ? y : max, 0)
+	);
 
 	let showCheckin = $state(false);
 
@@ -142,10 +150,16 @@
 		<div class="bg-gb-surface rounded-xl p-3 text-center">
 			<p class="text-2xl font-bold">{harvestCount}</p>
 			<p class="text-xs text-gb-text-muted">{tr('home.harvests')}</p>
+			{#if bestYield > 0}
+				<p class="text-[10px] text-gb-green mt-0.5">🏆 best {bestYield}g</p>
+			{/if}
 		</div>
 		<div class="bg-gb-surface rounded-xl p-3 text-center">
 			<p class="text-2xl font-bold text-gb-warning">{streakInfo.current}</p>
 			<p class="text-xs text-gb-text-muted">{tr('home.streak')}</p>
+			{#if longestStreak > streakInfo.current && longestStreak > 0}
+				<p class="text-[10px] text-gb-text-muted mt-0.5">best {longestStreak}</p>
+			{/if}
 		</div>
 	</div>
 

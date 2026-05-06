@@ -357,9 +357,10 @@
 
 	<!-- ═════ VOLL-MODUS ═════ -->
 	{#if !calcState.einfach_modus}
-		<details class="bg-gb-surface/50 rounded-xl border border-gb-border" open>
-			<summary class="px-4 py-3 text-sm font-medium cursor-pointer select-none">
-				⚙️ {tr('calc.advanced_options')}
+		<details class="bg-gb-surface/50 rounded-xl border border-gb-border">
+			<summary class="px-4 py-3 text-sm font-medium cursor-pointer select-none flex items-center justify-between">
+				<span>⚙️ {tr('calc.advanced_options')}</span>
+				<span class="text-xs text-gb-text-muted">tippen zum Öffnen</span>
 			</summary>
 			<div class="p-4 pt-0 space-y-5">
 

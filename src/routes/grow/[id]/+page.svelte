@@ -494,6 +494,21 @@
 			</div>
 		</div>
 
+		<!-- Aktuelle Position (Hero-Card bei aktivem Grow) -->
+		{#if grow.status === 'active'}
+			{@const pos = currentPhasePosition(grow, chronCheckins)}
+			{@const ps2 = phaseStyle(pos.phase)}
+			<div class="bg-gradient-to-br {ps2.bgSoft} border {ps2.border} rounded-xl p-4">
+				<div class="flex items-baseline gap-2">
+					<span class="text-3xl font-bold {ps2.text}">W{pos.week}</span>
+					<span class="text-xl font-semibold {ps2.text} opacity-70">·</span>
+					<span class="text-3xl font-bold {ps2.text}">T{pos.day}</span>
+					<span class="text-xs text-gb-text-muted ml-auto">{ps2.emoji} {pos.phase} · Tag {pos.daysIn}</span>
+				</div>
+				<p class="text-[11px] text-gb-text-muted mt-1">Heutige Position · für Calc + Check-in</p>
+			</div>
+		{/if}
+
 		<!-- Stats -->
 		<div class="grid grid-cols-3 gap-3">
 			<div class="bg-gb-surface rounded-xl p-3 text-center">

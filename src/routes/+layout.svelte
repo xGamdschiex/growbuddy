@@ -363,20 +363,22 @@
 				class="flex flex-col items-center gap-0.5 px-3 py-2 text-xs transition-colors
 					{isActive(item.href) ? 'text-gb-green' : 'text-gb-text-muted hover:text-gb-text'}"
 			>
-				<svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-					{#if item.icon === 'home'}
-						<path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1" />
-					{:else if item.icon === 'sprout'}
-						<path d="M12 22V16m0 0c-2-4-6-6-10-6 4 0 8-2 10-6 2 4 6 6 10 6-4 0-8 2-10 6z" />
-					{:else if item.icon === 'feed'}
-						<circle cx="6" cy="18" r="2" /><path d="M3 11a9 9 0 0 1 9 9" /><path d="M3 5a15 15 0 0 1 15 15" />
-					{:else if item.icon === 'wrench'}
-						<path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" />
-					{:else if item.icon === 'user'}
-						<path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2m8-10a4 4 0 100-8 4 4 0 000 8z" />
-					{/if}
-				</svg>
-				<span>{tr(item.key)}</span>
+				<span class="flex items-center justify-center h-7 w-12 rounded-full transition-colors {isActive(item.href) ? 'bg-gb-green/15' : ''}">
+					<svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+						{#if item.icon === 'home'}
+							<path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1" />
+						{:else if item.icon === 'sprout'}
+							<path d="M12 22V16m0 0c-2-4-6-6-10-6 4 0 8-2 10-6 2 4 6 6 10 6-4 0-8 2-10 6z" />
+						{:else if item.icon === 'feed'}
+							<circle cx="6" cy="18" r="2" /><path d="M3 11a9 9 0 0 1 9 9" /><path d="M3 5a15 15 0 0 1 15 15" />
+						{:else if item.icon === 'wrench'}
+							<path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" />
+						{:else if item.icon === 'user'}
+							<path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2m8-10a4 4 0 100-8 4 4 0 000 8z" />
+						{/if}
+					</svg>
+				</span>
+				<span class="{isActive(item.href) ? 'font-semibold' : ''}">{tr(item.key)}</span>
 			</a>
 		{/each}
 	</div>
