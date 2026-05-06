@@ -85,8 +85,10 @@ export interface PhaseSummary {
 
 /**
  * Tage pro Phase (Subline + Header-Σ).
- * Letzte Phase: bis heute (inklusive heute → +1d in Berechnung).
- * Folge-Phase-Start ist gleichzeitig Vorgänger-Phase-Ende.
+ * Konvention (Lauri 2026-05-06):
+ * - User loggt Bloom W2T1 → daysInPhase = 8 → Subline "Bloom 8"
+ * - Bedeutet: end = today (NICHT today+1d), Span [start, today)
+ * - Folge-Phase-Start ist gleichzeitig Vorgänger-Phase-Ende
  */
 export function phaseDaysSummary(grow: Grow, checkins: CheckIn[]): PhaseSummary[] {
 	const bounds = phaseBoundaries(grow, checkins);
@@ -97,11 +99,8 @@ export function phaseDaysSummary(grow: Grow, checkins: CheckIn[]): PhaseSummary[
 
 	for (let i = 0; i < bounds.length; i++) {
 		const start = bounds[i].start_ms;
-		// End: nächster Phase-Start, oder heute+1d für letzte aktive Phase
-		const end =
-			i + 1 < bounds.length
-				? bounds[i + 1].start_ms
-				: today + DAY_MS; // bis Ende heute (exklusiver heutiger Tag-Anfang +1d)
+		// End: nächster Phase-Start, oder heute für letzte aktive Phase
+		const end = i + 1 < bounds.length ? bounds[i + 1].start_ms : today;
 		const days = Math.max(0, Math.floor((end - start) / DAY_MS));
 		map.set(bounds[i].phase, (map.get(bounds[i].phase) ?? 0) + days);
 	}

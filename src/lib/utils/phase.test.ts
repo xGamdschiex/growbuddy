@@ -131,13 +131,22 @@ describe('phaseBoundaries', () => {
 });
 
 describe('phaseDaysSummary', () => {
-	it('keine Check-ins → leeres Veg', () => {
+	it('keine Check-ins, Grow heute → Veg 0 (User hat noch keinen CI)', () => {
 		const grow = makeGrow(todayMinusDays(0));
 		const result = phaseDaysSummary(grow, []);
 		expect(result).toHaveLength(1);
 		expect(result[0].phase).toBe('Veg');
-		// (today + 1d - today) / 1d = 1
-		expect(result[0].days).toBe(1);
+		// (today - today) / 1d = 0
+		expect(result[0].days).toBe(0);
+	});
+
+	it('User-Bug v1.3.37: Bloom W2T1 → Subline "Bloom 8" (NICHT 9)', () => {
+		const grow = makeGrow(todayMinusDays(20));
+		const ci = makeCheckin('g1', new Date(dayKey(Date.now())).toISOString(), 'Bloom', 2, 1);
+		const result = phaseDaysSummary(grow, [ci]);
+		expect(result[result.length - 1].phase).toBe('Bloom');
+		// daysInPhase(2,1) = 8 → Bloom-Tage = 8, nicht 9
+		expect(result[result.length - 1].days).toBe(8);
 	});
 
 	it('Veg+Bloom: Σ = totalGrowDays', () => {
