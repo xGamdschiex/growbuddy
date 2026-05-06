@@ -323,7 +323,7 @@
 			<div class="sec-head"><span class="sec-title">Phase &amp; Zeit</span></div>
 			<div class="chip-row">
 				{#each PHASES as p}
-					<button type="button" class="chip" class:active={phase === p} onclick={() => phase = p}>{p}</button>
+					<button type="button" class="chip" class:active={phase === p} onclick={() => { phase = p; weekDayManual = true; }}>{p}</button>
 				{/each}
 			</div>
 			<div class="grid-2 mt10">

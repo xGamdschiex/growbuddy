@@ -607,7 +607,7 @@
 						<div class="ci-sec-head"><span class="ci-sec-title">Phase &amp; Zeit</span></div>
 						<div class="ci-chip-row">
 							{#each CI_PHASES as p}
-								<button type="button" class="ci-chip" class:active={ciPhase === p} onclick={() => ciPhase = p}>{p}</button>
+								<button type="button" class="ci-chip" class:active={ciPhase === p} onclick={() => { ciPhase = p; ciWeekDayManual = true; }}>{p}</button>
 							{/each}
 						</div>
 						<div class="ci-grid2 ci-mt10">
