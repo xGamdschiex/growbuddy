@@ -7,7 +7,8 @@
 	import { t } from '$lib/i18n';
 	import { onMount } from 'svelte';
 	import type { Grow, CheckIn } from '$lib/stores/grow';
-	import { totalGrowDays } from '$lib/utils/phase';
+	import { totalGrowDays, currentPhasePosition } from '$lib/utils/phase';
+	import { phaseStyle } from '$lib/utils/phase-colors';
 
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
 	let storeVal: any = $state({ grows: [] });
@@ -156,27 +157,32 @@
 				{@const growCheckins = storeVal.grows.find((g: any) => g.id === grow.id) ? (storeVal as any).checkins?.filter((c: CheckIn) => c.grow_id === grow.id) ?? [] : []}
 				{@const days = totalGrowDays(grow, growCheckins)}
 				{@const lastCheckin = growCheckins.length > 0 ? growCheckins[growCheckins.length - 1] : null}
+				{@const phase = currentPhasePosition(grow, growCheckins).phase}
+				{@const ps = phaseStyle(phase)}
 				<a href="/grow/{grow.id}" class="block bg-gb-surface rounded-xl p-4 hover:bg-gb-surface-2 transition-colors">
-					<div class="flex items-center justify-between mb-2">
-						<div>
-							<p class="font-semibold">{grow.name}</p>
-							<p class="text-xs text-gb-text-muted">{grow.strain} · {grow.strain_type === 'auto' ? 'Auto' : 'Photo'}</p>
+					<div class="flex items-center justify-between mb-2 gap-2">
+						<div class="min-w-0">
+							<p class="font-semibold truncate">{grow.name}</p>
+							<p class="text-xs text-gb-text-muted truncate">{grow.strain} · {grow.strain_type === 'auto' ? 'Auto' : 'Photo'}</p>
 						</div>
-						<span class="text-xs bg-gb-green/10 text-gb-green px-2 py-1 rounded-full">Tag {days}</span>
+						<div class="flex items-center gap-1.5 shrink-0">
+							<span class="text-[11px] {ps.text} {ps.bgSoft} px-2 py-0.5 rounded-full font-medium">{ps.emoji} {phase}</span>
+							<span class="text-xs bg-gb-green/10 text-gb-green px-2 py-1 rounded-full font-semibold">Tag {days}</span>
+						</div>
 					</div>
 					{#if lastCheckin}
 						<div class="flex gap-3 text-xs text-gb-text-muted">
-							{#if lastCheckin.phase}
-								<span class="capitalize">{lastCheckin.phase}</span>
-							{/if}
 							{#if lastCheckin.temp}
-								<span>{lastCheckin.temp}°C</span>
+								<span>🌡️ {lastCheckin.temp}°C</span>
 							{/if}
 							{#if lastCheckin.rh}
-								<span>{lastCheckin.rh}% RH</span>
+								<span>💧 {lastCheckin.rh}%</span>
 							{/if}
 							{#if lastCheckin.vpd}
 								<span>VPD {lastCheckin.vpd.toFixed(2)}</span>
+							{/if}
+							{#if !lastCheckin.temp && !lastCheckin.rh && !lastCheckin.vpd}
+								<span class="text-gb-text-muted">W{lastCheckin.week}T{lastCheckin.day}</span>
 							{/if}
 						</div>
 					{:else}
@@ -185,6 +191,15 @@
 				</a>
 			{/each}
 		</div>
+	{:else}
+		<!-- Empty-State: noch keine Grows -->
+		<a href="/grow/new"
+			class="block bg-gradient-to-br from-gb-green/15 to-gb-green/5 border border-gb-green/30 rounded-xl p-5 text-center hover:opacity-95 transition-opacity">
+			<div class="text-4xl mb-2">🌱</div>
+			<p class="font-bold text-base">Starte deinen ersten Grow</p>
+			<p class="text-xs text-gb-text-muted mt-1">Lege Strain, Medium und Phase fest — dann täglich Check-in machen.</p>
+			<span class="inline-block mt-3 bg-gb-green text-black font-semibold text-sm px-4 py-2 rounded-lg">+ Neuer Grow</span>
+		</a>
 	{/if}
 
 	<!-- Quick Actions -->

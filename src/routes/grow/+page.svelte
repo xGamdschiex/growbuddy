@@ -3,7 +3,8 @@
 	import { t } from '$lib/i18n';
 	import { onMount } from 'svelte';
 	import type { Grow, CheckIn } from '$lib/stores/grow';
-	import { totalGrowDays } from '$lib/utils/phase';
+	import { totalGrowDays, currentPhasePosition } from '$lib/utils/phase';
+	import { phaseStyle } from '$lib/utils/phase-colors';
 
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
 	let active: Grow[] = $state([]);
@@ -22,6 +23,28 @@
 
 	function growDays(grow: Grow): number {
 		return totalGrowDays(grow, allCheckins);
+	}
+
+	function checkinsFor(grow: Grow): CheckIn[] {
+		return allCheckins.filter(c => c.grow_id === grow.id);
+	}
+
+	/** Letztes Check-in-Foto (data: oder URL) für Hero-Thumbnail */
+	function latestPhoto(grow: Grow): string | null {
+		const cis = checkinsFor(grow).sort(
+			(a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+		);
+		for (const c of cis) {
+			if (c.photos_data?.length && c.photos_data[0]) return c.photos_data[0];
+			if (c.photo_data) return c.photo_data;
+			if (c.photo_urls?.length && c.photo_urls[0]) return c.photo_urls[0];
+			if (c.photo_url) return c.photo_url;
+		}
+		return null;
+	}
+
+	function currentPhase(grow: Grow): string {
+		return currentPhasePosition(grow, checkinsFor(grow)).phase;
 	}
 </script>
 
@@ -53,15 +76,33 @@
 			<div class="space-y-3">
 				<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">{tr('grow.active')}</h2>
 				{#each active as grow}
-					<a href="/grow/{grow.id}" class="block bg-gb-surface rounded-xl p-4 hover:bg-gb-surface-2 transition-colors">
-						<div class="flex justify-between items-start">
-							<div>
-								<p class="font-medium">{grow.name}</p>
-								<p class="text-sm text-gb-text-muted">{grow.strain} · {grow.medium} · {grow.plant_count} {grow.plant_count > 1 ? tr('grow.plants_plural') : tr('grow.plant')}</p>
+					{@const photo = latestPhoto(grow)}
+					{@const phase = currentPhase(grow)}
+					{@const ps = phaseStyle(phase)}
+					<a href="/grow/{grow.id}" class="block bg-gb-surface rounded-xl overflow-hidden hover:bg-gb-surface-2 transition-colors">
+						<div class="flex gap-3 p-3">
+							<!-- Hero-Thumbnail -->
+							<div class="w-20 h-20 rounded-lg shrink-0 overflow-hidden flex items-center justify-center {ps.bgSoft}">
+								{#if photo}
+									<img src={photo} alt={grow.name} class="w-full h-full object-cover" />
+								{:else}
+									<span class="text-3xl">{ps.emoji}</span>
+								{/if}
 							</div>
-							<div class="text-right">
-								<p class="text-gb-green font-bold">{tr('home.day', { days: growDays(grow) })}</p>
-								<p class="text-xs text-gb-text-muted">{grow.strain_type === 'auto' ? 'Auto' : 'Photo'}</p>
+							<div class="flex-1 min-w-0 flex flex-col justify-between">
+								<div>
+									<div class="flex items-start justify-between gap-2">
+										<p class="font-medium truncate">{grow.name}</p>
+										<span class="shrink-0 text-xs font-bold text-gb-green">{tr('home.day', { days: growDays(grow) })}</span>
+									</div>
+									<p class="text-xs text-gb-text-muted truncate">{grow.strain} · {grow.medium} · {grow.plant_count} {grow.plant_count > 1 ? tr('grow.plants_plural') : tr('grow.plant')}</p>
+								</div>
+								<div class="flex items-center gap-2 mt-1">
+									<span class="text-[11px] {ps.text} {ps.bgSoft} px-2 py-0.5 rounded-full font-medium">
+										{ps.emoji} {phase}
+									</span>
+									<span class="text-[11px] text-gb-text-muted">{grow.strain_type === 'auto' ? 'Auto' : 'Photo'}</span>
+								</div>
 							</div>
 						</div>
 					</a>
@@ -74,15 +115,32 @@
 			<div class="space-y-3">
 				<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">{tr('grow.harvested')}</h2>
 				{#each harvested as grow}
-					<a href="/grow/{grow.id}" class="block bg-gb-surface rounded-xl p-4 hover:bg-gb-surface-2 transition-colors opacity-70">
-						<div class="flex justify-between items-start">
-							<div>
-								<p class="font-medium">{grow.name}</p>
-								<p class="text-sm text-gb-text-muted">{grow.strain}</p>
+					{@const photo = latestPhoto(grow)}
+					<a href="/grow/{grow.id}" class="block bg-gb-surface rounded-xl overflow-hidden hover:bg-gb-surface-2 transition-colors">
+						<div class="flex gap-3 p-3">
+							<div class="w-20 h-20 rounded-lg shrink-0 overflow-hidden flex items-center justify-center bg-gb-surface-2">
+								{#if photo}
+									<img src={photo} alt={grow.name} class="w-full h-full object-cover" />
+								{:else}
+									<span class="text-3xl">🏆</span>
+								{/if}
 							</div>
-							{#if grow.yield_g}
-								<p class="text-gb-green font-bold">{grow.yield_g}g</p>
-							{/if}
+							<div class="flex-1 min-w-0 flex flex-col justify-between">
+								<div>
+									<p class="font-medium truncate">{grow.name}</p>
+									<p class="text-xs text-gb-text-muted truncate">{grow.strain}</p>
+								</div>
+								<div class="flex items-center gap-2 mt-1">
+									{#if grow.yield_g}
+										<span class="text-[11px] text-gb-green bg-gb-green/15 px-2 py-0.5 rounded-full font-medium">
+											🏆 {grow.yield_g}g
+										</span>
+									{/if}
+									{#if grow.grow_score != null}
+										<span class="text-[11px] text-gb-text-muted">Score {grow.grow_score}</span>
+									{/if}
+								</div>
+							</div>
 						</div>
 					</a>
 				{/each}

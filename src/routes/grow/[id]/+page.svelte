@@ -21,6 +21,7 @@
 	import { toMsPerCm, fromMsPerCm, type ECEinheit } from '$lib/calc/units';
 	import { getFeedLine } from '$lib/calc/feedlines/registry';
 	import { phaseDaysSummary, totalGrowDays, currentPhasePosition } from '$lib/utils/phase';
+	import { phaseStyle } from '$lib/utils/phase-colors';
 
 	import { onMount } from 'svelte';
 
@@ -479,8 +480,18 @@
 		<!-- Header -->
 		<div>
 			<a href="/grow" class="text-gb-text-muted text-sm hover:text-gb-text">&larr; {tr('grow.my_grows')}</a>
-			<h1 class="text-xl font-bold mt-2">{grow.name}</h1>
-			<p class="text-sm text-gb-text-muted">{grow.strain} · {grow.strain_type === 'auto' ? 'Auto' : 'Photo'} · {grow.medium}</p>
+			<div class="flex items-start justify-between gap-3 mt-2">
+				<div class="min-w-0">
+					<h1 class="text-xl font-bold truncate">{grow.name}</h1>
+					<p class="text-sm text-gb-text-muted">{grow.strain} · {grow.strain_type === 'auto' ? 'Auto' : 'Photo'} · {grow.medium}</p>
+				</div>
+				{#if grow.status === 'active'}
+					{@const ps = phaseStyle(currentPhasePosition(grow, chronCheckins).phase)}
+					<span class="shrink-0 text-xs {ps.text} {ps.bgSoft} px-2.5 py-1 rounded-full font-semibold whitespace-nowrap">
+						{ps.emoji} {currentPhasePosition(grow, chronCheckins).phase}
+					</span>
+				{/if}
+			</div>
 		</div>
 
 		<!-- Stats -->
@@ -504,13 +515,47 @@
 			</div>
 		</div>
 
-		<!-- Info -->
-		<div class="bg-gb-surface rounded-xl p-4 space-y-2 text-sm">
-			{#if grow.space}<p><span class="text-gb-text-muted">{tr('grow.info_space')}:</span> {grow.space}</p>{/if}
-			{#if grow.light_info}<p><span class="text-gb-text-muted">{tr('grow.info_light')}:</span> {grow.light_info}</p>{/if}
-			{#if grow.feedline_id}<p><span class="text-gb-text-muted">{tr('grow.info_feedline')}:</span> {grow.feedline_id}</p>{/if}
-			{#if grow.notes}<p><span class="text-gb-text-muted">{tr('grow.info_notes')}:</span> {grow.notes}</p>{/if}
-		</div>
+		<!-- Info-Grid -->
+		{#if grow.space || grow.light_info || grow.feedline_id || grow.notes}
+			<div class="bg-gb-surface rounded-xl p-3 grid grid-cols-2 gap-2 text-sm">
+				{#if grow.space}
+					<div class="flex items-start gap-2 min-w-0">
+						<span class="text-base shrink-0">📐</span>
+						<div class="min-w-0">
+							<p class="text-[10px] text-gb-text-muted uppercase tracking-wide">{tr('grow.info_space')}</p>
+							<p class="text-xs truncate">{grow.space}</p>
+						</div>
+					</div>
+				{/if}
+				{#if grow.light_info}
+					<div class="flex items-start gap-2 min-w-0">
+						<span class="text-base shrink-0">💡</span>
+						<div class="min-w-0">
+							<p class="text-[10px] text-gb-text-muted uppercase tracking-wide">{tr('grow.info_light')}</p>
+							<p class="text-xs truncate">{grow.light_info}</p>
+						</div>
+					</div>
+				{/if}
+				{#if grow.feedline_id}
+					<div class="flex items-start gap-2 min-w-0">
+						<span class="text-base shrink-0">🧪</span>
+						<div class="min-w-0">
+							<p class="text-[10px] text-gb-text-muted uppercase tracking-wide">{tr('grow.info_feedline')}</p>
+							<p class="text-xs truncate">{grow.feedline_id}</p>
+						</div>
+					</div>
+				{/if}
+				{#if grow.notes}
+					<div class="flex items-start gap-2 min-w-0 col-span-2">
+						<span class="text-base shrink-0">📝</span>
+						<div class="min-w-0">
+							<p class="text-[10px] text-gb-text-muted uppercase tracking-wide">{tr('grow.info_notes')}</p>
+							<p class="text-xs">{grow.notes}</p>
+						</div>
+					</div>
+				{/if}
+			</div>
+		{/if}
 
 		<!-- Public-Toggle (Phase 2 Community) — div statt button damit inneres Repair-button valid HTML ist -->
 		<div role="button" tabindex="0"

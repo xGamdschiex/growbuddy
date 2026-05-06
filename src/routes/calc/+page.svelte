@@ -259,7 +259,7 @@
 	<!-- Feedline -->
 	<div>
 		<label for="calc-feedline" class="block text-xs text-gb-text-muted mb-1">{tr('calc.feedline')}</label>
-		<select id="calc-feedline" value={calcState.feedline_id} onchange={(e) => switchFeedline(e.currentTarget.value)} class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm">
+		<select id="calc-feedline" value={calcState.feedline_id} onchange={(e) => switchFeedline(e.currentTarget.value)} class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-3 text-sm">
 			{#each feedlines as fl}
 				<option value={fl.id}>{fl.name} ({fl.hersteller})</option>
 			{/each}
@@ -275,7 +275,7 @@
 	<div class="grid grid-cols-3 gap-3">
 		<div>
 			<label for="calc-phase" class="block text-xs text-gb-text-muted mb-1">{tr('calc.phase')}</label>
-			<select id="calc-phase" value={calcState.phase} onchange={(e) => { autoFillFromGrow = false; updateState({ phase: e.currentTarget.value, woche: 1 }); }} class="w-full bg-gb-surface border border-gb-border rounded-lg px-2 py-2.5 text-sm">
+			<select id="calc-phase" value={calcState.phase} onchange={(e) => { autoFillFromGrow = false; updateState({ phase: e.currentTarget.value, woche: 1 }); }} class="w-full bg-gb-surface border border-gb-border rounded-lg px-2 py-3 text-sm">
 				{#each phasen as p}
 					<option value={p}>{p}</option>
 				{/each}
@@ -283,7 +283,7 @@
 		</div>
 		<div>
 			<label for="calc-week" class="block text-xs text-gb-text-muted mb-1">{tr('calc.week')}</label>
-			<select id="calc-week" value={calcState.woche} onchange={(e) => { autoFillFromGrow = false; updateState({ woche: Number(e.currentTarget.value) }); }} class="w-full bg-gb-surface border border-gb-border rounded-lg px-2 py-2.5 text-sm">
+			<select id="calc-week" value={calcState.woche} onchange={(e) => { autoFillFromGrow = false; updateState({ woche: Number(e.currentTarget.value) }); }} class="w-full bg-gb-surface border border-gb-border rounded-lg px-2 py-3 text-sm">
 				{#each wochen as w}
 					<option value={w}>{w}</option>
 				{/each}
@@ -291,7 +291,7 @@
 		</div>
 		<div>
 			<label for="calc-day" class="block text-xs text-gb-text-muted mb-1">{tr('calc.day')}</label>
-			<select id="calc-day" value={calcState.tag} onchange={(e) => { autoFillFromGrow = false; updateState({ tag: Number(e.currentTarget.value) }); }} class="w-full bg-gb-surface border border-gb-border rounded-lg px-2 py-2.5 text-sm">
+			<select id="calc-day" value={calcState.tag} onchange={(e) => { autoFillFromGrow = false; updateState({ tag: Number(e.currentTarget.value) }); }} class="w-full bg-gb-surface border border-gb-border rounded-lg px-2 py-3 text-sm">
 				{#each [1,2,3,4,5,6,7] as d}
 					<option value={d}>{d}</option>
 				{/each}
@@ -309,11 +309,11 @@
 		<div>
 			<label for="calc-reservoir" class="block text-xs text-gb-text-muted mb-1">{tr('calc.reservoir')}</label>
 			<input id="calc-reservoir" type="number" value={calcState.reservoir} oninput={(e) => updateState({ reservoir: Number(e.currentTarget.value) })} min="1" max="1000" step="1"
-				class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm" />
+				class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-3 text-sm" />
 		</div>
 		<div>
 			<label for="calc-medium" class="block text-xs text-gb-text-muted mb-1">{tr('calc.medium')}</label>
-			<select id="calc-medium" value={calcState.medium} onchange={(e) => updateState({ medium: e.currentTarget.value as any })} class="w-full bg-gb-surface border border-gb-border rounded-lg px-2 py-2.5 text-sm">
+			<select id="calc-medium" value={calcState.medium} onchange={(e) => updateState({ medium: e.currentTarget.value as any })} class="w-full bg-gb-surface border border-gb-border rounded-lg px-2 py-3 text-sm">
 				<option value="coco">{tr('grow.medium_coco')}</option>
 				<option value="hydro">{tr('grow.medium_hydro')}</option>
 				<option value="erde">{tr('grow.medium_soil')}</option>
@@ -376,7 +376,7 @@
 						<div class="flex gap-2">
 							<input id="calc-city" type="text" bind:value={stadtInput} placeholder={tr('calc.city_placeholder')}
 								onkeydown={(e) => { if (e.key === 'Enter') lookupCity(); }}
-								class="flex-1 bg-gb-bg border border-gb-border rounded-lg px-3 py-2.5 text-sm" />
+								class="flex-1 bg-gb-bg border border-gb-border rounded-lg px-3 py-3 text-sm" />
 							<button onclick={lookupCity} disabled={lookupLoading || !stadtInput.trim()}
 								class="bg-gb-green text-black font-semibold px-4 py-2.5 rounded-lg text-sm disabled:opacity-50 shrink-0">
 								{lookupLoading ? '...' : tr('calc.lookup_btn')}
@@ -398,7 +398,7 @@
 
 					<div>
 						<label for="calc-waterprofile" class="block text-xs text-gb-text-muted mb-1">{tr('calc.water_profile')}</label>
-						<select id="calc-waterprofile" value={calcState.wasserprofil} onchange={(e) => updateState({ wasserprofil: e.currentTarget.value })} class="w-full bg-gb-bg border border-gb-border rounded-lg px-3 py-2.5 text-sm">
+						<select id="calc-waterprofile" value={calcState.wasserprofil} onchange={(e) => updateState({ wasserprofil: e.currentTarget.value })} class="w-full bg-gb-bg border border-gb-border rounded-lg px-3 py-3 text-sm">
 							{#each WASSER_PROFILE as p}
 								<option value={p.name}>{p.name}</option>
 							{/each}
@@ -411,22 +411,22 @@
 						<div>
 							<label for="calc-ca" class="block text-xs text-gb-text-muted mb-1">Ca (mg/L)</label>
 							<input id="calc-ca" type="number" value={calcState.custom_ca} oninput={(e) => updateState({ custom_ca: Number(e.currentTarget.value) })} min="0" max="300" step="1"
-								class="w-full bg-gb-bg border border-gb-border rounded-lg px-3 py-2.5 text-sm" />
+								class="w-full bg-gb-bg border border-gb-border rounded-lg px-3 py-3 text-sm" />
 						</div>
 						<div>
 							<label for="calc-mg" class="block text-xs text-gb-text-muted mb-1">Mg (mg/L)</label>
 							<input id="calc-mg" type="number" value={calcState.custom_mg} oninput={(e) => updateState({ custom_mg: Number(e.currentTarget.value) })} min="0" max="100" step="1"
-								class="w-full bg-gb-bg border border-gb-border rounded-lg px-3 py-2.5 text-sm" />
+								class="w-full bg-gb-bg border border-gb-border rounded-lg px-3 py-3 text-sm" />
 						</div>
 						<div>
 							<label for="calc-customec" class="block text-xs text-gb-text-muted mb-1">EC (mS/cm)</label>
 							<input id="calc-customec" type="number" value={calcState.custom_ec} oninput={(e) => updateState({ custom_ec: Number(e.currentTarget.value) })} min="0" max="3" step="0.01"
-								class="w-full bg-gb-bg border border-gb-border rounded-lg px-3 py-2.5 text-sm" />
+								class="w-full bg-gb-bg border border-gb-border rounded-lg px-3 py-3 text-sm" />
 						</div>
 						<div>
 							<label for="calc-ph" class="block text-xs text-gb-text-muted mb-1">pH</label>
 							<input id="calc-ph" type="number" value={calcState.custom_ph} oninput={(e) => updateState({ custom_ph: Number(e.currentTarget.value) })} min="4" max="9" step="0.1"
-								class="w-full bg-gb-bg border border-gb-border rounded-lg px-3 py-2.5 text-sm" />
+								class="w-full bg-gb-bg border border-gb-border rounded-lg px-3 py-3 text-sm" />
 						</div>
 					</div>
 					<p class="text-xs text-gb-text-muted -mt-2">{tr('calc.custom_water_hint')}</p>
@@ -608,7 +608,7 @@
 				<select
 					id="calc-applygrow"
 					bind:value={applyGrowId}
-					class="w-full bg-gb-bg border border-gb-border rounded-lg px-3 py-2.5 text-sm"
+					class="w-full bg-gb-bg border border-gb-border rounded-lg px-3 py-3 text-sm"
 				>
 					{#each activeGrows as g}
 						<option value={g.id}>{g.name || g.strain} — {g.phase}</option>
