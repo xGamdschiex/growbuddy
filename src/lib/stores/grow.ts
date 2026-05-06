@@ -88,7 +88,7 @@ function loadState(): GrowState {
 		const parsed = JSON.parse(raw);
 		// Migrate old check-ins without photos_data / water_ml / nutrient_ml / updated_at
 		if (parsed.checkins) {
-			parsed.checkins = parsed.checkins.map((c: any) => ({
+			parsed.checkins = (parsed.checkins as Partial<CheckIn>[]).map((c) => ({
 				photos_data: [],
 				water_ml: null,
 				nutrient_ml: null,
@@ -97,7 +97,7 @@ function loadState(): GrowState {
 			}));
 		}
 		if (parsed.grows) {
-			parsed.grows = parsed.grows.map((g: any) => ({
+			parsed.grows = (parsed.grows as Partial<Grow>[]).map((g) => ({
 				...g,
 				updated_at: g.updated_at ?? g.started_at ?? new Date().toISOString(),
 			}));

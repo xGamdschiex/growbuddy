@@ -31,16 +31,27 @@ export function getStreakMultiplier(streak: number): number {
 
 // ─── HELPERS ────────────────────────────────────────────────────────────
 
+/** Lokale YYYY-MM-DD-Repräsentation (DST-safe statt UTC `slice(0,10)`). */
+function toLocalDateKey(d: Date): string {
+	const y = d.getFullYear();
+	const m = (d.getMonth() + 1).toString().padStart(2, '0');
+	const day = d.getDate().toString().padStart(2, '0');
+	return `${y}-${m}-${day}`;
+}
+
 function toDateKey(isoString: string): string {
-	return isoString.slice(0, 10); // "2026-04-17"
+	return toLocalDateKey(new Date(isoString));
 }
 
 function todayKey(): string {
-	return new Date().toISOString().slice(0, 10);
+	return toLocalDateKey(new Date());
 }
 
 function daysBetween(a: string, b: string): number {
-	return Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000);
+	// `${YYYY-MM-DD}T00:00:00` parst als lokale Mitternacht → DST-safe via Math.round
+	const da = new Date(`${a}T00:00:00`).getTime();
+	const db = new Date(`${b}T00:00:00`).getTime();
+	return Math.round((db - da) / 86400000);
 }
 
 /**

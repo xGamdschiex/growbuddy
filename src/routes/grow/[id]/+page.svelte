@@ -441,10 +441,6 @@
 		cancelCheckin();
 	}
 
-	function daysSince(dateStr: string): number {
-		return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
-	}
-
 	function formatDate(dateStr: string): string {
 		return new Date(dateStr).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
 	}
