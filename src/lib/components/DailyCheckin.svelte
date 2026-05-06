@@ -15,7 +15,8 @@
 	import { toMsPerCm, type ECEinheit } from '$lib/calc/units';
 	import { compressBatch, MAX_PHOTOS } from '$lib/utils/photo';
 	import { getFeedLine } from '$lib/calc/feedlines/registry';
-	import type { Grow } from '$lib/stores/grow';
+	import type { Grow, CheckIn } from '$lib/stores/grow';
+	import { currentPhasePosition } from '$lib/utils/phase';
 	import { onMount } from 'svelte';
 
 	interface Props {
@@ -31,7 +32,8 @@
 
 	let { growId, onDone, onCancel, compact = false }: Props = $props();
 
-	let active = $state<Grow[]>([]);
+	let active: Grow[] = $state([]);
+	let allCheckins: CheckIn[] = $state([]);
 	let multiplier = $state(1);
 	let streakInfo = $state({ current: 0, graceActive: false, lastCheckinDate: null as string | null });
 	let alreadyToday = $state(false);
@@ -39,6 +41,7 @@
 	onMount(() => {
 		const subs = [
 			activeGrows.subscribe(v => active = v),
+			growStore.subscribe(v => allCheckins = v.checkins),
 			streakMultiplier.subscribe(v => multiplier = v),
 			currentStreak.subscribe(v => streakInfo = v),
 			hasCheckinToday.subscribe(v => alreadyToday = v),
@@ -73,14 +76,13 @@
 	let day = $state(1);
 	let weekDayManual = $state(false);
 
-	// Auto-Berechnung aus started_at — User kann manuell overriden
+	// Auto-Berechnung Phase/Woche/Tag (Lauri-Logik via Helper)
 	$effect(() => {
 		if (!selectedGrow || weekDayManual) return;
-		const started = new Date(selectedGrow.started_at).getTime();
-		if (Number.isNaN(started)) return;
-		const daysSince = Math.max(1, Math.floor((Date.now() - started) / 86400000) + 1);
-		week = Math.max(1, Math.ceil(daysSince / 7));
-		day = ((daysSince - 1) % 7) + 1;
+		const pos = currentPhasePosition(selectedGrow, allCheckins);
+		phase = pos.phase;
+		week = pos.week;
+		day = pos.day;
 	});
 	let temp = $state<number | null>(null);
 	let rh = $state<number | null>(null);

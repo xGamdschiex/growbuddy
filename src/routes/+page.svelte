@@ -7,6 +7,7 @@
 	import { t } from '$lib/i18n';
 	import { onMount } from 'svelte';
 	import type { Grow, CheckIn } from '$lib/stores/grow';
+	import { totalGrowDays } from '$lib/utils/phase';
 
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
 	let storeVal: any = $state({ grows: [] });
@@ -152,8 +153,8 @@
 		<div class="space-y-2">
 			<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">{tr('home.active_grows_title')}</h2>
 			{#each active as grow}
-				{@const days = Math.floor((Date.now() - new Date(grow.started_at).getTime()) / 86400000)}
 				{@const growCheckins = storeVal.grows.find((g: any) => g.id === grow.id) ? (storeVal as any).checkins?.filter((c: CheckIn) => c.grow_id === grow.id) ?? [] : []}
+				{@const days = totalGrowDays(grow, growCheckins)}
 				{@const lastCheckin = growCheckins.length > 0 ? growCheckins[growCheckins.length - 1] : null}
 				<a href="/grow/{grow.id}" class="block bg-gb-surface rounded-xl p-4 hover:bg-gb-surface-2 transition-colors">
 					<div class="flex items-center justify-between mb-2">

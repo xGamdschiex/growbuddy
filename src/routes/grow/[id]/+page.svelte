@@ -20,6 +20,7 @@
 	import { clampNumber, RANGES } from '$lib/utils/validation';
 	import { toMsPerCm, fromMsPerCm, type ECEinheit } from '$lib/calc/units';
 	import { getFeedLine } from '$lib/calc/feedlines/registry';
+	import { phaseDaysSummary, totalGrowDays, currentPhasePosition } from '$lib/utils/phase';
 
 	import { onMount } from 'svelte';
 
@@ -51,14 +52,14 @@
 	let ciDay = $state(1);
 	let ciWeekDayManual = $state(false);
 
-	// Auto-Berechnung Woche/Tag aus Grow-Start (wenn kein Edit, kein manueller Override)
+	// Auto-Berechnung Phase/Woche/Tag (Lauri-Logik via Helper)
 	$effect(() => {
 		if (editingId || ciWeekDayManual || !grow || !showCheckin) return;
-		const started = new Date(grow.started_at).getTime();
-		if (Number.isNaN(started)) return;
-		const daysSince = Math.max(1, Math.floor((Date.now() - started) / 86400000) + 1);
-		ciWeek = Math.max(1, Math.ceil(daysSince / 7));
-		ciDay = ((daysSince - 1) % 7) + 1;
+		const allCheckins = (growState?.checkins ?? []) as CheckIn[];
+		const pos = currentPhasePosition(grow, allCheckins);
+		ciPhase = pos.phase;
+		ciWeek = pos.week;
+		ciDay = pos.day;
 	});
 	let ciTemp: number | null = $state(null);
 	let ciRh: number | null = $state(null);
@@ -265,34 +266,10 @@
 	let avgVpd = $derived(avg(vpdData));
 	let avgEc = $derived(avg(ecData));
 	let avgPh = $derived(avg(phData));
-	// Phase-Tage kalendarisch: erster Check-in einer neuen Phase startet sie,
-	// der letzte Check-in (oder heute bei aktiver Phase) beendet sie. Lücken zählen mit.
-	let phaseDays = $derived.by(() => {
-		if (chronCheckins.length === 0) return [] as { phase: string; days: number }[];
-		// Phase-Segmente bilden basierend auf chronologischer Reihenfolge
-		type Seg = { phase: string; start: number; end: number };
-		const segs: Seg[] = [];
-		for (const c of chronCheckins) {
-			const t = new Date(c.created_at).getTime();
-			const last = segs[segs.length - 1];
-			if (!last || last.phase !== c.phase) {
-				segs.push({ phase: c.phase, start: t, end: t });
-			} else {
-				last.end = t;
-			}
-		}
-		// Letzte Phase: bei aktivem Grow bis heute laufend
-		if (grow?.status === 'active' && segs.length) {
-			segs[segs.length - 1].end = Date.now();
-		}
-		// Pro Phase: Tage aufsummieren (mehrere Segmente einer Phase möglich)
-		const map = new Map<string, number>();
-		for (const s of segs) {
-			const days = Math.max(1, Math.round((s.end - s.start) / 86400000) + 1);
-			map.set(s.phase, (map.get(s.phase) ?? 0) + days);
-		}
-		return Array.from(map.entries()).map(([phase, days]) => ({ phase, days }));
-	});
+	// Phase-Tage neu (v1.3.34): Lauri-Logik via Helper.
+	// Σ phaseDays = totalGrowDays = Header-Zahl (garantiert konsistent).
+	let phaseDays = $derived(grow ? phaseDaysSummary(grow, chronCheckins) : []);
+	let totalDays = $derived(grow ? totalGrowDays(grow, chronCheckins) : 0);
 	let hasAggregates = $derived(totalWaterMl > 0 || avgTemp !== null || phaseDays.length > 0);
 
 	// Harvest Flow
@@ -513,7 +490,7 @@
 		<!-- Stats -->
 		<div class="grid grid-cols-3 gap-3">
 			<div class="bg-gb-surface rounded-xl p-3 text-center">
-				<p class="text-2xl font-bold text-gb-green">{daysSince(grow.started_at)}</p>
+				<p class="text-2xl font-bold text-gb-green">{totalDays}</p>
 				<p class="text-xs text-gb-text-muted">{tr('grow.days')}</p>
 				{#if phaseDays.length >= 1}
 					<p class="text-[10px] text-gb-text-muted mt-0.5 leading-tight">

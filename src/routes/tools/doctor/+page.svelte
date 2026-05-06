@@ -8,6 +8,7 @@
 	import { diagnosePlant } from '$lib/utils/gemini';
 	import type { Diagnosis, DiagnosisContext } from '$lib/utils/gemini';
 	import type { Grow, CheckIn, GrowState } from '$lib/stores/grow';
+	import { totalGrowDays } from '$lib/utils/phase';
 	import { onMount } from 'svelte';
 
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
@@ -55,7 +56,7 @@
 		}
 	});
 	let daysSinceStart = $derived(selectedGrow
-		? Math.floor((Date.now() - new Date(selectedGrow.started_at).getTime()) / 86400000)
+		? totalGrowDays(selectedGrow, growState?.checkins ?? [])
 		: undefined);
 
 	function handlePhoto(e: Event) {

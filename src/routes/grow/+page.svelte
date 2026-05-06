@@ -2,23 +2,26 @@
 	import { growStore, activeGrows, harvestedGrows } from '$lib/stores/grow';
 	import { t } from '$lib/i18n';
 	import { onMount } from 'svelte';
-	import type { Grow } from '$lib/stores/grow';
+	import type { Grow, CheckIn } from '$lib/stores/grow';
+	import { totalGrowDays } from '$lib/utils/phase';
 
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
-	let active = $state<Grow[]>([]);
-	let harvested = $state<Grow[]>([]);
+	let active: Grow[] = $state([]);
+	let harvested: Grow[] = $state([]);
+	let allCheckins: CheckIn[] = $state([]);
 	let hasGrows = $derived(active.length > 0 || harvested.length > 0);
 
 	onMount(() => {
 		const subs = [
 			activeGrows.subscribe(v => active = v),
 			harvestedGrows.subscribe(v => harvested = v),
+			growStore.subscribe(v => allCheckins = v.checkins),
 		];
 		return () => subs.forEach(u => u());
 	});
 
-	function daysSince(dateStr: string): number {
-		return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
+	function growDays(grow: Grow): number {
+		return totalGrowDays(grow, allCheckins);
 	}
 </script>
 
@@ -57,7 +60,7 @@
 								<p class="text-sm text-gb-text-muted">{grow.strain} · {grow.medium} · {grow.plant_count} {grow.plant_count > 1 ? tr('grow.plants_plural') : tr('grow.plant')}</p>
 							</div>
 							<div class="text-right">
-								<p class="text-gb-green font-bold">{tr('home.day', { days: daysSince(grow.started_at) })}</p>
+								<p class="text-gb-green font-bold">{tr('home.day', { days: growDays(grow) })}</p>
 								<p class="text-xs text-gb-text-muted">{grow.strain_type === 'auto' ? 'Auto' : 'Photo'}</p>
 							</div>
 						</div>

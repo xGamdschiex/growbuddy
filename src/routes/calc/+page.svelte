@@ -16,6 +16,7 @@
 	import { calcStore, type CalcState } from '$lib/stores/calc';
 	import { hapticSuccess } from '$lib/utils/haptic';
 	import { toMsPerCm } from '$lib/calc/units';
+	import { currentPhasePosition } from '$lib/utils/phase';
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 
@@ -108,34 +109,22 @@
 	let authUser = $state<any>(null);
 	$effect(() => authStore.subscribe(a => { authUser = a?.user ?? null; }));
 
-	// Auto-Fill: Phase + Woche + Tag aus aktivem Grow übernehmen.
-	// Lauri stellt im Check-in z.B. auf Bloom W1T1 → der Calc folgt automatisch.
+	// Auto-Fill: heutige Position im aktiven Grow (v1.3.34 — Lauri-Logik).
+	// Berechnet aus phaseBoundaries: aktuelle Phase + heutiger W/T basierend auf Phase-Start.
 	// Bei manuellem Override (User ändert phase/woche/tag selbst) → autoFill aus.
 	let autoFillFromGrow = $state(true);
 	$effect(() => {
 		if (!autoFillFromGrow) return;
 		const grow = activeGrows[0];
 		if (!grow?.started_at) return;
-		const startMs = new Date(grow.started_at).getTime();
-		if (Number.isNaN(startMs)) return;
-		const lastCi = (growState?.checkins ?? [])
-			.filter((c: any) => c.grow_id === grow.id)
-			.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
-		let phase: string;
-		let week: number;
-		let day: number;
-		if (lastCi) {
-			phase = lastCi.phase;
-			week = lastCi.week;
-			day = lastCi.day;
-		} else {
-			const daysSince = Math.max(1, Math.floor((Date.now() - startMs) / 86400000) + 1);
-			phase = 'Veg';
-			week = Math.max(1, Math.ceil(daysSince / 7));
-			day = ((daysSince - 1) % 7) + 1;
-		}
-		if (calcState.phase !== phase || calcState.woche !== week || calcState.tag !== day) {
-			updateState({ phase, woche: week, tag: day });
+		const checkins = (growState?.checkins ?? []) as any[];
+		const pos = currentPhasePosition(grow, checkins);
+		if (
+			calcState.phase !== pos.phase ||
+			calcState.woche !== pos.week ||
+			calcState.tag !== pos.day
+		) {
+			updateState({ phase: pos.phase, woche: pos.week, tag: pos.day });
 		}
 	});
 
