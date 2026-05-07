@@ -163,7 +163,7 @@ export interface GenericCalcInput {
   reservoir_L: number;
   faktor_modus: 'Auto' | 'Manuell';
   faktor_manuell: number;
-  calmag_typ: 'A' | 'B';          // Athena / CANNA CalMag
+  calmag_typ: 'A' | 'B' | 'BB';   // Athena / CANNA / BioBizz CalMag
   ec_einheit: 'mS/cm' | 'ppm500' | 'ppm700';
   medium?: Medium;                 // Für Lines die medium-abhängig dosieren
   ist_ec?: number;

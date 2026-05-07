@@ -112,3 +112,37 @@ describe('Athena Pro — moduleweekNotes', () => {
 		expect(notes ?? []).toHaveLength(0);
 	});
 });
+
+describe('Athena Pro — Flush-EC Regression (Lauri 2026-05-07)', () => {
+	// User-Bug: 'EC skaliert nach oben in den Flush-Wochen, soll aber bleiben/runter'
+	// Test: EC-Soll muss monoton sinken oder gleich bleiben von W7 → W8 → W9
+	// (Auto-Faktor T7 = höchster Punkt der Woche)
+	it('Bloom W7→W8 EC-Soll sinkt (RO-Wasser)', () => {
+		const w7 = calculate(inputAthena({ phase: 'Bloom', woche: 7, tag: 7, faktor_modus: 'Auto', hat_ro: true }));
+		const w8 = calculate(inputAthena({ phase: 'Bloom', woche: 8, tag: 7, faktor_modus: 'Auto', hat_ro: true }));
+		expect(w8.ec_soll).toBeLessThanOrEqual(w7.ec_soll);
+	});
+
+	it('Bloom W8→W9 EC-Soll sinkt (RO-Wasser)', () => {
+		const w8 = calculate(inputAthena({ phase: 'Bloom', woche: 8, tag: 7, faktor_modus: 'Auto', hat_ro: true }));
+		const w9 = calculate(inputAthena({ phase: 'Bloom', woche: 9, tag: 7, faktor_modus: 'Auto', hat_ro: true }));
+		expect(w9.ec_soll).toBeLessThanOrEqual(w8.ec_soll);
+	});
+
+	it('Bloom W7→W8 EC-Soll sinkt (Mainz-LW, kein RO)', () => {
+		const w7 = calculate(inputAthena({ phase: 'Bloom', woche: 7, tag: 7, faktor_modus: 'Auto', hat_ro: false, wasserprofil: 'Mainz Petersaue' }));
+		const w8 = calculate(inputAthena({ phase: 'Bloom', woche: 8, tag: 7, faktor_modus: 'Auto', hat_ro: false, wasserprofil: 'Mainz Petersaue' }));
+		expect(w8.ec_soll).toBeLessThanOrEqual(w7.ec_soll);
+	});
+
+	it('Bloom W8→W9 EC-Soll sinkt (Mainz-LW, kein RO)', () => {
+		const w8 = calculate(inputAthena({ phase: 'Bloom', woche: 8, tag: 7, faktor_modus: 'Auto', hat_ro: false, wasserprofil: 'Mainz Petersaue' }));
+		const w9 = calculate(inputAthena({ phase: 'Bloom', woche: 9, tag: 7, faktor_modus: 'Auto', hat_ro: false, wasserprofil: 'Mainz Petersaue' }));
+		expect(w9.ec_soll).toBeLessThanOrEqual(w8.ec_soll);
+	});
+
+	it('Bloom W9 EC-Soll <= 1.5 (Schema-Ziel)', () => {
+		const w9 = calculate(inputAthena({ phase: 'Bloom', woche: 9, tag: 7, faktor_modus: 'Auto', hat_ro: true }));
+		expect(w9.ec_soll).toBeLessThanOrEqual(1.5);
+	});
+});

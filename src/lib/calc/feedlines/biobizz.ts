@@ -24,7 +24,45 @@
  * Niedrigere fmin weil BioBizz-Lösung im Reservoir schneller altert (organisch).
  */
 
-import type { FeedLine } from './types';
+import type { FeedLine, LineModule } from './types';
+
+/**
+ * BioBizz Modul — Default-Mix (Produkte → CalMag) reicht für Organik.
+ * Custom-Hooks für organisch-spezifische Hinweise + Validation.
+ */
+const biobizzModule: LineModule = {
+	weekNotes(phase, woche) {
+		const notes: string[] = [];
+		// Microbes 1x/Woche (BioBizz-Hinweis)
+		if (phase === 'Veg' || phase === 'Bloom') {
+			notes.push('Microbes 1x/Woche dazu, 2x bei hohem Nährstoffbedarf');
+		}
+		// CalMag-Ramp (Coco)
+		if (phase === 'Bloom' && woche >= 6) {
+			notes.push('CalMag jetzt 1 mL/L (Coco) bzw. 0.5 mL/L (Erde)');
+		}
+		return notes;
+	},
+	validateInput(input) {
+		const warnings: string[] = [];
+		const errors: string[] = [];
+		// BioBizz hat kein optimales Ergebnis in DWC (rein hydroponisch)
+		if (input.medium === 'hydro') {
+			warnings.push('BioBizz ist organisch — DWC/Hydro nicht empfohlen (Mikrobiologie braucht Substrat)');
+		}
+		// EC-Eingabe ist bei Organik nur Richtwert
+		if (input.ist_ec !== undefined && input.ist_ec > 0) {
+			warnings.push('EC bei BioBizz ist nur Richtwert — Mikroben verändern den Wert über die Zeit');
+		}
+		return { warnings, errors };
+	},
+	recommendedAddons() {
+		return [
+			{ name: 'BioBizz CalMag', reason: 'Coco/RO bevorzugt — Ca/Mg-Defizit in BioBizz-Schema' },
+			{ name: 'BioBizz Microbes', reason: 'Beschleunigt organischen Abbau im Substrat' },
+		];
+	},
+};
 
 export const biobizz: FeedLine = {
   id: 'biobizz',
@@ -171,4 +209,6 @@ export const biobizz: FeedLine = {
     'Microbes: 1x pro Woche, 2x bei hohem Nährstoffbedarf',
     'Vegetationsphase kann beliebig verlängert werden',
   ],
+
+  module: biobizzModule,
 };
