@@ -12,9 +12,10 @@
  * - Medium-abhängige pH-Korrektur
  */
 
-import type { FeedLine, FeedSchemaRow, GenericCalcInput, DosierungResult, FeedProduct } from './feedlines/types';
+import type { FeedLine, FeedSchemaRow, GenericCalcInput, DosierungResult, FeedProduct, MixContext, MixStep as MixStepGeneric } from './feedlines/types';
 import { getSchemaForWeek, calcProductDosierung } from './feedlines/types';
 import { getFeedLine } from './feedlines/registry';
+import { defaultMixSteps } from './feedlines/default-mix';
 import type { WasserProfil } from './schema';
 import { getWasserProfil, PRODUKTE } from './schema';
 import type { ECEinheit } from './units';
@@ -123,12 +124,8 @@ export interface StretchInfo {
   strategy: string;
 }
 
-export interface MixStep {
-  nr: number;
-  label: string;
-  detail: string;
-  menge: string;
-}
+// MixStep aus types.ts re-exportieren für backwards-compat
+export type MixStep = MixStepGeneric;
 
 // ─── MAIN CALCULATION ─────────────────────────────────────────────────────
 
@@ -415,7 +412,7 @@ function getDosierungMenge(dosierungen: DosierungResult[], key: string): number 
   return d ? d.menge_tank : 0;
 }
 
-// ─── MIX STEPS (generisch) ──────────────────────────────────────────────
+// ─── MIX STEPS (Strategy-Pattern via line.module) ───────────────────────
 
 interface MixStepInput {
   feedline: FeedLine;
@@ -431,103 +428,34 @@ interface MixStepInput {
 }
 
 function buildMixSteps(p: MixStepInput): MixStep[] {
-  const steps: MixStep[] = [];
-  let nr = 1;
-
   // CalMag-Label
   const calmagLabels: Record<string, string> = { A: 'Athena CalMag', B: 'CANNA CalMag', BB: 'BioBizz CalMag' };
   const calmag_name = calmagLabels[p.input.calmag_typ] ?? 'CalMag';
 
-  // Helper: CalMag + MonoMg Steps
-  function addCalMagSteps() {
-    if (p.calmag.mono_mg_mL_total > 0) {
-      steps.push({
-        nr: nr++,
-        label: 'Mono Mg',
-        detail: `${p.calmag.mono_mg_mLpL} mL/L`,
-        menge: `${p.calmag.mono_mg_mL_total} mL`,
-      });
-    }
-    if (p.calmag.calmag_mL_total > 0) {
-      steps.push({
-        nr: nr++,
-        label: calmag_name,
-        detail: `${p.calmag.calmag_mLpL} mL/L`,
-        menge: `${p.calmag.calmag_mL_total} mL`,
-      });
-    }
+  const ctx: MixContext = {
+    line: p.feedline,
+    dosierungen: p.dosierungen,
+    calmag: {
+      calmag_mLpL: p.calmag.calmag_mLpL,
+      mono_mg_mLpL: p.calmag.mono_mg_mLpL,
+      calmag_mL_total: p.calmag.calmag_mL_total,
+      mono_mg_mL_total: p.calmag.mono_mg_mL_total,
+    },
+    cleanse_mL_tank: p.cleanse_mL_tank,
+    ro_L: p.ro_L,
+    lw_L: p.lw_L,
+    ph_ziel: p.ph_ziel,
+    ec_soll: p.ec_soll,
+    schema: p.schema,
+    input: p.input as unknown as GenericCalcInput,
+    calmag_name,
+  };
+
+  // Strategy-Pattern: Line-eigenes Modul oder Default-Logik
+  if (p.feedline.module?.buildMixSteps) {
+    return p.feedline.module.buildMixSteps(ctx);
   }
-
-  // Helper: Produkt-Dosierungen
-  function addProductSteps() {
-    for (const d of p.dosierungen) {
-      const schemaLabel = d.product.pro === '10L'
-        ? `${d.menge_schema} ${d.product.einheit}/10L`
-        : `${d.menge_schema} ${d.product.einheit}/L`;
-      steps.push({
-        nr: nr++,
-        label: d.product.einheit === 'g'
-          ? `${d.product.name} einwiegen`
-          : `${d.product.name} abmessen`,
-        detail: `Schema: ${schemaLabel}`,
-        menge: d.display,
-      });
-    }
-  }
-
-  // Step 1: Wasser
-  const hat_ro = p.input.hat_ro !== false;
-  steps.push({
-    nr: nr++,
-    label: 'Wasser befuellen',
-    detail: hat_ro
-      ? `${p.ro_L} L RO + ${p.lw_L} L Leitungswasser`
-      : `${p.input.reservoir_L} L Leitungswasser (kein RO)`,
-    menge: `${p.input.reservoir_L} L`,
-  });
-
-  // Mischreihenfolge abhängig von Düngerlinie
-  const lineId = p.feedline.id;
-
-  if (lineId === 'atami-bcuzz') {
-    // Atami: CalMag ZUERST, dann A, dann B, dann Rest
-    addCalMagSteps();
-    addProductSteps();
-  } else if (lineId === 'athena-pro') {
-    // Athena: Mono Mg → CalMag → Cleanse → Produkte
-    addCalMagSteps();
-    if (p.cleanse_mL_tank > 0) {
-      steps.push({
-        nr: nr++,
-        label: 'Cleanse',
-        detail: `${p.cleanse_mL_tank} mL auf Tank`,
-        menge: `${p.cleanse_mL_tank} mL`,
-      });
-    }
-    addProductSteps();
-  } else {
-    // BioBizz, GH Feeding: Produkte → CalMag
-    addProductSteps();
-    addCalMagSteps();
-  }
-
-  // pH einstellen
-  steps.push({
-    nr: nr++,
-    label: 'pH einstellen',
-    detail: `Zielbereich: ${p.ph_ziel}`,
-    menge: p.ph_ziel,
-  });
-
-  // EC kontrollieren
-  steps.push({
-    nr: nr++,
-    label: 'EC kontrollieren',
-    detail: `EC-Soll: ${p.ec_soll}`,
-    menge: `${p.ec_soll}`,
-  });
-
-  return steps;
+  return defaultMixSteps(ctx);
 }
 
 function round(n: number, decimals: number): number {

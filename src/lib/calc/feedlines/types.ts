@@ -23,6 +23,64 @@ export interface FeedLine {
 
   // Line-spezifische Hinweise für den User
   hinweise?: string[];
+
+  /**
+   * Optionale Strategy-Hooks für line-spezifische Logik.
+   * Lines können hier eigene Mix-Order, Validation, Hinweise etc. liefern.
+   * `nutrients.ts` ruft Hooks mit Fallback auf Default-Logik.
+   * Backend-only, kein User-sichtbarer Impact.
+   */
+  module?: LineModule;
+}
+
+// ─── PER-LINE MODULE (Strategy Hooks) ────────────────────────────────────
+
+/**
+ * Optionale Logik-Hooks pro Düngerlinie.
+ * Lines können selektiv Hooks implementieren. Wenn nicht gesetzt, wird
+ * Default-Implementation in `nutrients.ts` verwendet.
+ *
+ * Vorteile:
+ * - Line-spezifische Improvements ohne andere Lines zu brechen
+ * - `nutrients.ts` bleibt generisch
+ * - Per-Line-Tests können Hooks isoliert testen
+ */
+export interface LineModule {
+  /** Mischreihenfolge: was zuerst, was zuletzt? */
+  buildMixSteps?: (ctx: MixContext) => MixStep[];
+
+  /** Custom-Hinweise pro Phase/Woche (z.B. "BioBizz: Top-Dressing diese Woche") */
+  weekNotes?: (phase: string, woche: number) => string[];
+
+  /** Input-Validierung (z.B. "BioBizz nicht in DWC empfohlen") */
+  validateInput?: (input: GenericCalcInput) => { warnings: string[]; errors: string[] };
+
+  /** Empfohlene Add-Ons für diese Line */
+  recommendedAddons?: () => Array<{ name: string; reason: string }>;
+}
+
+/** Context der dem Mix-Builder übergeben wird (alle Berechnungs-Resultate). */
+export interface MixContext {
+  line: FeedLine;
+  dosierungen: DosierungResult[];
+  /** CalMag-Resultat (any: Type aus calmag.ts, hier nicht hard-coupled) */
+  calmag: { calmag_mLpL: number; mono_mg_mLpL: number; calmag_mL_total: number; mono_mg_mL_total: number };
+  cleanse_mL_tank: number;
+  ro_L: number;
+  lw_L: number;
+  ph_ziel: string;
+  ec_soll: number;
+  schema: FeedSchemaRow;
+  input: GenericCalcInput;
+  /** CalMag-Display-Name z.B. 'Athena CalMag' */
+  calmag_name: string;
+}
+
+export interface MixStep {
+  nr: number;
+  label: string;
+  detail: string;
+  menge: string;
 }
 
 export type Medium = 'hydro' | 'coco' | 'erde';

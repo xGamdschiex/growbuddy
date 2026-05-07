@@ -8,7 +8,46 @@
  * Phasen: Clone (2W), Veg (4W), Bloom (9W)
  */
 
-import type { FeedLine } from './types';
+import type { FeedLine, LineModule, MixContext, MixStep } from './types';
+import { waterStep, calmagSteps, productSteps, cleanseStep, controlSteps } from './default-mix';
+
+/**
+ * Athena-spezifische Mix-Reihenfolge:
+ * Wasser → Mono Mg → CalMag → Cleanse → Produkte (Pro Grow / Bloom / Core / Fade) → pH → EC
+ *
+ * Begründung Athena:
+ * - CalMag VOR den Pulvern: stellt Ca/Mg-Basis her, Pulver können binden
+ * - Cleanse als Enzym-Reiniger zwischen CalMag und Pulvern
+ * - Pulver einzeln einwiegen (siehe `hinweise`)
+ */
+const athenaProModule: LineModule = {
+	buildMixSteps(ctx: MixContext): MixStep[] {
+		const steps: MixStep[] = [];
+		let nr = 1;
+		steps.push(waterStep(ctx, nr++));
+		const cm = calmagSteps(ctx, nr);
+		steps.push(...cm.steps);
+		nr = cm.nextNr;
+		const cleanse = cleanseStep(ctx, nr);
+		if (cleanse) {
+			steps.push(cleanse);
+			nr++;
+		}
+		const products = productSteps(ctx.dosierungen, nr);
+		steps.push(...products.steps);
+		nr = products.nextNr;
+		steps.push(...controlSteps(ctx, nr));
+		return steps;
+	},
+	weekNotes(phase, woche) {
+		// Beispielhinweise — können künftig pro Woche erweitert werden.
+		const notes: string[] = [];
+		if (phase === 'Bloom' && (woche === 8 || woche === 9)) {
+			notes.push('Fade-Phase: Pulver runter, Fade-Booster aktiv');
+		}
+		return notes;
+	},
+};
 
 export const athenaPro: FeedLine = {
   id: 'athena-pro',
@@ -140,4 +179,6 @@ export const athenaPro: FeedLine = {
     'Cleanse-Dosierung steigt linear von T1 bis T7',
     'Fade nur in Bloom W8-W9',
   ],
+
+  module: athenaProModule,
 };

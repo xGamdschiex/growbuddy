@@ -12,7 +12,42 @@
  * A+B reagiert gleichmäßig → engere Ranges als Athena Pulver.
  */
 
-import type { FeedLine } from './types';
+import type { FeedLine, LineModule, MixContext, MixStep } from './types';
+import { waterStep, calmagSteps, productSteps, controlSteps } from './default-mix';
+
+/**
+ * Atami-spezifische Mix-Reihenfolge:
+ * Wasser → CalMag → Produkte (A → B → Booster) → pH → EC
+ *
+ * Begründung Atami:
+ * - "ATA CalMag ZUERST ins Wasser, dann A, dann B" (Atami Grow Guide)
+ * - A+B Verhältnis 1:1, Booster zuletzt
+ */
+const atamiBcuzzModule: LineModule = {
+	buildMixSteps(ctx: MixContext): MixStep[] {
+		const steps: MixStep[] = [];
+		let nr = 1;
+		steps.push(waterStep(ctx, nr++));
+		const cm = calmagSteps(ctx, nr);
+		steps.push(...cm.steps);
+		nr = cm.nextNr;
+		const products = productSteps(ctx.dosierungen, nr);
+		steps.push(...products.steps);
+		nr = products.nextNr;
+		steps.push(...controlSteps(ctx, nr));
+		return steps;
+	},
+	validateInput(input) {
+		const warnings: string[] = [];
+		const errors: string[] = [];
+		// Atami hat Bloombastic vs Rokzbastic Konflikt-Regel,
+		// aber das ist Schema-Logik, nicht Input-Validierung. Hier nur Beispiel:
+		if (input.medium && input.medium !== 'coco') {
+			warnings.push('Atami B\'cuzz Bastics ist auf Coco optimiert');
+		}
+		return { warnings, errors };
+	},
+};
 
 export const atamiBcuzz: FeedLine = {
   id: 'atami-bcuzz',
@@ -171,4 +206,6 @@ export const atamiBcuzz: FeedLine = {
     'Rokzbastic: Ab Bloom W2 bis W5',
     'Dosierungen sind Midpoints der offiziellen Ranges',
   ],
+
+  module: atamiBcuzzModule,
 };
