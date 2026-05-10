@@ -11,7 +11,95 @@
  * EC: Veg 1.0-1.4, Bloom 1.4-2.0, Flush 0.0
  */
 
-import type { FeedLine } from './types';
+import type { FeedLine, LineModule } from './types';
+
+/**
+ * CANNA Terra — erden-spezifisch, vorgedüngte Substrate.
+ * Default-Mix-Reihenfolge passt (Wasser → Produkte → CalMag → pH → EC).
+ */
+const cannaTerraModule: LineModule = {
+	weekNotes(phase, woche) {
+		const notes: string[] = [];
+		if (phase === 'Veg' && woche === 1) {
+			notes.push('Erste Woche: niedrig dosieren, Substrat ist meist vorgedüngt');
+		}
+		if (phase === 'Bloom' && woche >= 4 && woche <= 6) {
+			notes.push('PK 13-14 jetzt aktiv — sparsam dosieren, NICHT überlappen');
+		}
+		if (phase === 'Bloom' && woche === 7) {
+			notes.push('Pre-Flush: PK 13-14 absetzen, Boost reduzieren');
+		}
+		if (phase === 'Flush') {
+			notes.push('Nur klares Wasser — letzte 1-2 Wochen vor Ernte');
+		}
+		// Rhizotonic-Hinweis in frühen Phasen
+		if ((phase === 'Veg' && woche <= 2)) {
+			notes.push('Rhizotonic auch als Blattspray verwendbar (0.4 mL/L)');
+		}
+		return notes;
+	},
+	validateInput(input) {
+		const warnings: string[] = [];
+		const errors: string[] = [];
+		// Terra ist explizit für Erde gedacht
+		if (input.medium === 'coco') {
+			warnings.push('CANNA Terra für Erde — bei Coco lieber CANNA Coco A+B verwenden');
+		}
+		if (input.medium === 'hydro') {
+			warnings.push('CANNA Terra ungeeignet für DWC/Hydro — bitte Coco A+B oder Aqua wählen');
+		}
+		return { warnings, errors };
+	},
+	recommendedAddons() {
+		return [
+			{ name: 'Cannazym', reason: 'Beschleunigt Wurzel-Recycling in vorgedüngter Erde' },
+			{ name: 'Boost', reason: 'Bloom-Booster für stärkere Bud-Entwicklung' },
+			{ name: 'PK 13-14', reason: 'Bloom W4-6 für Phosphor/Kalium-Boost — sparsam' },
+		];
+	},
+};
+
+/**
+ * CANNA Coco A+B — coco-spezifisch.
+ * Wichtig: A und B IMMER gleiche Menge, nie unverdünnt mischen.
+ * CalMag-Empfehlung wegen Ca-Bindung in Coco.
+ */
+const cannaCocoModule: LineModule = {
+	weekNotes(phase, woche) {
+		const notes: string[] = [];
+		if (woche === 1 && (phase === 'Veg' || phase === 'Bloom')) {
+			notes.push('Coco A und Coco B IMMER in gleicher Menge — niemals unverdünnt mischen!');
+		}
+		if (phase === 'Veg' && woche >= 2) {
+			notes.push('CalMag bei weichem Wasser/RO empfohlen (Coco bindet Ca)');
+		}
+		if (phase === 'Bloom' && woche >= 4 && woche <= 6) {
+			notes.push('PK 13-14 jetzt aktiv — sparsam dosieren');
+		}
+		if (phase === 'Bloom' && woche === 7) {
+			notes.push('Pre-Flush: PK 13-14 absetzen, Boost reduzieren');
+		}
+		if (phase === 'Flush') {
+			notes.push('Nur klares Wasser — Coco besonders gründlich spülen');
+		}
+		return notes;
+	},
+	validateInput(input) {
+		const warnings: string[] = [];
+		const errors: string[] = [];
+		if (input.medium === 'erde') {
+			warnings.push('CANNA Coco A+B für Coco/Hydro — bei Erde lieber CANNA Terra verwenden');
+		}
+		return { warnings, errors };
+	},
+	recommendedAddons() {
+		return [
+			{ name: 'CANNA CalMag Agent', reason: 'Coco bindet Ca/Mg — bei RO/weichem Wasser pflicht' },
+			{ name: 'Cannazym', reason: 'Wurzel-Hygiene + Recycling abgestorbener Wurzelmasse' },
+			{ name: 'Boost', reason: 'Bloom-Booster, ab Bloom W1 möglich' },
+		];
+	},
+};
 
 export const cannaTerra: FeedLine = {
   id: 'canna-terra',
@@ -67,6 +155,8 @@ export const cannaTerra: FeedLine = {
     'PK 13-14 nur in Bloom W4-6, sparsam dosieren.',
     'Rhizotonic auch als Blattspray verwendbar (0.4 mL/L).',
   ],
+
+  module: cannaTerraModule,
 };
 
 export const cannaCoco: FeedLine = {
@@ -120,4 +210,6 @@ export const cannaCoco: FeedLine = {
     'Coco bindet Calcium — CalMag bei weichem Wasser empfohlen.',
     'Nie A und B unverdünnt mischen!',
   ],
+
+  module: cannaCocoModule,
 };
