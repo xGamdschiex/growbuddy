@@ -1,0 +1,31 @@
+<!--
+  GrowBuddy App-Icon — Foreground (Adaptive-Icon, API 26+).
+  Sprout-Symbol in weiß auf grünem Background.
+
+  ViewBox: 108x108dp. Safe area: zentral 66x66dp (alles außerhalb kann
+  von runden/squircle/rounded-square Masken beschnitten werden).
+
+  Design: Stem (mittig vertical) + 2 Blätter (V-Form, links unten + rechts oben).
+  Generisch "Plant Care" — kein Cannabis-Bezug (Play-Store-compliant).
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Stem (rounded vertical bar, ~38dp lang im Center) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M50,90 L50,62 Q50,56 54,56 Q58,56 58,62 L58,90 Z" />
+
+    <!-- Linkes Blatt (Tear-Drop nach links-oben, V-Form) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,68 C44,68 30,56 28,40 C42,40 56,52 54,68 Z" />
+
+    <!-- Rechtes Blatt (Tear-Drop nach rechts-oben, höher als linkes) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,58 C64,58 78,46 80,30 C66,30 52,42 54,58 Z" />
+</vector>

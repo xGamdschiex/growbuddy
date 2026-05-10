@@ -8,7 +8,13 @@ build/
 *.log
 
 .vercel
+
+# Android: Build-Artefakte ignorieren, aber Brand-Resources tracken
 android/
+!android/app/src/main/res/
+!android/app/src/main/res/**
+!android/app/src/main/AndroidManifest.xml
+!android/variables.gradle
 
 # Keystore - NIEMALS committen!
 keystore/*.jks
