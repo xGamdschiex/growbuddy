@@ -13,6 +13,7 @@
 	import { calcVPD, getVPDStatus } from '$lib/data/science';
 	import { clampNumber } from '$lib/utils/validation';
 	import { toMsPerCm, type ECEinheit } from '$lib/calc/units';
+	import { calcStore } from '$lib/stores/calc';
 	import { compressBatch, MAX_PHOTOS } from '$lib/utils/photo';
 	import { getFeedLine } from '$lib/calc/feedlines/registry';
 	import type { Grow, CheckIn } from '$lib/stores/grow';
@@ -87,12 +88,13 @@
 	let temp = $state<number | null>(null);
 	let rh = $state<number | null>(null);
 	let ec = $state<number | null>(null);
-	let ecUnit = $state<ECEinheit>(
-		(typeof localStorage !== 'undefined' ? (localStorage.getItem('growbuddy_ec_unit') as ECEinheit | null) : null) ?? 'mS/cm'
-	);
-	$effect(() => {
-		if (typeof localStorage !== 'undefined') localStorage.setItem('growbuddy_ec_unit', ecUnit);
-	});
+	// ec_einheit = Single Source of Truth aus calcStore (sonst drift zw. Calc + Daily).
+	// Subscribe synchron im Init-Block + bei User-Click via setEcUnit() in calcStore patchen.
+	let ecUnit = $state<ECEinheit>('mS/cm');
+	onMount(() => calcStore.subscribe(s => ecUnit = s.ec_einheit));
+	function setEcUnit(v: ECEinheit) {
+		calcStore.patch({ ec_einheit: v });
+	}
 	let ecStep = $derived(ecUnit === 'mS/cm' ? 0.1 : 10);
 	let ecPlaceholder = $derived(ecUnit === 'mS/cm' ? '1.5' : ecUnit === 'ppm500' ? '750' : '1050');
 	let ph = $state<number | null>(null);
@@ -399,7 +401,7 @@
 							<span class="sec-title">Messwerte</span>
 							<div class="seg">
 								{#each EC_UNIT_OPTS as opt}
-									<button type="button" class:on={ecUnit === opt.v} onclick={() => ecUnit = opt.v}>{opt.l}</button>
+									<button type="button" class:on={ecUnit === opt.v} onclick={() => setEcUnit(opt.v)}>{opt.l}</button>
 								{/each}
 							</div>
 						</div>
