@@ -22,6 +22,14 @@
 	import { getFeedLine } from '$lib/calc/feedlines/registry';
 	import { phaseDaysSummary, totalGrowDays, currentPhasePosition } from '$lib/utils/phase';
 	import { phaseStyle } from '$lib/utils/phase-colors';
+	import {
+		metricStats,
+		metricPerPhase,
+		stressDays,
+		checkinConsistency,
+		type MetricStats,
+		type CheckinNumKey,
+	} from '$lib/utils/grow-stats';
 
 	import { onMount } from 'svelte';
 
@@ -262,16 +270,39 @@
 	}
 	let totalWaterMl = $derived(sum(chronCheckins.filter((c: CheckIn) => c.water_ml != null).map((c: CheckIn) => c.water_ml as number)));
 	let totalNutrientMl = $derived(sum(chronCheckins.filter((c: CheckIn) => c.nutrient_ml != null).map((c: CheckIn) => c.nutrient_ml as number)));
-	let avgTemp = $derived(avg(tempData));
-	let avgRh = $derived(avg(rhData));
-	let avgVpd = $derived(avg(vpdData));
-	let avgEc = $derived(avg(ecData));
-	let avgPh = $derived(avg(phData));
+
+	// v1.3.54: Min/Avg/Max statt nur Avg (Reihenfolge: temp, rh, vpd, ec, ph)
+	let tempStats: MetricStats = $derived(metricStats(chronCheckins.map((c: CheckIn) => c.temp)));
+	let rhStats: MetricStats = $derived(metricStats(chronCheckins.map((c: CheckIn) => c.rh)));
+	let vpdStats: MetricStats = $derived(metricStats(chronCheckins.map((c: CheckIn) => c.vpd)));
+	let ecStats: MetricStats = $derived(metricStats(chronCheckins.map((c: CheckIn) => c.ec_measured)));
+	let phStats: MetricStats = $derived(metricStats(chronCheckins.map((c: CheckIn) => c.ph_measured)));
+	// Phase-Sub-Aggregate (Veg/Bloom/Flush separat)
+	let tempPerPhase = $derived(metricPerPhase(chronCheckins, 'temp'));
+	let vpdPerPhase = $derived(metricPerPhase(chronCheckins, 'vpd'));
+	let ecPerPhase = $derived(metricPerPhase(chronCheckins, 'ec_measured'));
+	// Stress-Counter (VPD = wichtigste Health-Metrik)
+	let vpdStress = $derived(stressDays(chronCheckins, 'vpd', {
+		Veg: PHASE_TARGETS.vpd.Veg,
+		Bloom: PHASE_TARGETS.vpd.Bloom,
+		Flush: PHASE_TARGETS.vpd.Flush,
+	}));
+	// Konsistenz: wie zuverlässig wurde geloggt
+	let consistency = $derived(grow ? checkinConsistency(chronCheckins, grow.started_at) : null);
+
+	// Legacy-aliases (für UI-Fragments unten beibehalten)
+	let avgTemp = $derived(tempStats.avg);
+	let avgRh = $derived(rhStats.avg);
+	let avgVpd = $derived(vpdStats.avg);
+	let avgEc = $derived(ecStats.avg);
+	let avgPh = $derived(phStats.avg);
 	// Phase-Tage neu (v1.3.34): Lauri-Logik via Helper.
 	// Σ phaseDays = totalGrowDays = Header-Zahl (garantiert konsistent).
 	let phaseDays = $derived(grow ? phaseDaysSummary(grow, chronCheckins) : []);
 	let totalDays = $derived(grow ? totalGrowDays(grow, chronCheckins) : 0);
 	let hasAggregates = $derived(totalWaterMl > 0 || avgTemp !== null || phaseDays.length > 0);
+	// Health-Card sichtbar wenn ≥1 Check-in (Konsistenz-Wert macht Sinn ab Tag 1)
+	let hasHealthData = $derived(chronCheckins.length > 0);
 
 	// Harvest Flow
 	let showHarvest = $state(false);
@@ -924,48 +955,126 @@
 			</div>
 		{/if}
 
-		<!-- Aggregat-Statistiken -->
+		<!-- Health-Card (v1.3.54): Konsistenz + VPD-Stress + letzter Check-in -->
+		{#if hasHealthData && consistency}
+			<div class="bg-gb-surface rounded-xl p-4 space-y-3">
+				<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">Health</h2>
+				<div class="grid grid-cols-3 gap-2">
+					<!-- Konsistenz -->
+					<div class="text-center">
+						<p class="text-2xl font-bold {consistency.percent !== null && consistency.percent >= 80 ? 'text-gb-green' : consistency.percent !== null && consistency.percent >= 50 ? 'text-gb-warning' : 'text-gb-text-muted'}">
+							{consistency.percent ?? '—'}{consistency.percent !== null ? '%' : ''}
+						</p>
+						<p class="text-[10px] text-gb-text-muted leading-tight mt-0.5">Konsistenz<br/><span class="text-[9px]">{consistency.daysWithCheckin}/{consistency.totalDays} Tage</span></p>
+					</div>
+					<!-- VPD-Stress -->
+					<div class="text-center">
+						{#if vpdStress.total > 0}
+							<p class="text-2xl font-bold {vpdStress.okPercent !== null && vpdStress.okPercent >= 70 ? 'text-gb-green' : vpdStress.okPercent !== null && vpdStress.okPercent >= 40 ? 'text-gb-warning' : 'text-gb-danger'}">
+								{vpdStress.okPercent}%
+							</p>
+							<p class="text-[10px] text-gb-text-muted leading-tight mt-0.5">VPD optimal<br/><span class="text-[9px]">{vpdStress.ok}/{vpdStress.total} Tage</span></p>
+						{:else}
+							<p class="text-2xl font-bold text-gb-text-muted">—</p>
+							<p class="text-[10px] text-gb-text-muted leading-tight mt-0.5">VPD optimal<br/><span class="text-[9px]">noch keine Daten</span></p>
+						{/if}
+					</div>
+					<!-- Letzter Check-in -->
+					<div class="text-center">
+						{#if consistency.daysSinceLastCheckin !== null}
+							<p class="text-2xl font-bold {consistency.daysSinceLastCheckin === 0 ? 'text-gb-green' : consistency.daysSinceLastCheckin <= 2 ? 'text-gb-text' : 'text-gb-warning'}">
+								{consistency.daysSinceLastCheckin === 0 ? 'heute' : `${consistency.daysSinceLastCheckin}d`}
+							</p>
+							<p class="text-[10px] text-gb-text-muted leading-tight mt-0.5">letzter<br/>Check-in</p>
+						{:else}
+							<p class="text-2xl font-bold text-gb-text-muted">—</p>
+							<p class="text-[10px] text-gb-text-muted leading-tight mt-0.5">letzter<br/>Check-in</p>
+						{/if}
+					</div>
+				</div>
+			</div>
+		{/if}
+
+		<!-- Aggregat-Statistiken (v1.3.54: Min/Avg/Max statt nur Avg) -->
 		{#if hasAggregates}
 			<div class="space-y-2">
 				<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">Statistik gesamt</h2>
 				<div class="grid grid-cols-2 gap-2">
 					{#if totalWaterMl > 0}
-						<div class="bg-gb-surface rounded-xl p-3">
+						<div class="bg-gb-surface rounded-xl p-3 col-span-2">
 							<p class="text-xs text-gb-text-muted">💧 Wasser total</p>
 							<p class="text-xl font-bold text-gb-info">{(totalWaterMl / 1000).toFixed(1)} L</p>
+							{#if totalNutrientMl > 0}
+								<p class="text-[10px] text-gb-text-muted mt-1">+ {(totalNutrientMl / 1000).toFixed(2)} L Nährstoffe</p>
+							{/if}
 						</div>
 					{/if}
-					{#if avgTemp !== null}
+					{#if tempStats.avg !== null}
 						<div class="bg-gb-surface rounded-xl p-3">
-							<p class="text-xs text-gb-text-muted">Ø Temp</p>
-							<p class="text-xl font-bold">{avgTemp.toFixed(1)}°C</p>
+							<p class="text-xs text-gb-text-muted">Temp</p>
+							<p class="text-lg font-bold">Ø {tempStats.avg.toFixed(1)}°C</p>
+							<p class="text-[10px] text-gb-text-muted">{tempStats.min!.toFixed(1)} – {tempStats.max!.toFixed(1)}°C</p>
 						</div>
 					{/if}
-					{#if avgRh !== null}
+					{#if rhStats.avg !== null}
 						<div class="bg-gb-surface rounded-xl p-3">
-							<p class="text-xs text-gb-text-muted">Ø RH</p>
-							<p class="text-xl font-bold">{avgRh.toFixed(0)}%</p>
+							<p class="text-xs text-gb-text-muted">RH</p>
+							<p class="text-lg font-bold">Ø {rhStats.avg.toFixed(0)}%</p>
+							<p class="text-[10px] text-gb-text-muted">{rhStats.min!.toFixed(0)} – {rhStats.max!.toFixed(0)}%</p>
 						</div>
 					{/if}
-					{#if avgVpd !== null}
+					{#if vpdStats.avg !== null}
 						<div class="bg-gb-surface rounded-xl p-3">
-							<p class="text-xs text-gb-text-muted">Ø VPD</p>
-							<p class="text-xl font-bold text-gb-green">{avgVpd.toFixed(2)} kPa</p>
+							<p class="text-xs text-gb-text-muted">VPD</p>
+							<p class="text-lg font-bold text-gb-green">Ø {vpdStats.avg.toFixed(2)} kPa</p>
+							<p class="text-[10px] text-gb-text-muted">{vpdStats.min!.toFixed(2)} – {vpdStats.max!.toFixed(2)}</p>
 						</div>
 					{/if}
-					{#if avgEc !== null}
+					{#if ecStats.avg !== null}
 						<div class="bg-gb-surface rounded-xl p-3">
-							<p class="text-xs text-gb-text-muted">Ø EC</p>
-							<p class="text-xl font-bold">{avgEc.toFixed(2)}</p>
+							<p class="text-xs text-gb-text-muted">EC</p>
+							<p class="text-lg font-bold">Ø {ecStats.avg.toFixed(2)}</p>
+							<p class="text-[10px] text-gb-text-muted">{ecStats.min!.toFixed(2)} – {ecStats.max!.toFixed(2)}</p>
 						</div>
 					{/if}
-					{#if avgPh !== null}
+					{#if phStats.avg !== null}
 						<div class="bg-gb-surface rounded-xl p-3">
-							<p class="text-xs text-gb-text-muted">Ø pH</p>
-							<p class="text-xl font-bold">{avgPh.toFixed(1)}</p>
+							<p class="text-xs text-gb-text-muted">pH</p>
+							<p class="text-lg font-bold">Ø {phStats.avg.toFixed(1)}</p>
+							<p class="text-[10px] text-gb-text-muted">{phStats.min!.toFixed(1)} – {phStats.max!.toFixed(1)}</p>
 						</div>
 					{/if}
 				</div>
+
+				<!-- Phase-Sub-Stats: Ø pro Phase (zeigt sich nur wenn ≥2 Phasen Daten haben) -->
+				{#if Object.keys(tempPerPhase).length >= 2 || Object.keys(vpdPerPhase).length >= 2 || Object.keys(ecPerPhase).length >= 2}
+					<div class="bg-gb-surface rounded-xl p-3 space-y-2">
+						<p class="text-xs text-gb-text-muted">Ø pro Phase</p>
+						<div class="overflow-x-auto -mx-1 px-1">
+							<table class="w-full text-xs">
+								<thead>
+									<tr class="text-gb-text-muted text-[10px] uppercase tracking-wide">
+										<th class="text-left font-medium pb-1">Phase</th>
+										<th class="text-right font-medium pb-1">Temp</th>
+										<th class="text-right font-medium pb-1">VPD</th>
+										<th class="text-right font-medium pb-1">EC</th>
+									</tr>
+								</thead>
+								<tbody>
+									{#each Array.from(new Set([...Object.keys(tempPerPhase), ...Object.keys(vpdPerPhase), ...Object.keys(ecPerPhase)])) as phase}
+										<tr class="border-t border-gb-border/50">
+											<td class="py-1.5 font-medium">{phase}</td>
+											<td class="text-right text-gb-text-muted">{tempPerPhase[phase]?.avg !== null && tempPerPhase[phase] !== undefined ? `${tempPerPhase[phase].avg!.toFixed(1)}°` : '—'}</td>
+											<td class="text-right text-gb-text-muted">{vpdPerPhase[phase]?.avg !== null && vpdPerPhase[phase] !== undefined ? vpdPerPhase[phase].avg!.toFixed(2) : '—'}</td>
+											<td class="text-right text-gb-text-muted">{ecPerPhase[phase]?.avg !== null && ecPerPhase[phase] !== undefined ? ecPerPhase[phase].avg!.toFixed(2) : '—'}</td>
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						</div>
+					</div>
+				{/if}
+
 				{#if phaseDays.length > 0}
 					<div class="bg-gb-surface rounded-xl p-3">
 						<p class="text-xs text-gb-text-muted mb-1">Tage pro Phase</p>
