@@ -995,98 +995,34 @@
 			</div>
 		{/if}
 
-		<!-- Aggregat-Statistiken (v1.3.54: Min/Avg/Max statt nur Avg) -->
+		<!-- Quick-Stats (v1.3.55: slim — nur EC, VPD, Wasser. Volle Details auf /grow/[id]/stats) -->
 		{#if hasAggregates}
 			<div class="space-y-2">
-				<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">Statistik gesamt</h2>
-				<div class="grid grid-cols-2 gap-2">
-					{#if totalWaterMl > 0}
-						<div class="bg-gb-surface rounded-xl p-3 col-span-2">
-							<p class="text-xs text-gb-text-muted">💧 Wasser total</p>
-							<p class="text-xl font-bold text-gb-info">{(totalWaterMl / 1000).toFixed(1)} L</p>
-							{#if totalNutrientMl > 0}
-								<p class="text-[10px] text-gb-text-muted mt-1">+ {(totalNutrientMl / 1000).toFixed(2)} L Nährstoffe</p>
-							{/if}
-						</div>
-					{/if}
-					{#if tempStats.avg !== null}
-						<div class="bg-gb-surface rounded-xl p-3">
-							<p class="text-xs text-gb-text-muted">Temp</p>
-							<p class="text-lg font-bold">Ø {tempStats.avg.toFixed(1)}°C</p>
-							<p class="text-[10px] text-gb-text-muted">{tempStats.min!.toFixed(1)} – {tempStats.max!.toFixed(1)}°C</p>
-						</div>
-					{/if}
-					{#if rhStats.avg !== null}
-						<div class="bg-gb-surface rounded-xl p-3">
-							<p class="text-xs text-gb-text-muted">RH</p>
-							<p class="text-lg font-bold">Ø {rhStats.avg.toFixed(0)}%</p>
-							<p class="text-[10px] text-gb-text-muted">{rhStats.min!.toFixed(0)} – {rhStats.max!.toFixed(0)}%</p>
+				<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">Quick-Stats</h2>
+				<div class="grid grid-cols-3 gap-2">
+					{#if ecStats.avg !== null}
+						<div class="bg-gb-surface rounded-xl p-3 text-center">
+							<p class="text-[10px] text-gb-text-muted uppercase tracking-wide">Ø EC</p>
+							<p class="text-lg font-bold mt-0.5">{ecStats.avg.toFixed(2)}</p>
 						</div>
 					{/if}
 					{#if vpdStats.avg !== null}
-						<div class="bg-gb-surface rounded-xl p-3">
-							<p class="text-xs text-gb-text-muted">VPD</p>
-							<p class="text-lg font-bold text-gb-green">Ø {vpdStats.avg.toFixed(2)} kPa</p>
-							<p class="text-[10px] text-gb-text-muted">{vpdStats.min!.toFixed(2)} – {vpdStats.max!.toFixed(2)}</p>
+						<div class="bg-gb-surface rounded-xl p-3 text-center">
+							<p class="text-[10px] text-gb-text-muted uppercase tracking-wide">Ø VPD</p>
+							<p class="text-lg font-bold text-gb-green mt-0.5">{vpdStats.avg.toFixed(2)}</p>
 						</div>
 					{/if}
-					{#if ecStats.avg !== null}
-						<div class="bg-gb-surface rounded-xl p-3">
-							<p class="text-xs text-gb-text-muted">EC</p>
-							<p class="text-lg font-bold">Ø {ecStats.avg.toFixed(2)}</p>
-							<p class="text-[10px] text-gb-text-muted">{ecStats.min!.toFixed(2)} – {ecStats.max!.toFixed(2)}</p>
-						</div>
-					{/if}
-					{#if phStats.avg !== null}
-						<div class="bg-gb-surface rounded-xl p-3">
-							<p class="text-xs text-gb-text-muted">pH</p>
-							<p class="text-lg font-bold">Ø {phStats.avg.toFixed(1)}</p>
-							<p class="text-[10px] text-gb-text-muted">{phStats.min!.toFixed(1)} – {phStats.max!.toFixed(1)}</p>
+					{#if totalWaterMl > 0}
+						<div class="bg-gb-surface rounded-xl p-3 text-center">
+							<p class="text-[10px] text-gb-text-muted uppercase tracking-wide">💧 Wasser</p>
+							<p class="text-lg font-bold text-gb-info mt-0.5">{(totalWaterMl / 1000).toFixed(1)} L</p>
 						</div>
 					{/if}
 				</div>
-
-				<!-- Phase-Sub-Stats: Ø pro Phase (zeigt sich nur wenn ≥2 Phasen Daten haben) -->
-				{#if Object.keys(tempPerPhase).length >= 2 || Object.keys(vpdPerPhase).length >= 2 || Object.keys(ecPerPhase).length >= 2}
-					<div class="bg-gb-surface rounded-xl p-3 space-y-2">
-						<p class="text-xs text-gb-text-muted">Ø pro Phase</p>
-						<div class="overflow-x-auto -mx-1 px-1">
-							<table class="w-full text-xs">
-								<thead>
-									<tr class="text-gb-text-muted text-[10px] uppercase tracking-wide">
-										<th class="text-left font-medium pb-1">Phase</th>
-										<th class="text-right font-medium pb-1">Temp</th>
-										<th class="text-right font-medium pb-1">VPD</th>
-										<th class="text-right font-medium pb-1">EC</th>
-									</tr>
-								</thead>
-								<tbody>
-									{#each Array.from(new Set([...Object.keys(tempPerPhase), ...Object.keys(vpdPerPhase), ...Object.keys(ecPerPhase)])) as phase}
-										<tr class="border-t border-gb-border/50">
-											<td class="py-1.5 font-medium">{phase}</td>
-											<td class="text-right text-gb-text-muted">{tempPerPhase[phase]?.avg !== null && tempPerPhase[phase] !== undefined ? `${tempPerPhase[phase].avg!.toFixed(1)}°` : '—'}</td>
-											<td class="text-right text-gb-text-muted">{vpdPerPhase[phase]?.avg !== null && vpdPerPhase[phase] !== undefined ? vpdPerPhase[phase].avg!.toFixed(2) : '—'}</td>
-											<td class="text-right text-gb-text-muted">{ecPerPhase[phase]?.avg !== null && ecPerPhase[phase] !== undefined ? ecPerPhase[phase].avg!.toFixed(2) : '—'}</td>
-										</tr>
-									{/each}
-								</tbody>
-							</table>
-						</div>
-					</div>
-				{/if}
-
-				{#if phaseDays.length > 0}
-					<div class="bg-gb-surface rounded-xl p-3">
-						<p class="text-xs text-gb-text-muted mb-1">Tage pro Phase</p>
-						<div class="flex flex-wrap gap-2">
-							{#each phaseDays as pd}
-								<span class="bg-gb-bg px-2 py-1 rounded text-xs">
-									<span class="text-gb-text-muted">{pd.phase}:</span> <span class="font-semibold">{pd.days}d</span>
-								</span>
-							{/each}
-						</div>
-					</div>
-				{/if}
+				<a href="/grow/{grow.id}/stats"
+					class="block bg-gb-surface rounded-xl p-3 text-center hover:bg-gb-surface-2 transition-colors">
+					<span class="text-sm">📊 Vollständige Statistik <span class="text-gb-text-muted">→</span></span>
+				</a>
 			</div>
 		{/if}
 
