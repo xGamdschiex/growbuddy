@@ -18,6 +18,7 @@
 		type MetricStats,
 	} from '$lib/utils/grow-stats';
 	import MiniChart from '$lib/components/MiniChart.svelte';
+	import MultiSeriesChart, { type ChartSeries } from '$lib/components/MultiSeriesChart.svelte';
 	import { onMount } from 'svelte';
 
 	let growId = $derived($page.params.id);
@@ -78,7 +79,7 @@
 		if (!grow) return 0;
 		return Math.floor((new Date(c.created_at).getTime() - new Date(grow.started_at).getTime()) / 86400000) + 1;
 	}
-	function seriesFrom(key: 'temp' | 'rh') {
+	function seriesFrom(key: 'temp' | 'rh' | 'vpd' | 'ec_measured' | 'ph_measured') {
 		const filtered = chronCheckins.filter((c: CheckIn) => (c as any)[key] != null);
 		return {
 			values: filtered.map((c: CheckIn) => (c as any)[key] as number),
@@ -87,6 +88,9 @@
 	}
 	let tempSeries = $derived(seriesFrom('temp'));
 	let rhSeries = $derived(seriesFrom('rh'));
+	let vpdSeries = $derived(seriesFrom('vpd'));
+	let ecSeries = $derived(seriesFrom('ec_measured'));
+	let phSeries = $derived(seriesFrom('ph_measured'));
 	let waterSeries = $derived.by(() => {
 		const filtered = chronCheckins.filter((c: CheckIn) => c.water_ml != null && (c.water_ml as number) > 0);
 		let cum = 0;
@@ -145,6 +149,26 @@
 	}
 	let tempPhaseTargets = $derived(phaseTargetsFor(TEMP_TARGETS_BY_PHASE, tempSeries.days));
 	let rhPhaseTargets = $derived(phaseTargetsFor(RH_TARGETS_BY_PHASE, rhSeries.days));
+
+	// MultiSeriesChart: alle 7 Metriken zur Auswahl
+	let allSeries: ChartSeries[] = $derived([
+		{ key: 'temp', label: 'Temp', color: '#f59e0b', unit: '°C', values: tempSeries.values, days: tempSeries.days },
+		{ key: 'rh', label: 'RH', color: '#3b82f6', unit: '%', values: rhSeries.values, days: rhSeries.days },
+		{ key: 'vpd', label: 'VPD', color: '#22c55e', unit: ' kPa', values: vpdSeries.values, days: vpdSeries.days },
+		{ key: 'ec', label: 'EC', color: '#a855f7', unit: '', values: ecSeries.values, days: ecSeries.days },
+		{ key: 'ph', label: 'pH', color: '#ef4444', unit: '', values: phSeries.values, days: phSeries.days },
+		{ key: 'water', label: 'Wasser', color: '#0ea5e9', unit: ' L', values: waterSeries.values, days: waterSeries.days },
+		{ key: 'nutrient', label: 'Dünger', color: '#84cc16', unit: ' mL', values: nutrientSeries.values, days: nutrientSeries.days },
+	]);
+	// Default-aktive Metriken: VPD + EC + Wasser (häufigste Health-Indikatoren)
+	let enabledKeys = $state<string[]>(['vpd', 'ec', 'water']);
+	function toggleKey(key: string) {
+		enabledKeys = enabledKeys.includes(key)
+			? enabledKeys.filter(k => k !== key)
+			: [...enabledKeys, key];
+	}
+	// Series die mind. 2 Datenpunkte haben (sonst nicht sinnvoll plotbar)
+	let plottableSeries = $derived(allSeries.filter(s => s.values.length >= 2));
 
 	let allPhases = $derived(Array.from(new Set([
 		...Object.keys(tempPerPhase), ...Object.keys(rhPerPhase),
@@ -334,6 +358,31 @@
 							{/each}
 						</div>
 					</div>
+				</div>
+			{/if}
+
+			<!-- Multi-Series Combined-Chart (v1.3.58): alle 7 Metriken überlagert, Pills zum Toggle -->
+			{#if plottableSeries.length >= 2}
+				<div class="space-y-2">
+					<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">Alle Werte überlagert</h2>
+					<div class="bg-gb-surface rounded-xl p-3">
+						<div class="flex flex-wrap gap-1.5 mb-3">
+							{#each plottableSeries as s}
+								{@const active = enabledKeys.includes(s.key)}
+								<button type="button" onclick={() => toggleKey(s.key)}
+									class="text-[11px] px-2.5 py-1 rounded-full border font-medium transition-colors flex items-center gap-1.5 {active ? 'border-transparent text-white' : 'border-gb-border text-gb-text-muted bg-gb-bg/50 hover:text-gb-text'}"
+									style={active ? `background-color: ${s.color}` : ''}>
+									<span class="w-1.5 h-1.5 rounded-full" style="background-color: {active ? '#fff' : s.color}"></span>
+									{s.label}
+								</button>
+							{/each}
+						</div>
+					</div>
+					<MultiSeriesChart series={allSeries} {enabledKeys} />
+					<p class="text-[10px] text-gb-text-muted px-2">
+						Werte sind pro Metrik einzeln skaliert (jede Linie nutzt ihren eigenen Min/Max-Range).
+						So bleiben Verläufe vergleichbar, auch bei sehr unterschiedlichen Größen (Temp vs. Wasser).
+					</p>
 				</div>
 			{/if}
 
