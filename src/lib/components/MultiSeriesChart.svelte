@@ -72,6 +72,25 @@
 		}));
 	}
 
+	// Min/Max + Last-Value pro Series für Inline-Labels
+	function extremesFor(s: ChartSeries) {
+		if (s.values.length < 2) return null;
+		const ps = pointsFor(s);
+		let minIdx = 0, maxIdx = 0;
+		for (let i = 1; i < s.values.length; i++) {
+			if (s.values[i] < s.values[minIdx]) minIdx = i;
+			if (s.values[i] > s.values[maxIdx]) maxIdx = i;
+		}
+		return { min: ps[minIdx], max: ps[maxIdx], last: ps[ps.length - 1] };
+	}
+
+	// Format-Helper: kürzt unnötige Dezimalen je nach Wert
+	function fmt(v: number, unit: string): string {
+		const abs = Math.abs(v);
+		const dp = abs >= 100 ? 0 : abs >= 10 ? 1 : 2;
+		return v.toFixed(dp) + unit.trim();
+	}
+
 	// Tap-Tooltip: zeigt für gewählten Day pro aktiver Series den Original-Wert
 	let activeDay = $state<number | null>(null);
 
@@ -161,6 +180,33 @@
 					stroke-linejoin="round"
 					stroke-linecap="round"
 				/>
+			{/each}
+
+			<!-- Min/Max + Last-Value Labels pro aktiver Series -->
+			{#each activeSeries as s}
+				{@const ext = extremesFor(s)}
+				{#if ext}
+					<!-- Min-Label (unter dem Punkt) -->
+					<text x={ext.min.x} y={ext.min.y + 12} font-size="9" font-weight="600"
+						text-anchor="middle" fill={s.color} stroke="#0a0a0a" stroke-width="3" paint-order="stroke">
+						{fmt(ext.min.value, s.unit)}
+					</text>
+					<!-- Max-Label (über dem Punkt) -->
+					{#if ext.max.x !== ext.min.x || ext.max.y !== ext.min.y}
+						<text x={ext.max.x} y={ext.max.y - 5} font-size="9" font-weight="600"
+							text-anchor="middle" fill={s.color} stroke="#0a0a0a" stroke-width="3" paint-order="stroke">
+							{fmt(ext.max.value, s.unit)}
+						</text>
+					{/if}
+					<!-- Last-Value rechts (nur wenn nicht == max/min) -->
+					{#if ext.last.x !== ext.min.x && ext.last.x !== ext.max.x}
+						<text x={Math.min(ext.last.x + 4, width - 2)} y={ext.last.y + 3} font-size="9" font-weight="600"
+							text-anchor={ext.last.x > width - 30 ? 'end' : 'start'}
+							fill={s.color} stroke="#0a0a0a" stroke-width="3" paint-order="stroke">
+							{fmt(ext.last.value, s.unit)}
+						</text>
+					{/if}
+				{/if}
 			{/each}
 
 			<!-- Tap-Linie + Punkte -->
