@@ -25,3 +25,6 @@ keystore/*.keystore
 # Build-Artefakte / APKs
 dist/*.apk
 *.apk
+
+# Claude Code temp files
+.claude-tmp-*
