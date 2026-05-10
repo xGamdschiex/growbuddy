@@ -6,7 +6,8 @@
 
 	// Vite-injected: __APP_VERSION__ aus package.json (declared in src/app.d.ts)
 	const VERSION = __APP_VERSION__;
-	const FEEDBACK_EMAIL = 'feedback@growbuddy.app';
+	// Beta-Phase: realer Kanal. Spätere Migration auf feedback@growbuddy.app möglich.
+	const FEEDBACK_EMAIL = 'lauritz.wirtz@gmail.com';
 	const PRIVACY_URL = '/privacy';
 
 	// Build-Datum aus aktuellem Browser-Time bei Mount (lokal)
