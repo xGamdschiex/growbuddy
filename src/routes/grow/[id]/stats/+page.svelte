@@ -7,6 +7,7 @@
 	 */
 	import { page } from '$app/stores';
 	import { growStore } from '$lib/stores/grow';
+	import { isPro } from '$lib/stores/pro';
 	import type { CheckIn } from '$lib/stores/grow';
 	import { phaseDaysSummary } from '$lib/utils/phase';
 	import {
@@ -16,13 +17,21 @@
 		checkinConsistency,
 		type MetricStats,
 	} from '$lib/utils/grow-stats';
+	import MiniChart from '$lib/components/MiniChart.svelte';
 	import { onMount } from 'svelte';
 
 	let growId = $derived($page.params.id);
 	let growState = $state<any>({ grows: [], checkins: [] });
 	let grow = $derived(growState?.grows?.find((g: any) => g.id === growId));
+	let userIsPro = $state(false);
 
-	onMount(() => growStore.subscribe(v => growState = v));
+	onMount(() => {
+		const subs = [
+			growStore.subscribe(v => growState = v),
+			isPro.subscribe(v => userIsPro = v),
+		];
+		return () => subs.forEach(u => u());
+	});
 
 	// Chrono-sortierte Check-ins dieses Grows
 	let chronCheckins = $derived(
@@ -63,6 +72,80 @@
 	);
 
 	let phaseDays = $derived(grow ? phaseDaysSummary(grow, chronCheckins) : []);
+
+	// Chart-Series (Temp/RH/Wasser/Dünger) — auf Stats-Page (Übersicht hat VPD/EC/pH)
+	function dayOf(c: CheckIn): number {
+		if (!grow) return 0;
+		return Math.floor((new Date(c.created_at).getTime() - new Date(grow.started_at).getTime()) / 86400000) + 1;
+	}
+	function seriesFrom(key: 'temp' | 'rh') {
+		const filtered = chronCheckins.filter((c: CheckIn) => (c as any)[key] != null);
+		return {
+			values: filtered.map((c: CheckIn) => (c as any)[key] as number),
+			days: filtered.map(dayOf),
+		};
+	}
+	let tempSeries = $derived(seriesFrom('temp'));
+	let rhSeries = $derived(seriesFrom('rh'));
+	let waterSeries = $derived.by(() => {
+		const filtered = chronCheckins.filter((c: CheckIn) => c.water_ml != null && (c.water_ml as number) > 0);
+		let cum = 0;
+		const points = filtered.map((c: CheckIn) => {
+			cum += (c.water_ml as number) / 1000;
+			return { day: dayOf(c), value: Math.round(cum * 10) / 10 };
+		});
+		return { values: points.map((p: { day: number; value: number }) => p.value), days: points.map((p: { day: number; value: number }) => p.day) };
+	});
+	let nutrientSeries = $derived.by(() => {
+		const filtered = chronCheckins.filter((c: CheckIn) => c.nutrient_ml != null && (c.nutrient_ml as number) > 0);
+		return { values: filtered.map((c: CheckIn) => c.nutrient_ml as number), days: filtered.map(dayOf) };
+	});
+
+	// Phase-Marker für Charts (gleicher Algorithmus wie auf Übersicht)
+	function markersFor(serieDays: number[]): { atIndex: number; label: string }[] {
+		if (!serieDays.length) return [];
+		const out: { atIndex: number; label: string }[] = [];
+		let lastPhase: string | null = null;
+		serieDays.forEach((d: number, i: number) => {
+			const ci = chronCheckins.find((c: CheckIn) => dayOf(c) === d);
+			const ph = (ci?.phase as string) || '';
+			if (ph && ph !== lastPhase) {
+				if (lastPhase !== null) out.push({ atIndex: i, label: ph });
+				lastPhase = ph;
+			}
+		});
+		return out;
+	}
+	let tempMarkers = $derived(markersFor(tempSeries.days));
+	let rhMarkers = $derived(markersFor(rhSeries.days));
+	let waterMarkers = $derived(markersFor(waterSeries.days));
+	let nutrientMarkers = $derived(markersFor(nutrientSeries.days));
+
+	// Phase-Targets (nur Temp/RH brauchen sie für Range-Anzeige)
+	const TEMP_TARGETS_BY_PHASE = {
+		Veg: { min: 22, max: 28 }, Bloom: { min: 20, max: 26 }, Flush: { min: 18, max: 24 },
+	} as const;
+	const RH_TARGETS_BY_PHASE = {
+		Veg: { min: 55, max: 70 }, Bloom: { min: 40, max: 55 }, Flush: { min: 35, max: 50 },
+	} as const;
+	function phaseTargetsFor(targetMap: Record<string, { min: number; max: number }>, serieDays: number[]) {
+		if (!serieDays.length) return [];
+		const segs: { atIndex: number; min: number; max: number }[] = [];
+		let lastPhase: string | null = null;
+		serieDays.forEach((d: number, i: number) => {
+			const ci = chronCheckins.find((c: CheckIn) => dayOf(c) === d);
+			const ph = (ci?.phase as string) || 'Veg';
+			if (ph !== lastPhase) {
+				const t = targetMap[ph];
+				if (t) segs.push({ atIndex: i, min: t.min, max: t.max });
+				lastPhase = ph;
+			}
+		});
+		return segs;
+	}
+	let tempPhaseTargets = $derived(phaseTargetsFor(TEMP_TARGETS_BY_PHASE, tempSeries.days));
+	let rhPhaseTargets = $derived(phaseTargetsFor(RH_TARGETS_BY_PHASE, rhSeries.days));
+
 	let allPhases = $derived(Array.from(new Set([
 		...Object.keys(tempPerPhase), ...Object.keys(rhPerPhase),
 		...Object.keys(vpdPerPhase), ...Object.keys(ecPerPhase), ...Object.keys(phPerPhase),
@@ -251,6 +334,54 @@
 							{/each}
 						</div>
 					</div>
+				</div>
+			{/if}
+
+			<!-- Verlaufsgrafiken (v1.3.57: Temp/RH/Wasser/Dünger — VPD/EC/pH sind auf Übersicht) -->
+			{#if tempSeries.values.length >= 2 || rhSeries.values.length >= 2 || waterSeries.values.length >= 2 || nutrientSeries.values.length >= 2}
+				<div class="space-y-2">
+					<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide flex items-center gap-2">
+						Verlaufsgrafiken
+						{#if !userIsPro}
+							<span class="text-[10px] bg-gb-accent/20 text-gb-accent px-2 py-0.5 rounded-full font-normal">Pro</span>
+						{/if}
+					</h2>
+					{#if userIsPro}
+						{#if tempSeries.values.length >= 2}
+							<MiniChart data={tempSeries.values} days={tempSeries.days} phaseMarkers={tempMarkers}
+								phaseTargets={tempPhaseTargets} showMinMax
+								color="#f59e0b" label="Temperatur" unit="°C" />
+						{/if}
+						{#if rhSeries.values.length >= 2}
+							<MiniChart data={rhSeries.values} days={rhSeries.days} phaseMarkers={rhMarkers}
+								phaseTargets={rhPhaseTargets} showMinMax
+								color="#3b82f6" label="Luftfeuchte" unit="%" />
+						{/if}
+						{#if waterSeries.values.length >= 2}
+							<MiniChart data={waterSeries.values} days={waterSeries.days} phaseMarkers={waterMarkers}
+								showMinMax color="#0ea5e9" label="Wasser kumulativ" unit=" L" />
+						{/if}
+						{#if nutrientSeries.values.length >= 2}
+							<MiniChart data={nutrientSeries.values} days={nutrientSeries.days} phaseMarkers={nutrientMarkers}
+								showMinMax color="#84cc16" label="Dünger" unit=" mL" />
+						{/if}
+					{:else}
+						<div class="bg-gradient-to-br from-gb-accent/15 to-gb-accent/5 border border-gb-accent/30 rounded-xl p-4">
+							<div class="flex items-start gap-3">
+								<div class="text-2xl">📊</div>
+								<div class="flex-1">
+									<p class="font-semibold text-sm">4 Charts mit Pro</p>
+									<p class="text-xs text-gb-text-muted mt-1 leading-relaxed">
+										Temperatur, Luftfeuchte, Wasser-Verbrauch und Dünger über die Zeit — alle mit Phasen-Targets, Tap-Tooltips und Min/Max-Markern.
+									</p>
+									<a href="/pro" class="inline-block mt-3 bg-gb-accent text-white font-semibold text-xs px-4 py-2 rounded-lg"
+										style="min-height:36px; display:inline-flex; align-items:center;">
+										Pro freischalten
+									</a>
+								</div>
+							</div>
+						</div>
+					{/if}
 				</div>
 			{/if}
 		{/if}
