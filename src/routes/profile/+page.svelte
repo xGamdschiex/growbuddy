@@ -286,6 +286,18 @@
 	let userIsPro = $state(false);
 	let reminder: any = $state({ enabled: false, time: '19:00', permission: 'default' });
 	let currentLocale: Locale = $state('de');
+
+	// Demo-Grow Status (für Mary-Jane-Demo)
+	let demoActive = $derived(growStore.hasDemo(growState));
+
+	function loadDemoGrow() {
+		growStore.loadDemo();
+		toastStore.success('Demo-Grow geladen — 35 Tage, 14 Check-ins');
+	}
+	function clearDemoGrow() {
+		growStore.clearDemo();
+		toastStore.info('Demo-Grow entfernt');
+	}
 </script>
 
 <div class="px-4 pt-6 max-w-lg mx-auto space-y-6 pb-24">
@@ -402,6 +414,35 @@
 				</label>
 			</div>
 			<p class="text-xs text-gb-text-muted text-center">Sichere deine Daten als JSON-Datei</p>
+		</div>
+
+		<!-- Demo-Grow (Mary-Jane-Demo) -->
+		<div class="bg-gb-surface rounded-xl p-4 space-y-2">
+			<div class="flex items-center gap-2">
+				<span class="text-lg">🎬</span>
+				<p class="text-sm font-medium">Demo-Grow</p>
+				{#if demoActive}
+					<span class="ml-auto text-[10px] bg-gb-green/15 text-gb-green px-2 py-0.5 rounded-full">aktiv</span>
+				{/if}
+			</div>
+			<p class="text-xs text-gb-text-muted leading-relaxed">
+				Lädt einen 35-Tage-Demo-Grow mit 14 plausiblen Check-ins (für Demo-Zwecke). Beeinflusst echte Grows nicht — jederzeit reset-bar.
+			</p>
+			<div class="flex gap-2 pt-1">
+				{#if !demoActive}
+					<button onclick={loadDemoGrow}
+						class="flex-1 bg-gb-accent/15 border border-gb-accent/30 text-gb-accent font-medium text-sm py-2.5 rounded-lg hover:bg-gb-accent/25 transition-colors"
+						style="min-height:44px;">
+						🎬 Demo laden
+					</button>
+				{:else}
+					<button onclick={clearDemoGrow}
+						class="flex-1 bg-gb-danger/10 border border-gb-danger/20 text-gb-danger font-medium text-sm py-2.5 rounded-lg hover:bg-gb-danger/20 transition-colors"
+						style="min-height:44px;">
+						🗑️ Demo entfernen
+					</button>
+				{/if}
+			</div>
 		</div>
 	</div>
 

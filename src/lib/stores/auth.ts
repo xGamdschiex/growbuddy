@@ -13,6 +13,7 @@ import type { User, Session } from '@supabase/supabase-js';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Browser } from '@capacitor/browser';
+import { logger } from '$lib/utils/logger';
 
 const NATIVE_CALLBACK = 'growbuddy://auth/callback';
 const VERCEL_CALLBACK = 'https://growbuddy-app.vercel.app/auth/callback';
@@ -68,7 +69,7 @@ function createAuthStore() {
 	async function init() {
 		try {
 			const { data: { session } } = await supabase.auth.getSession();
-			console.log('[auth] init session=', session?.user?.id ?? null);
+			logger.info('[auth] init', { user: session?.user?.id ?? null });
 			set({
 				user: session?.user ?? null,
 				session: session ?? null,
@@ -81,7 +82,7 @@ function createAuthStore() {
 
 		// Auth-State-Changes lauschen (Login, Logout, Token-Refresh)
 		supabase.auth.onAuthStateChange((event, session) => {
-			console.log('[auth] state', event, 'user=', session?.user?.id ?? null);
+			logger.info('[auth] state', { event, user: session?.user?.id ?? null });
 			set({
 				user: session?.user ?? null,
 				session: session ?? null,
@@ -102,7 +103,7 @@ function createAuthStore() {
 
 		/** Magic Link Login (E-Mail) */
 		async loginWithEmail(email: string): Promise<{ error: string | null }> {
-			console.log('[auth] loginWithEmail to', email, 'redirect=', getRedirectUrl());
+			logger.info('[auth] loginWithEmail', { email, redirect: getRedirectUrl() });
 			const { error } = await supabase.auth.signInWithOtp({
 				email,
 				options: { emailRedirectTo: getRedirectUrl() },
@@ -113,7 +114,7 @@ function createAuthStore() {
 
 		/** Google OAuth Login */
 		async loginWithGoogle(): Promise<{ error: string | null }> {
-			console.log('[auth] loginWithGoogle native=', Capacitor.isNativePlatform());
+			logger.info('[auth] loginWithGoogle', { native: Capacitor.isNativePlatform() });
 			if (Capacitor.isNativePlatform()) {
 				const { data, error } = await supabase.auth.signInWithOAuth({
 					provider: 'google',
@@ -124,7 +125,7 @@ function createAuthStore() {
 					return { error: error.message };
 				}
 				if (data?.url) {
-					console.log('[auth] opening Browser →', data.url.slice(0, 80) + '…');
+					logger.info('[auth] opening Browser', { url: data.url.slice(0, 80) + '…' });
 					await Browser.open({ url: data.url, presentationStyle: 'popover' });
 				}
 				return { error: null };
@@ -139,7 +140,7 @@ function createAuthStore() {
 
 		/** Logout */
 		async logout(): Promise<void> {
-			console.log('[auth] logout');
+			logger.info('[auth] logout');
 			await supabase.auth.signOut();
 			set({ user: null, session: null, loading: false });
 		},

@@ -231,7 +231,128 @@ function createGrowStore() {
 				.filter(c => c.grow_id === growId)
 				.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 		},
+
+		/**
+		 * Demo-Daten für Mary-Jane-Demo: 1 aktiver 35-Tage-Grow + 14 Check-ins.
+		 * Idempotent — mehrfacher Aufruf ersetzt alte Demo-Daten.
+		 * Reset über `clearDemo()`.
+		 */
+		loadDemo(): void {
+			update(s => {
+				const purged: GrowState = {
+					grows: s.grows.filter(g => g.id !== DEMO_GROW_ID),
+					checkins: s.checkins.filter(c => c.grow_id !== DEMO_GROW_ID),
+				};
+				const { grow, checkins } = buildDemoData();
+				return {
+					grows: [...purged.grows, grow],
+					checkins: [...purged.checkins, ...checkins],
+				};
+			});
+		},
+
+		/** Entfernt nur die Demo-Daten, lässt echte Grows + Check-ins unangetastet. */
+		clearDemo(): void {
+			update(s => ({
+				grows: s.grows.filter(g => g.id !== DEMO_GROW_ID),
+				checkins: s.checkins.filter(c => c.grow_id !== DEMO_GROW_ID),
+			}));
+		},
+
+		/** True wenn aktuell ein Demo-Grow aktiv ist. */
+		hasDemo(state: GrowState): boolean {
+			return state.grows.some(g => g.id === DEMO_GROW_ID);
+		},
 	};
+}
+
+// ─── DEMO-DATEN ─────────────────────────────────────────────────────────
+
+const DEMO_GROW_ID = 'demo-mary-jane-grow';
+
+/** Generiert plausible Demo-Daten: 35-Tage-Grow + 14 Check-ins. */
+function buildDemoData(): { grow: Grow; checkins: CheckIn[] } {
+	const now = Date.now();
+	const dayMs = 86400000;
+	const startedAt = new Date(now - 35 * dayMs).toISOString();
+	const nowIso = new Date(now).toISOString();
+
+	const grow: Grow = {
+		id: DEMO_GROW_ID,
+		name: 'Demo Mary Jane',
+		strain: 'Northern Lights Auto',
+		strain_type: 'auto',
+		medium: 'soil',
+		space: '60x60',
+		feedline_id: 'biobizz',
+		light_info: 'LED 150W',
+		plant_count: 2,
+		status: 'active',
+		started_at: startedAt,
+		harvested_at: null,
+		yield_g: null,
+		grow_score: null,
+		notes: 'Demo-Grow für Mary-Jane-Messe — beliebig per Reset löschbar.',
+		system: 'topf',
+		coco_perlite_ratio: 70,
+		is_public: false,
+		updated_at: nowIso,
+	};
+
+	// 14 Check-ins über 35 Tage:
+	// Veg W1-3 (Tag 1, 4, 7, 11, 15, 18, 21) → 7 CIs
+	// Bloom W1-3 (Tag 22, 25, 28, 31, 33, 34, 35) → 7 CIs
+	type CIDef = { day: number; phase: string; week: number; t: number; rh: number; ec: number; ph: number; notes: string; train: string | null };
+	const defs: CIDef[] = [
+		{ day: 1,  phase: 'Veg',   week: 1, t: 25.0, rh: 65, ec: 1.2, ph: 6.0, notes: 'Erste Blätter, sieht gesund aus.',          train: null },
+		{ day: 4,  phase: 'Veg',   week: 1, t: 24.5, rh: 62, ec: 1.4, ph: 6.0, notes: 'Wachstum konstant.',                          train: null },
+		{ day: 7,  phase: 'Veg',   week: 2, t: 25.0, rh: 60, ec: 1.6, ph: 6.1, notes: 'Erstes echtes Blattpaar entwickelt.',         train: null },
+		{ day: 11, phase: 'Veg',   week: 2, t: 25.5, rh: 58, ec: 1.7, ph: 6.0, notes: 'Stamm wird stabiler.',                         train: 'LST' },
+		{ day: 15, phase: 'Veg',   week: 3, t: 26.0, rh: 56, ec: 1.8, ph: 6.0, notes: 'LST-Tie-Down erfolgreich.',                    train: 'LST' },
+		{ day: 18, phase: 'Veg',   week: 3, t: 25.5, rh: 55, ec: 1.9, ph: 6.1, notes: 'Side-Branches kommen.',                        train: null },
+		{ day: 21, phase: 'Veg',   week: 3, t: 25.0, rh: 55, ec: 2.0, ph: 6.0, notes: 'Übergang Veg → Bloom steht bevor.',            train: null },
+		{ day: 22, phase: 'Bloom', week: 1, t: 25.0, rh: 52, ec: 2.0, ph: 6.2, notes: 'Erste Pre-Flowers sichtbar.',                  train: null },
+		{ day: 25, phase: 'Bloom', week: 1, t: 24.5, rh: 50, ec: 2.1, ph: 6.2, notes: 'Stretch beginnt.',                             train: null },
+		{ day: 28, phase: 'Bloom', week: 2, t: 24.0, rh: 48, ec: 2.2, ph: 6.3, notes: 'Erste echte Buds.',                            train: null },
+		{ day: 31, phase: 'Bloom', week: 2, t: 24.0, rh: 48, ec: 2.3, ph: 6.3, notes: 'Bloom-Booster auf 100%.',                       train: null },
+		{ day: 33, phase: 'Bloom', week: 3, t: 23.5, rh: 45, ec: 2.4, ph: 6.4, notes: 'Buds dichten sich.',                           train: null },
+		{ day: 34, phase: 'Bloom', week: 3, t: 23.5, rh: 45, ec: 2.4, ph: 6.4, notes: 'Erste Trichome milchig.',                      train: null },
+		{ day: 35, phase: 'Bloom', week: 3, t: 23.0, rh: 44, ec: 2.5, ph: 6.4, notes: 'Bald in Late-Bloom-Phase.',                    train: null },
+	];
+
+	const checkins: CheckIn[] = defs.map((d, i) => {
+		const createdAt = new Date(now - (35 - d.day) * dayMs).toISOString();
+		// VPD: vereinfachte Berechnung über calcVPD-Formel-Konstanten
+		const tempLeaf = d.t - 2;
+		const svpAir = 0.6108 * Math.exp((17.27 * d.t) / (d.t + 237.3));
+		const svpLeaf = 0.6108 * Math.exp((17.27 * tempLeaf) / (tempLeaf + 237.3));
+		const vpd = Math.round((svpLeaf - svpAir * (d.rh / 100)) * 100) / 100;
+		return {
+			id: `${DEMO_GROW_ID}-ci-${i + 1}`,
+			grow_id: DEMO_GROW_ID,
+			phase: d.phase,
+			week: d.week,
+			day: d.day - (d.phase === 'Bloom' ? 21 : 0),
+			photo_data: null,
+			photos_data: [],
+			temp: d.t,
+			rh: d.rh,
+			vpd,
+			ec_measured: d.ec,
+			ph_measured: d.ph,
+			watered: true,
+			nutrients_given: i % 2 === 0,
+			water_ml: 1500,
+			nutrient_ml: i % 2 === 0 ? 25 : null,
+			is_public: false,
+			training: d.train,
+			notes: d.notes,
+			created_at: createdAt,
+			updated_at: createdAt,
+		};
+	});
+
+	return { grow, checkins };
 }
 
 export const growStore = createGrowStore();

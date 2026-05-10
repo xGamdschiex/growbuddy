@@ -6,6 +6,7 @@
 	import { toastStore } from '$lib/stores/toast';
 	import { t } from '$lib/i18n';
 	import { onMount } from 'svelte';
+	import { logger } from '$lib/utils/logger';
 
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
 	let step = $state(0);
@@ -32,7 +33,7 @@
 			// User war schon eingeloggt mit dieser ID — kein neuer Login → ignorieren
 			return;
 		}
-		console.log('[onboarding] auth changed → finish (was', preLoginUserId, 'now', auth.user.id, ')');
+		logger.info('[onboarding] auth changed → finish', { was: preLoginUserId, now: auth.user.id });
 		finishing = true;
 		oauthPending = false;
 		toastStore.success('Eingeloggt — Daten werden synchronisiert');
@@ -44,13 +45,13 @@
 	async function cloudGoogle() {
 		// Wenn bereits eingeloggt → direkt finish (kein OAuth-Flow nötig)
 		if (auth.user && !finishing) {
-			console.log('[onboarding] already logged in → direct finish');
+			logger.info('[onboarding] already logged in → direct finish');
 			finishing = true;
 			toastStore.success('Bereits eingeloggt — App wird vorbereitet');
 			finish();
 			return;
 		}
-		console.log('[onboarding] cloudGoogle clicked, current user=', auth.user?.id ?? null);
+		logger.info('[onboarding] cloudGoogle clicked', { user: auth.user?.id ?? null });
 		preLoginUserId = auth.user?.id ?? null;
 		oauthPending = true;
 		const { error } = await authStore.loginWithGoogle();
@@ -78,7 +79,7 @@
 		if (!loginEmail.trim()) return;
 		// Wenn bereits eingeloggt → direkt finish
 		if (auth.user && !finishing) {
-			console.log('[onboarding] already logged in → direct finish (email path)');
+			logger.info('[onboarding] already logged in → direct finish (email path)');
 			finishing = true;
 			finish();
 			return;
@@ -134,7 +135,7 @@
 	function finish() {
 		if (navigatedAway) return;
 		navigatedAway = true;
-		console.log('[onboarding] finish exp=', experience, 'goal=', goal);
+		logger.info('[onboarding] finish', { exp: experience, goal });
 		onboardingStore.complete(experience, goal);
 		goto('/', { replaceState: true });
 	}
@@ -142,7 +143,7 @@
 	function skip() {
 		if (navigatedAway) return;
 		navigatedAway = true;
-		console.log('[onboarding] skip');
+		logger.info('[onboarding] skip');
 		onboardingStore.complete(null, null);
 		goto('/', { replaceState: true });
 	}

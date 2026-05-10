@@ -20,6 +20,7 @@
 	import { Browser } from '@capacitor/browser';
 	import { supabase } from '$lib/supabase';
 	import { onMount } from 'svelte';
+	import { logger } from '$lib/utils/logger';
 
 	let { children }: { children: Snippet } = $props();
 	let toasts = $state<Toast[]>([]);
@@ -74,7 +75,7 @@
 		const key = currentPath;
 		if (lastRedirectFor === key) return; // bereits in dieser Session umgeleitet
 		lastRedirectFor = key;
-		console.log('[onboarding] redirect from', currentPath, '→ /onboarding');
+		logger.info('[onboarding] redirect', { from: currentPath, to: '/onboarding' });
 		goto('/onboarding', { replaceState: true });
 	});
 
@@ -149,30 +150,30 @@
 		let exchanging = false;
 
 		const handle = CapacitorApp.addListener('appUrlOpen', async (event) => {
-			console.log('[auth] appUrlOpen', event.url);
+			logger.info('[auth] appUrlOpen', { url: event.url });
 			try {
 				const u = new URL(event.url);
 				const code = u.searchParams.get('code');
 				if (code) {
 					if (processedCodes.has(code)) {
-						console.log('[auth] code already processed, skip');
+						logger.debug('[auth] code already processed, skip');
 						await Browser.close().catch(() => {});
 						return;
 					}
 					if (exchanging) {
-						console.log('[auth] another exchange in flight, skip');
+						logger.debug('[auth] another exchange in flight, skip');
 						return;
 					}
 					exchanging = true;
 					processedCodes.add(code);
-					console.log('[auth] exchangeCodeForSession start');
+					logger.info('[auth] exchangeCodeForSession start');
 					const { error } = await supabase.auth.exchangeCodeForSession(code);
 					exchanging = false;
 					if (error) {
 						console.warn('[auth] exchangeCodeForSession error', error.message);
 						toastStore.warning('Login-Fehler: ' + error.message);
 					} else {
-						console.log('[auth] exchangeCodeForSession ok');
+						logger.info('[auth] exchangeCodeForSession ok');
 					}
 					await Browser.close().catch(() => {});
 					return;
@@ -183,7 +184,7 @@
 				const access_token = params.get('access_token');
 				const refresh_token = params.get('refresh_token');
 				if (access_token && refresh_token) {
-					console.log('[auth] setSession from implicit hash');
+					logger.info('[auth] setSession from implicit hash');
 					await supabase.auth.setSession({ access_token, refresh_token });
 					await Browser.close().catch(() => {});
 				}
