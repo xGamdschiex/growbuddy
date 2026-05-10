@@ -11,7 +11,60 @@
  * EC: Veg 1.0-1.5, Bloom 1.4-2.2, Flush 0.0
  */
 
-import type { FeedLine } from './types';
+import type { FeedLine, LineModule } from './types';
+
+/**
+ * Advanced Nutrients Sensi pH Perfect Modul.
+ * Besonderheiten: pH wird automatisch gepuffert (5.5-6.3),
+ * A+B IMMER gleiche Menge, Big Bud W1-5 → Overdrive W6+.
+ */
+const advancedSensiModule: LineModule = {
+	weekNotes(phase, woche) {
+		const notes: string[] = [];
+		if ((phase === 'Veg' || phase === 'Bloom') && woche === 1) {
+			notes.push('A und B Komponenten IMMER in gleicher Menge — niemals einzeln dosieren');
+		}
+		if (phase === 'Veg' && woche <= 2) {
+			notes.push('Voodoo Juice nur in den ersten 2 Wochen — Wurzelaktivator');
+		}
+		if (phase === 'Bloom' && woche === 1) {
+			notes.push('Big Bud Start (1 mL/L) — pH Perfect kümmert sich um pH');
+		}
+		if (phase === 'Bloom' && woche === 2) {
+			notes.push('Bud Candy ab jetzt (Süße + Aroma)');
+		}
+		if (phase === 'Bloom' && (woche === 4 || woche === 5)) {
+			notes.push('Big Bud Peak (2 mL/L) — Höhepunkt der Knospenbildung');
+		}
+		if (phase === 'Bloom' && woche === 6) {
+			notes.push('Wechsel: Big Bud absetzen, Overdrive (2 mL/L) starten');
+		}
+		if (phase === 'Bloom' && woche === 8) {
+			notes.push('Letzte Bloom-Woche — minimal dosieren, Reifung');
+		}
+		if (phase === 'Flush') {
+			notes.push('Nur klares Wasser — Flawless Finish optional für Geschmack');
+		}
+		return notes;
+	},
+	validateInput(input) {
+		const warnings: string[] = [];
+		const errors: string[] = [];
+		// pH Perfect kümmert sich um pH — User-pH-Eingabe ist nicht nötig aber auch nicht schlimm
+		if (input.ist_ph !== undefined && (input.ist_ph < 5.0 || input.ist_ph > 7.0)) {
+			warnings.push('pH außerhalb 5.0-7.0: pH Perfect arbeitet nur in diesem Bereich zuverlässig');
+		}
+		return { warnings, errors };
+	},
+	recommendedAddons() {
+		return [
+			{ name: 'B-52', reason: 'Vitamin-B-Komplex — Stress-Reduktion durchgehend' },
+			{ name: 'Voodoo Juice', reason: 'Wurzelaktivator nur Veg W1-2' },
+			{ name: 'Big Bud + Overdrive', reason: 'Bloom-Booster — Big Bud W1-5, dann Overdrive W6+' },
+			{ name: 'Bud Candy', reason: 'Süße + Aroma in Bloom W2-W6' },
+		];
+	},
+};
 
 export const advancedSensi: FeedLine = {
   id: 'advanced-sensi',
@@ -71,4 +124,6 @@ export const advancedSensi: FeedLine = {
     'Big Bud nur in Bloom W1-5 (Peak Flowering), dann auf Overdrive wechseln.',
     'Voodoo Juice nur in den ersten 2 Wochen verwenden.',
   ],
+
+  module: advancedSensiModule,
 };

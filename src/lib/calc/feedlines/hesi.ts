@@ -18,7 +18,65 @@
  * optional 0.3-0.5 mL/L CalMag.
  */
 
-import type { FeedLine } from './types';
+import type { FeedLine, LineModule } from './types';
+
+/**
+ * Hesi Soil-Modul: chelatiert (= bei höherem pH noch verfügbar),
+ * enthält bereits Ca/Mg, hybrid organisch-mineralisch.
+ * Schema: Erde (Coco/Hydro abweichend, separate Line geplant).
+ */
+const hesiModule: LineModule = {
+	weekNotes(phase, woche) {
+		const notes: string[] = [];
+		if (phase === 'Clone') {
+			notes.push('Clone: SuperVit als Tropfen dosieren (1 Tropfen ≈ 0.08 mL/L)');
+		}
+		if (phase === 'Veg' && woche === 1) {
+			notes.push('Root Complex parallel zu TNT — fördert Wurzelaufbau');
+		}
+		if (phase === 'Veg' && woche === 4) {
+			notes.push('Root Complex absetzen, Bloom-Wechsel vorbereiten');
+		}
+		if (phase === 'Bloom' && woche === 1) {
+			notes.push('Bloom Complex statt TNT — Boost ab dieser Woche');
+		}
+		if (phase === 'Bloom' && woche === 2) {
+			notes.push('PK 13/14 Start (2 mL/L) — kann parallel zu Boost laufen (keine Konkurrenz)');
+		}
+		if (phase === 'Bloom' && woche === 3) {
+			notes.push('Phosphorus Plus ab jetzt (1 mL/L) für späte P-Versorgung');
+		}
+		if (phase === 'Bloom' && (woche === 4 || woche === 5)) {
+			notes.push('Peak-Blüte: PK 13/14 + Boost + Phos Plus zusammen');
+		}
+		if (phase === 'Bloom' && woche === 7) {
+			notes.push('Reifung: Nährstoffe reduzieren, Phos Plus absetzen');
+		}
+		if (phase === 'Flush') {
+			notes.push('Nur Wasser — Power Zyme optional zum Wurzelreste-Abbau');
+		}
+		// Allgemeiner Hinweis: SuperVit-Tropfen-Dosierung
+		if ((phase === 'Veg' || phase === 'Bloom') && woche === 1) {
+			notes.push('Power Zyme durchgehend (5 mL/L) — hilft beim organisch-mineralischen Abbau');
+		}
+		return notes;
+	},
+	validateInput(input) {
+		const warnings: string[] = [];
+		const errors: string[] = [];
+		if (input.medium === 'coco' || input.medium === 'hydro') {
+			warnings.push('Hesi Soil ist für Erde — Coco/Hydro brauchen abweichende Dosen (separate Line geplant)');
+		}
+		return { warnings, errors };
+	},
+	recommendedAddons() {
+		return [
+			{ name: 'Power Zyme', reason: 'Enzym durchgehend — Abbau toter Wurzeln' },
+			{ name: 'CalMag', reason: 'Nur bei RO/destilliertem Wasser optional — Hesi enthält Ca/Mg' },
+			{ name: 'SuperVit', reason: 'Vitamin-Komplex — als Tropfen (0.08 mL/L)' },
+		];
+	},
+};
 
 export const hesi: FeedLine = {
   id: 'hesi',
@@ -192,4 +250,6 @@ export const hesi: FeedLine = {
     'Power Zyme hilft beim Abbau toter Wurzeln — durchgehend einsetzbar',
     'Boost und PK 13/14 können parallel dosiert werden (keine Konkurrenz)',
   ],
+
+  module: hesiModule,
 };
