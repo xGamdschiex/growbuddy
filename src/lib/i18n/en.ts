@@ -168,6 +168,8 @@ export const en: Record<string, string> = {
 
 	// Onboarding
 	'onboarding.skip': 'Skip',
+	'onboarding.beta_pill': '🧪 Closed Beta',
+	'onboarding.beta_note': 'Pre-release version — data stays local, demo grow available in profile',
 	'onboarding.next': 'Next',
 	'onboarding.start': 'Let\'s go',
 	'onboarding.experience_title': 'How experienced are you?',
@@ -331,7 +333,7 @@ export const en: Record<string, string> = {
 	'onboarding.track_title': 'Track your grows',
 	'onboarding.track_sub': 'Daily check-ins with photos, VPD, EC/pH — all in one place. Keep track of every plant.',
 	'onboarding.calc_title': 'Precise nutrient calculation',
-	'onboarding.calc_sub': '6 nutrient lines, CalMag auto, factor smoothing — the most accurate calculator on the market.',
+	'onboarding.calc_sub': '11 nutrient lines (Athena, Canna, BioBizz, GH, AN, Hesi…), CalMag auto, factor smoothing.',
 	'onboarding.improve_title': 'Get better with every grow',
 	'onboarding.improve_sub': 'XP, levels and achievements based on real actions. Grow Score shows you where you stand.',
 	'onboarding.exp_beginner': 'Beginner',

@@ -168,6 +168,8 @@ export const de: Record<string, string> = {
 
 	// Onboarding
 	'onboarding.skip': 'Überspringen',
+	'onboarding.beta_pill': '🧪 Closed Beta',
+	'onboarding.beta_note': 'Vorab-Version — Daten lokal, Demo-Grow im Profil verfügbar',
 	'onboarding.next': 'Weiter',
 	'onboarding.start': 'Los geht\'s',
 	'onboarding.experience_title': 'Wie erfahren bist du?',
@@ -331,7 +333,7 @@ export const de: Record<string, string> = {
 	'onboarding.track_title': 'Tracke deine Grows',
 	'onboarding.track_sub': 'Tägliche Check-ins mit Foto, VPD, EC/pH — alles an einem Ort. Behalte den Überblick über jede Pflanze.',
 	'onboarding.calc_title': 'Präzise Nährstoffberechnung',
-	'onboarding.calc_sub': '6 Düngerlinien, CalMag-Auto, Faktor-Smoothing — der genaueste Rechner auf dem Markt.',
+	'onboarding.calc_sub': '11 Düngerlinien (Athena, Canna, BioBizz, GH, AN, Hesi…), CalMag-Auto, Faktor-Smoothing.',
 	'onboarding.improve_title': 'Werde besser mit jedem Grow',
 	'onboarding.improve_sub': 'XP, Level und Achievements basierend auf echten Aktionen. Grow Score zeigt dir, wo du stehst.',
 	'onboarding.exp_beginner': 'Anfänger',

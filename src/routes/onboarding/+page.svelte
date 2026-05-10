@@ -176,9 +176,19 @@
 	{#if step < slides.length}
 		<!-- Intro Slides -->
 		<div class="text-center space-y-6 animate-[fadeIn_0.4s_ease-out]">
+			{#if step === 0}
+				<!-- Beta-Pill (nur erster Slide, transparent für Tester) -->
+				<div class="inline-flex items-center gap-2 bg-gb-accent/15 text-gb-accent text-xs font-semibold px-3 py-1 rounded-full">
+					<span class="w-1.5 h-1.5 bg-gb-accent rounded-full animate-pulse"></span>
+					{tr('onboarding.beta_pill')}
+				</div>
+			{/if}
 			<span class="text-6xl block">{slides[step].icon}</span>
 			<h1 class="text-2xl font-bold leading-tight">{slides[step].title}</h1>
 			<p class="text-gb-text-muted leading-relaxed">{slides[step].subtitle}</p>
+			{#if step === 0}
+				<p class="text-[11px] text-gb-text-muted/70 italic">{tr('onboarding.beta_note')}</p>
+			{/if}
 
 			<!-- Dots -->
 			<div class="flex justify-center gap-2 pt-4">
