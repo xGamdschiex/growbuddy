@@ -8,7 +8,7 @@
 	import { hasCheckinToday, currentStreak } from '$lib/stores/streak';
 	import { authStore } from '$lib/stores/auth';
 	import { syncStore } from '$lib/stores/sync';
-	import { growStore } from '$lib/stores/grow';
+	import { growStore, demoActive } from '$lib/stores/grow';
 	import type { GrowState, Grow, CheckIn } from '$lib/stores/grow';
 	import { t } from '$lib/i18n';
 	import { hapticLight } from '$lib/utils/haptic';
@@ -29,6 +29,7 @@
 	// Reaktive Subscriptions (Tab-Wechsel-Bug: $derived.by sah Store-Updates nicht)
 	let auth = $state<any>({ user: null, loading: true });
 	let growState = $state<GrowState>({ grows: [], checkins: [] });
+	let demoOn = $state(false);
 	onMount(() => {
 		const subs = [
 			onboardingStore.subscribe(v => onboarding = v),
@@ -36,9 +37,15 @@
 			growStore.subscribe(v => growState = v),
 			toastStore.subscribe(v => toasts = v),
 			t.subscribe(v => tr = v),
+			demoActive.subscribe(v => demoOn = v),
 		];
 		return () => subs.forEach(u => u());
 	});
+
+	function clearDemoBanner() {
+		growStore.clearDemo();
+		toastStore.info('Demo-Modus beendet');
+	}
 
 	let showUpdateBanner = $state(false);
 	let waitingSW: ServiceWorker | null = null;
@@ -51,6 +58,8 @@
 		return onboarding.completed;
 	});
 	let showNav = $derived(onboardingDone && !isOnboardingPage);
+	// Demo-Banner nur wenn Demo-Daten aktiv UND App nutzbar (kein Onboarding/Loading)
+	let showDemoBanner = $derived(demoOn && onboardingDone && !isOnboardingPage);
 
 	// Offline Status
 	let isOffline = $state(false);
@@ -290,6 +299,17 @@
 {#if isOffline}
 	<div class="fixed top-0 inset-x-0 z-[110] bg-gb-warning text-black text-center py-1.5 text-xs font-medium animate-[slideDown_0.3s_ease-out]">
 		📡 Offline — Daten werden lokal gespeichert
+	</div>
+{/if}
+
+<!-- Demo-Banner: aktiv sobald Demo-Daten geladen sind (Mary-Jane-Demo) -->
+{#if showDemoBanner}
+	<div class="fixed top-{isOffline ? '8' : '0'} inset-x-0 z-[107] bg-gb-accent text-white py-1.5 text-xs font-medium flex items-center justify-center gap-3 px-4 animate-[slideDown_0.3s_ease-out]">
+		<span>🎬 Demo-Modus aktiv — Daten sind nicht echt</span>
+		<button onclick={clearDemoBanner}
+			class="bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded text-[11px] font-semibold">
+			Reset
+		</button>
 	</div>
 {/if}
 

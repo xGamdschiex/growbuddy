@@ -363,3 +363,5 @@ export const activeGrows = derived(growStore, $s => $s.grows.filter(g => g.statu
 export const harvestedGrows = derived(growStore, $s => $s.grows.filter(g => g.status === 'harvested'));
 export const totalGrows = derived(growStore, $s => $s.grows.length);
 export const totalHarvests = derived(growStore, $s => $s.grows.filter(g => g.status === 'harvested').length);
+/** True wenn Demo-Grow aktiv ist (für globalen Demo-Banner). */
+export const demoActive = derived(growStore, $s => $s.grows.some(g => g.id === DEMO_GROW_ID));

@@ -388,6 +388,17 @@
 		</div>
 	</a>
 
+	<!-- About / Beta-Info / Feedback-Channel -->
+	<a href="/about" class="block bg-gb-surface rounded-xl p-4 hover:bg-gb-surface-2 transition-colors">
+		<div class="flex items-center justify-between">
+			<div>
+				<p class="font-medium text-sm">ℹ️ Über GrowBuddy</p>
+				<p class="text-xs text-gb-text-muted">Version, Beta-Info, Feedback, Datenschutz</p>
+			</div>
+			<span class="text-gb-text-muted text-sm">&rarr;</span>
+		</div>
+	</a>
+
 	<!-- Daten-Backup -->
 	<div class="space-y-3">
 		<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">Daten</h2>
