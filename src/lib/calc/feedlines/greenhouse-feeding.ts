@@ -16,7 +16,145 @@
  * Engere Ranges als Athena weil niedrigere EC-Ziele.
  */
 
-import type { FeedLine } from './types';
+import type { FeedLine, LineModule } from './types';
+
+// ─── SHARED HELPERS (DRY für 3 GH-Lines) ────────────────────────────────
+
+/** Produkt-Hinweis: Calcium bei RO/weichem Wasser zuerst. */
+const ghCalciumNote = (input: { wasserprofil?: string }): string | null => {
+	if (input.wasserprofil?.includes('RO')) {
+		return 'Bei RO-Wasser: Zuerst Calcium bis EC 0.3-0.4, dann Hauptpulver';
+	}
+	return null;
+};
+
+/** Standard-Validierung: GH-Lines bevorzugen alle Medien, aber Erde+Coco profitieren von Calcium. */
+const ghValidate: LineModule['validateInput'] = (input) => {
+	const warnings: string[] = [];
+	const errors: string[] = [];
+	if (input.medium === 'coco' || (input.wasserprofil?.includes('RO'))) {
+		warnings.push('Coco/RO: Calcium-Pulver pflicht (sonst Ca-Defizit)');
+	}
+	return { warnings, errors };
+};
+
+// ─── HYBRIDS MODULE (8-10W Bluete-Strains) ──────────────────────────────
+
+const ghHybridsModule: LineModule = {
+	weekNotes(phase, woche) {
+		const notes: string[] = [];
+		if (phase === 'Veg' && woche === 1) {
+			notes.push('Seedling: konservativ dosieren, Calcium ab Tag 1');
+		}
+		if (phase === 'Veg' && woche === 3) {
+			notes.push('Letzte Veg-Woche — bald 12/12 Umstellung');
+		}
+		if (phase === 'Bloom' && woche === 1) {
+			notes.push('Stretch-Phase + Booster PK+ Start (0.34 g/L)');
+		}
+		if (phase === 'Bloom' && (woche === 4 || woche === 5)) {
+			notes.push('Booster PK+ Peak (0.50 g/L) — Phosphor-Maximum');
+		}
+		if (phase === 'Bloom' && woche === 6) {
+			notes.push('Booster PK+ Maximum (0.61 g/L) — letzter Push');
+		}
+		if (phase === 'Bloom' && woche === 7) {
+			notes.push('Calcium hochfahren (1.29 g/L) für späte Bud-Entwicklung');
+		}
+		if (phase === 'Bloom' && woche === 8) {
+			notes.push('Ripen: minimale Düngung, Trichome-Reifung');
+		}
+		if (phase === 'Flush') {
+			notes.push('Nur klares Wasser, 7-14 Tage');
+		}
+		return notes;
+	},
+	validateInput: ghValidate,
+	recommendedAddons() {
+		return [
+			{ name: 'GH Calcium-Pulver', reason: 'Bei RO/weichem Wasser pflicht — GH-Hauptpulver enthält wenig Ca' },
+			{ name: 'GH Booster PK+', reason: 'Bloom W1-W7 für Phosphor/Kalium-Boost' },
+			{ name: 'GH Enhancer', reason: 'Stimulator alle 2 Wochen, Veg → Bloom W3' },
+		];
+	},
+};
+
+// ─── SHORT-FLOWERING MODULE (6-8W Bluete, Indica-dominant) ──────────────
+
+const ghShortFloweringModule: LineModule = {
+	weekNotes(phase, woche) {
+		const notes: string[] = [];
+		if (phase === 'Veg' && woche === 1) {
+			notes.push('Seedling: niedrig dosieren, Calcium ab Tag 1');
+		}
+		if (phase === 'Veg' && woche === 2) {
+			notes.push('Letzte Veg-Woche (Short Flow nur 2W Veg) — 12/12 Wechsel naht');
+		}
+		if (phase === 'Bloom' && woche === 1) {
+			notes.push('Stretch-Phase + Booster PK+ Start (0.21 g/L)');
+		}
+		if (phase === 'Bloom' && woche === 3) {
+			notes.push('Peak Feeding — höchste EC-Range');
+		}
+		if (phase === 'Bloom' && woche === 4) {
+			notes.push('Booster PK+ Peak (0.50 g/L)');
+		}
+		if (phase === 'Bloom' && woche === 6) {
+			notes.push('Letzte volle Bloom-Woche');
+		}
+		if (phase === 'Bloom' && woche === 7) {
+			notes.push('Ripen: minimale Düngung, Trichome reifen');
+		}
+		if (phase === 'Flush') {
+			notes.push('Nur klares Wasser, 7-14 Tage');
+		}
+		return notes;
+	},
+	validateInput: ghValidate,
+	recommendedAddons() {
+		return [
+			{ name: 'GH Calcium-Pulver', reason: 'Bei RO/weichem Wasser pflicht' },
+			{ name: 'GH Booster PK+', reason: 'Bloom W1-W6 (1 Woche kürzer als Hybrids)' },
+			{ name: 'GH Enhancer', reason: 'Stimulator Veg → Bloom W2' },
+		];
+	},
+};
+
+// ─── GROW MODULE (reine Veg-Line, KEIN Bloom!) ──────────────────────────
+
+const ghGrowModule: LineModule = {
+	weekNotes(phase, woche) {
+		const notes: string[] = [];
+		if (phase === 'Clone') {
+			notes.push('Klon-Phase — sehr niedrig dosieren, Wurzelbildung priorisieren');
+		}
+		if (phase === 'Veg' && woche === 1) {
+			notes.push('Veg-Start: 0.5 g/L Grow-Pulver + Calcium ab Tag 1');
+		}
+		if (phase === 'Veg' && woche === 4) {
+			notes.push('Maximale Veg-Dosierung (1.0 g/L) — bei Bloom-Wechsel auf Hybrids/Short-Flow umstellen');
+		}
+		// Kein Bloom-Hinweis weil Schema gar kein Bloom hat (Mutterpflanzen-Line)
+		return notes;
+	},
+	validateInput(input) {
+		const warnings: string[] = [];
+		const errors: string[] = [];
+		if (input.phase === 'Bloom' || input.phase === 'Flush') {
+			warnings.push('GH Grow ist eine reine Veg-Line — bei Bloom auf GH Hybrids oder Short Flowering wechseln');
+		}
+		const base = ghValidate(input);
+		warnings.push(...base.warnings);
+		return { warnings, errors };
+	},
+	recommendedAddons() {
+		return [
+			{ name: 'GH Calcium-Pulver', reason: 'Bei RO/weichem Wasser empfohlen' },
+			{ name: 'GH Hybrids oder Short Flowering', reason: 'Für Bloom-Phase — Grow-Line nur für Veg!' },
+			{ name: 'GH Enhancer', reason: 'Stimulator alle 2 Wochen' },
+		];
+	},
+};
 
 // ─── HYBRIDS (Haupt-Line fuer 8-10W Bluete-Strains) ─────────────────────
 
@@ -131,6 +269,8 @@ export const ghHybrids: FeedLine = {
     'Enhancer: 0.5 g/L alle 2 Wochen, Veg bis Bloom W3',
     'Bei RO-Wasser: Zuerst Calcium bis EC 0.3-0.4, dann Hauptprodukt',
   ],
+
+  module: ghHybridsModule,
 };
 
 // ─── SHORT FLOWERING (6-8W Bluete, z.B. Indica-dominant) ────────────────
@@ -234,6 +374,8 @@ export const ghShortFlowering: FeedLine = {
     'Calcium bei weichem Wasser / RO / Coco immer hinzufügen',
     'Booster PK+ nur in Bloom W1-W6',
   ],
+
+  module: ghShortFloweringModule,
 };
 
 // ─── GROW (reine Veg-Line, Mutterpflanzen / lange Veg) ──────────────────
@@ -307,4 +449,6 @@ export const ghGrow: FeedLine = {
     'Wechsel zu Hybrids / Short Flowering bei Bloom-Start',
     'Calcium bei weichem Wasser / RO / Coco hinzufügen',
   ],
+
+  module: ghGrowModule,
 };
