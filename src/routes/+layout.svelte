@@ -21,6 +21,7 @@
 	import { supabase } from '$lib/supabase';
 	import { onMount } from 'svelte';
 	import { logger } from '$lib/utils/logger';
+	import { shouldShowBackupReminder, markReminderShown } from '$lib/utils/backup-reminder';
 
 	let { children }: { children: Snippet } = $props();
 	let toasts = $state<Toast[]>([]);
@@ -218,6 +219,16 @@
 			currentStreak.subscribe(v => streak = v)();
 			reminderStore.checkMissedToday(hasToday, streak?.current ?? 0);
 		}, 2000);
+
+		// Backup-Reminder (Tester-Schutz): nach 5s checken ob Toast nötig
+		setTimeout(() => {
+			let count = 0;
+			growStore.subscribe(s => count = s.checkins.length)();
+			if (shouldShowBackupReminder(count)) {
+				markReminderShown();
+				toastStore.info('💾 Backup empfohlen — Profil → Daten → Export');
+			}
+		}, 5000);
 	});
 
 	// Service Worker Update-Flow

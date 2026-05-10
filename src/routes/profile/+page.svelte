@@ -11,6 +11,7 @@
 	import type { Locale } from '$lib/i18n';
 	import { ACHIEVEMENTS } from '$lib/data/achievements';
 	import { downloadBackup, importBackup, readFileAsText } from '$lib/utils/backup';
+	import { markBackupDone } from '$lib/utils/backup-reminder';
 	import { toastStore } from '$lib/stores/toast';
 	import type { AchievementStats, Achievement } from '$lib/data/achievements';
 	import type { GrowState, Grow, CheckIn } from '$lib/stores/grow';
@@ -404,7 +405,7 @@
 		<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">Daten</h2>
 		<div class="bg-gb-surface rounded-xl p-4 space-y-3">
 			<div class="flex gap-3">
-				<button onclick={() => { downloadBackup(); toastStore.success('Backup heruntergeladen'); }}
+				<button onclick={() => { downloadBackup(); markBackupDone(); toastStore.success('Backup heruntergeladen'); }}
 					class="flex-1 bg-gb-green/10 border border-gb-green/20 text-gb-green font-medium text-sm py-2.5 rounded-lg hover:bg-gb-green/20 transition-colors">
 					📦 Export
 				</button>
