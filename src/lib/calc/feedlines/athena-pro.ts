@@ -161,14 +161,16 @@ export const athenaPro: FeedLine = {
       cleanse_t1: 5, cleanse_t7: 13, hinweis: '',
     },
     {
+      // Flush-Taper (Lauri 2026-05-07 Option B): jeden Tag weniger
       phase: 'Bloom', woche: 8, ec_ziel: 1.5, ph_min: 6.0, ph_max: 6.4,
-      fmin: 48, fmax: 60, ca_ziel: 100, mg_ziel: 45,
+      fmin: 60, fmax: 48, ca_ziel: 100, mg_ziel: 45,
       dosierungen: { grow: 0, bloom: 9.4, core: 5.7, fade: 22 },
       cleanse_t1: 8, cleanse_t7: 14, hinweis: '',
     },
     {
+      // Flush-Taper (Lauri 2026-05-07 Option B): jeden Tag weniger
       phase: 'Bloom', woche: 9, ec_ziel: 1.5, ph_min: 6.0, ph_max: 6.4,
-      fmin: 28, fmax: 40, ca_ziel: 65, mg_ziel: 28,
+      fmin: 40, fmax: 28, ca_ziel: 65, mg_ziel: 28,
       dosierungen: { grow: 0, bloom: 9.4, core: 5.7, fade: 30 },
       cleanse_t1: 13, cleanse_t7: 26, hinweis: '',
     },

@@ -146,3 +146,33 @@ describe('Athena Pro — Flush-EC Regression (Lauri 2026-05-07)', () => {
 		expect(w9.ec_soll).toBeLessThanOrEqual(1.5);
 	});
 });
+
+describe('Athena Pro — Flush-Taper (Lauri 2026-05-07 Option B)', () => {
+	// Schema-Tausch: W8 fmin=60, fmax=48 + W9 fmin=40, fmax=28
+	// → Auto-Faktor sinkt T1 → T7 (jeden Tag weniger)
+	it('Bloom W8: faktor_auto T1 > T7 (jeden Tag weniger)', () => {
+		const t1 = calculate(inputAthena({ phase: 'Bloom', woche: 8, tag: 1, faktor_modus: 'Auto', hat_ro: true }));
+		const t7 = calculate(inputAthena({ phase: 'Bloom', woche: 8, tag: 7, faktor_modus: 'Auto', hat_ro: true }));
+		expect(t7.faktor_auto).toBeLessThanOrEqual(t1.faktor_auto);
+		expect(t1.faktor_auto).toBeGreaterThan(t7.faktor_auto);
+	});
+
+	it('Bloom W9: faktor_auto T1 > T7', () => {
+		const t1 = calculate(inputAthena({ phase: 'Bloom', woche: 9, tag: 1, faktor_modus: 'Auto', hat_ro: true }));
+		const t7 = calculate(inputAthena({ phase: 'Bloom', woche: 9, tag: 7, faktor_modus: 'Auto', hat_ro: true }));
+		expect(t7.faktor_auto).toBeLessThanOrEqual(t1.faktor_auto);
+		expect(t1.faktor_auto).toBeGreaterThan(t7.faktor_auto);
+	});
+
+	it('Bloom W8: EC-Soll T1 >= T7 (sinkt mit Faktor)', () => {
+		const t1 = calculate(inputAthena({ phase: 'Bloom', woche: 8, tag: 1, faktor_modus: 'Auto', hat_ro: true }));
+		const t7 = calculate(inputAthena({ phase: 'Bloom', woche: 8, tag: 7, faktor_modus: 'Auto', hat_ro: true }));
+		expect(t7.ec_soll).toBeLessThanOrEqual(t1.ec_soll);
+	});
+
+	it('Bloom W9: EC-Soll T1 >= T7 (sinkt mit Faktor)', () => {
+		const t1 = calculate(inputAthena({ phase: 'Bloom', woche: 9, tag: 1, faktor_modus: 'Auto', hat_ro: true }));
+		const t7 = calculate(inputAthena({ phase: 'Bloom', woche: 9, tag: 7, faktor_modus: 'Auto', hat_ro: true }));
+		expect(t7.ec_soll).toBeLessThanOrEqual(t1.ec_soll);
+	});
+});

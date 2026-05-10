@@ -102,6 +102,26 @@
 		<p class="text-sm text-gb-text-muted mt-1">Was deine Grows dir erzählen.</p>
 	</div>
 
+	{#if totals.grows === 0}
+		<!-- Empty-State: noch keine Grows -->
+		<div class="bg-gb-surface rounded-xl p-6 text-center space-y-4">
+			<div class="text-5xl">🌱</div>
+			<div class="space-y-1">
+				<p class="font-semibold">Noch keine Daten zum Auswerten</p>
+				<p class="text-sm text-gb-text-muted leading-relaxed">
+					Insights zeigt dir Trends, beste Strains und Phase-Verteilungen — sobald du den ersten Grow angelegt hast.
+				</p>
+			</div>
+			<a
+				href="/grow/new"
+				class="inline-flex items-center justify-center bg-gb-accent text-white font-semibold text-sm px-5 py-3 rounded-lg"
+				style="min-height:44px;"
+			>
+				Ersten Grow starten
+			</a>
+		</div>
+	{:else}
+
 	<!-- Totals -->
 	<div class="grid grid-cols-2 gap-3">
 		<div class="bg-gb-surface rounded-xl p-3">
@@ -206,5 +226,6 @@
 				</div>
 			</div>
 		</div>
+	{/if}
 	{/if}
 </div>

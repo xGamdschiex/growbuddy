@@ -7,10 +7,11 @@ const config: CapacitorConfig = {
   server: {
     androidScheme: 'https',
   },
-  // Beta-Phase: WebView-Inspection erlauben für chrome://inspect Live-Diagnose
-  // TODO vor Play-Store-Submission: auf false setzen
+  // Production: WebView-Inspection deaktiviert (Play-Store-Anforderung).
+  // Für lokales Debugging via chrome://inspect temporär auf true setzen
+  // (capacitor.config.ts ist Build-Time-Config, kein Runtime-Switch möglich).
   android: {
-    webContentsDebuggingEnabled: true,
+    webContentsDebuggingEnabled: false,
   },
   plugins: {
     SplashScreen: {

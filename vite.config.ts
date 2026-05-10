@@ -24,9 +24,20 @@ function swVersionPlugin(): Plugin {
 	};
 }
 
-export default defineConfig({
-	plugins: [tailwindcss(), sveltekit(), swVersionPlugin()],
-	define: {
-		__APP_VERSION__: JSON.stringify(APP_VERSION),
-	},
+// TODO Mary-Jane Follow-up: Console-Strip für Production-Build.
+// Naive Regex zerschießt mehrzeilige `console.log({\n...})`-Calls.
+// Optionen:
+//   1. utils/logger.ts überall konsequent statt console.log nutzen
+//      (Logger no-op in Production)
+//   2. AST-basiertes vite-plugin-remove-console (Dependency)
+//   3. Vite 8 oxc.drop sobald upstream supportet wird
+// Vite 8 + oxc hat aktuell kein drop-Support; esbuild.drop wird ignoriert.
+
+export default defineConfig(() => {
+	return {
+		plugins: [tailwindcss(), sveltekit(), swVersionPlugin()],
+		define: {
+			__APP_VERSION__: JSON.stringify(APP_VERSION),
+		},
+	};
 });
