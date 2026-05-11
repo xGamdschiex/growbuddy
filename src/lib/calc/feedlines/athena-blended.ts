@@ -17,7 +17,63 @@
  * EC: Veg 2.4-3.0, Bloom-Peak 2.8-3.2, Fade 1.4-1.6
  */
 
-import type { FeedLine } from './types';
+import type { FeedLine, LineModule, MixContext, MixStep } from './types';
+import { waterStep, calmagSteps, productSteps, cleanseStep, controlSteps } from './default-mix';
+
+/**
+ * Athena-Blended-spezifische Mix-Reihenfolge:
+ * Wasser → Mono Mg → CalMag → Cleanse → A → B → Stack → Fade → pH → EC
+ *
+ * Begründung Athena Blended (2-Part-System):
+ * - CalMag VOR den Bases: stellt Ca/Mg-Basis her
+ * - Cleanse als Enzym-Reiniger vor den Produkten
+ * - A IMMER vor B (Produkt-Reihenfolge im Schema garantiert das via productSteps)
+ * - Stack/Fade als Booster nach Bases
+ */
+const athenaBlendedModule: LineModule = {
+	buildMixSteps(ctx: MixContext): MixStep[] {
+		const steps: MixStep[] = [];
+		let nr = 1;
+		steps.push(waterStep(ctx, nr++));
+		const cm = calmagSteps(ctx, nr);
+		steps.push(...cm.steps);
+		nr = cm.nextNr;
+		const cleanse = cleanseStep(ctx, nr);
+		if (cleanse) {
+			steps.push(cleanse);
+			nr++;
+		}
+		const products = productSteps(ctx.dosierungen, nr);
+		steps.push(...products.steps);
+		nr = products.nextNr;
+		steps.push(...controlSteps(ctx, nr));
+		return steps;
+	},
+	weekNotes(phase, woche) {
+		const notes: string[] = [];
+		if (phase === 'Bloom' && woche === 2) {
+			notes.push('Stack startet — PK-Booster zur Knospenbildung');
+		}
+		if (phase === 'Bloom' && (woche === 8 || woche === 9)) {
+			notes.push('Fade-Phase: Bloom-Dosierung runter, Fade aktiv (Finish/Ripen)');
+		}
+		return notes;
+	},
+	validateInput(input) {
+		const warnings: string[] = [];
+		const errors: string[] = [];
+		if (input.medium && input.medium !== 'hydro' && input.medium !== 'coco') {
+			warnings.push('Athena Blended ist auf Hydro/Coco optimiert — Erde nicht empfohlen');
+		}
+		return { warnings, errors };
+	},
+	recommendedAddons() {
+		return [
+			{ name: 'Athena CaMg', reason: 'Bei RO/weichem Wasser für stabile Ca/Mg-Versorgung' },
+			{ name: 'Athena Cleanse', reason: 'Enzym-Reiniger für saubere Wurzelzone (Hydro)' },
+		];
+	},
+};
 
 export const athenaBlended: FeedLine = {
   id: 'athena-blended',
@@ -157,4 +213,6 @@ export const athenaBlended: FeedLine = {
     'Stack ist der PK-Booster — startet ab Bloom W2',
     'Fade nur in Bloom W8-W9 (Finish/Ripen)',
   ],
+
+  module: athenaBlendedModule,
 };
