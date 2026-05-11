@@ -5,6 +5,7 @@
 	import type { Grow, CheckIn } from '$lib/stores/grow';
 	import { totalGrowDays, currentPhasePosition } from '$lib/utils/phase';
 	import { phaseStyle } from '$lib/utils/phase-colors';
+	import { summarizeStrains, totalPlantCount } from '$lib/utils/grow-strains';
 
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
 	let active: Grow[] = $state([]);
@@ -95,7 +96,7 @@
 										<p class="font-medium truncate">{grow.name}</p>
 										<span class="shrink-0 text-xs font-bold text-gb-green">{tr('home.day', { days: growDays(grow) })}</span>
 									</div>
-									<p class="text-xs text-gb-text-muted truncate">{grow.strain} · {grow.medium} · {grow.plant_count} {grow.plant_count > 1 ? tr('grow.plants_plural') : tr('grow.plant')}</p>
+									<p class="text-xs text-gb-text-muted truncate">{summarizeStrains(grow, { maxLength: 50 })} · {grow.medium} · {totalPlantCount(grow)} {totalPlantCount(grow) > 1 ? tr('grow.plants_plural') : tr('grow.plant')}</p>
 								</div>
 								<div class="flex items-center gap-2 mt-1">
 									<span class="text-[11px] {ps.text} {ps.bgSoft} px-2 py-0.5 rounded-full font-medium">
@@ -128,7 +129,7 @@
 							<div class="flex-1 min-w-0 flex flex-col justify-between">
 								<div>
 									<p class="font-medium truncate">{grow.name}</p>
-									<p class="text-xs text-gb-text-muted truncate">{grow.strain}</p>
+									<p class="text-xs text-gb-text-muted truncate">{summarizeStrains(grow, { maxLength: 50 })}</p>
 								</div>
 								<div class="flex items-center gap-2 mt-1">
 									{#if grow.yield_g}

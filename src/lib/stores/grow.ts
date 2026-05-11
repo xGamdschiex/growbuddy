@@ -14,16 +14,24 @@ export type StrainType = 'auto' | 'photo';
 export type GrowStatus = 'active' | 'harvested' | 'abandoned';
 export type GrowSystem = 'topf' | 'autopot' | 'dwc' | 'rdwc';
 
+/** Ein einzelner Strain im Multi-Strain-Grow. */
+export interface GrowStrainEntry {
+	strain: string;
+	plant_count: number;
+}
+
 export interface Grow {
 	id: string;
 	name: string;
-	strain: string;
+	strain: string;          // Legacy: erster Strain oder zusammengefasster Display-String
 	strain_type: StrainType;
 	medium: Medium;
-	space: string;           // z.B. '60x60', '80x80', 'outdoor'
+	space: string;           // z.B. '60x60', '80x80', 'outdoor' ODER custom 'WxH' (z.B. '130x80')
 	feedline_id: string;
 	light_info: string;      // z.B. 'LED 150W', 'Sonne'
-	plant_count: number;
+	plant_count: number;     // Legacy: Summe aller Pflanzen (= Σ strains[].plant_count wenn strains gesetzt)
+	/** Multi-Strain-Liste (v1.3.65+). Wenn nicht gesetzt: synthetisiert aus `strain` + `plant_count`. */
+	strains?: GrowStrainEntry[];
 	status: GrowStatus;
 	started_at: string;      // ISO date
 	harvested_at: string | null;

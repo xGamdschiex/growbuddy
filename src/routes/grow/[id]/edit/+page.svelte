@@ -14,11 +14,14 @@
 	import { t } from '$lib/i18n';
 	import { onMount } from 'svelte';
 	import { getAllFeedLines } from '$lib/calc/feedlines/registry';
-	import type { StrainType, GrowSystem, Grow } from '$lib/stores/grow';
+	import type { StrainType, GrowSystem, Grow, GrowStrainEntry } from '$lib/stores/grow';
 	import type { Medium } from '$lib/data/science';
 	import { hapticSuccess, hapticMedium } from '$lib/utils/haptic';
 	import { toastStore } from '$lib/stores/toast';
 	import type { GrowStatus } from '$lib/stores/grow';
+	import StrainList from '$lib/components/StrainList.svelte';
+	import SpacePicker from '$lib/components/SpacePicker.svelte';
+	import { getStrainEntries, joinedStrainName, totalPlantCount, validateStrains } from '$lib/utils/grow-strains';
 
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
 	const feedlines = getAllFeedLines();
@@ -32,13 +35,12 @@
 
 	// Form-State (wird aus grow gefüllt sobald geladen)
 	let name = $state('');
-	let strain = $state('');
+	let strainEntries = $state<GrowStrainEntry[]>([{ strain: '', plant_count: 1 }]);
 	let strainType = $state<StrainType>('photo');
 	let medium = $state<Medium>('coco');
 	let space = $state('60x60');
 	let feedlineId = $state('athena-pro');
 	let lightInfo = $state('');
-	let plantCount = $state(1);
 	let notes = $state('');
 	let startDate = $state(new Date().toISOString().slice(0, 10));
 	let system = $state<GrowSystem>('topf');
@@ -47,6 +49,7 @@
 	let yieldG = $state(0);
 	let loaded = $state(false);
 
+	let strainsValid = $derived(validateStrains(strainEntries));
 	let showDeleteConfirm = $state(false);
 
 	onMount(() => {
@@ -61,13 +64,14 @@
 	$effect(() => {
 		if (grow && !loaded) {
 			name = grow.name ?? '';
-			strain = grow.strain ?? '';
+			// Multi-Strain: aus grow.strains laden oder aus Legacy synthesisieren
+			const existing = getStrainEntries(grow);
+			strainEntries = existing.length > 0 ? existing.map(e => ({ ...e })) : [{ strain: grow.strain ?? '', plant_count: grow.plant_count ?? 1 }];
 			strainType = grow.strain_type ?? 'photo';
 			medium = (grow.medium as Medium) ?? 'coco';
 			space = grow.space ?? '60x60';
 			feedlineId = grow.feedline_id ?? 'athena-pro';
 			lightInfo = grow.light_info ?? '';
-			plantCount = grow.plant_count ?? 1;
 			notes = grow.notes ?? '';
 			startDate = grow.started_at ? new Date(grow.started_at).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
 			system = (grow.system as GrowSystem) ?? 'topf';
@@ -77,18 +81,6 @@
 			loaded = true;
 		}
 	});
-
-	let spaces = $derived([
-		{ value: 'fensterbank', label: tr('grow.space_fensterbank') },
-		{ value: '40x40', label: '40×40 cm' },
-		{ value: '60x60', label: '60×60 cm' },
-		{ value: '80x80', label: '80×80 cm' },
-		{ value: '100x100', label: '100×100 cm' },
-		{ value: '120x60', label: '120×60 cm' },
-		{ value: '120x120', label: '120×120 cm' },
-		{ value: 'raum', label: tr('grow.space_raum') },
-		{ value: 'outdoor', label: tr('grow.space_outdoor') },
-	]);
 
 	let originalStartDate = $derived(grow?.started_at ? new Date(grow.started_at).toISOString().slice(0, 10) : null);
 	let startDateChanged = $derived(originalStartDate && startDate !== originalStartDate);
@@ -102,16 +94,25 @@
 	}
 
 	function saveGrow() {
-		if (!grow || !strain.trim()) return;
+		if (!grow) return;
+		if (!strainsValid.ok) {
+			toastStore.error(strainsValid.error ?? 'Strain-Liste ungültig');
+			return;
+		}
+		const cleanedEntries = strainEntries.filter(e => e.strain && e.strain.trim() && e.plant_count > 0)
+			.map(e => ({ strain: e.strain.trim(), plant_count: e.plant_count }));
+		const joinedStrain = joinedStrainName(cleanedEntries);
+		const totalPlants = totalPlantCount({ strain: joinedStrain, plant_count: 0, strains: cleanedEntries });
 		const patch: any = {
-			name: name.trim() || `${strain.trim()} #1`,
-			strain: strain.trim(),
+			name: name.trim() || `${cleanedEntries[0].strain} #1`,
+			strain: joinedStrain,
 			strain_type: strainType,
 			medium,
 			space,
 			feedline_id: feedlineId,
 			light_info: lightInfo.trim(),
-			plant_count: plantCount,
+			plant_count: totalPlants,
+			strains: cleanedEntries,
 			notes: notes.trim(),
 			system,
 			coco_perlite_ratio: medium === 'coco' ? cocoPerliteRatio : undefined,
@@ -159,11 +160,10 @@
 			<p class="text-xs text-gb-text-muted mt-1">{checkinCount} Check-in{checkinCount === 1 ? '' : 's'} · Änderungen werden sofort übernommen</p>
 		</div>
 
-		<!-- Strain -->
+		<!-- Strains (Multi) -->
 		<div>
-			<label for="edit-strain" class="block text-xs text-gb-text-muted mb-1">{tr('grow.strain')} *</label>
-			<input id="edit-strain" type="text" bind:value={strain} placeholder={tr('grow.strain_placeholder')}
-				class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm placeholder:text-gb-border" />
+			<span class="block text-xs text-gb-text-muted mb-2">Strain(s) + Anzahl Pflanzen *</span>
+			<StrainList bind:entries={strainEntries} placeholder={tr('grow.strain_placeholder')} />
 		</div>
 
 		<!-- Name (optional) -->
@@ -241,21 +241,10 @@
 			</div>
 		</div>
 
-		<!-- Space + Plants -->
-		<div class="grid grid-cols-2 gap-3">
-			<div>
-				<label for="edit-space" class="block text-xs text-gb-text-muted mb-1">{tr('grow.space')}</label>
-				<select id="edit-space" bind:value={space} class="w-full bg-gb-surface border border-gb-border rounded-lg px-2 py-2.5 text-sm">
-					{#each spaces as s}
-						<option value={s.value}>{s.label}</option>
-					{/each}
-				</select>
-			</div>
-			<div>
-				<label for="edit-plants" class="block text-xs text-gb-text-muted mb-1">{tr('grow.plants')}</label>
-				<input id="edit-plants" type="number" bind:value={plantCount} min="1" max="50" step="1"
-					class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm" />
-			</div>
+		<!-- Space (Preset oder Custom Größe) -->
+		<div>
+			<span class="block text-xs text-gb-text-muted mb-1">{tr('grow.space')}</span>
+			<SpacePicker bind:value={space} />
 		</div>
 
 		<!-- Feedline -->
@@ -335,7 +324,7 @@
 				Abbrechen
 			</button>
 			<button onclick={saveGrow}
-				disabled={!strain.trim()}
+				disabled={!strainsValid.ok}
 				class="bg-gb-green text-black font-semibold py-3 rounded-lg text-sm
 					hover:bg-gb-green-light transition-colors
 					disabled:opacity-30 disabled:cursor-not-allowed">

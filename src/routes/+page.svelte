@@ -9,6 +9,7 @@
 	import type { Grow, CheckIn } from '$lib/stores/grow';
 	import { totalGrowDays, currentPhasePosition } from '$lib/utils/phase';
 	import { phaseStyle } from '$lib/utils/phase-colors';
+	import { summarizeStrains } from '$lib/utils/grow-strains';
 
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
 	let storeVal: any = $state({ grows: [] });
@@ -274,7 +275,7 @@
 					<div class="flex items-center justify-between">
 						<div>
 							<p class="font-semibold">{grow.name}</p>
-							<p class="text-xs text-gb-text-muted">{grow.strain}</p>
+							<p class="text-xs text-gb-text-muted truncate">{summarizeStrains(grow, { maxLength: 40 })}</p>
 						</div>
 						<div class="text-right">
 							{#if grow.yield_g}

@@ -24,6 +24,7 @@
 	import { phaseStyle } from '$lib/utils/phase-colors';
 	import { phaseTargetSegments, PHASE_TARGETS as PHASE_TARGETS_ALL } from '$lib/utils/phase-targets';
 	import { predictHarvest, formatDaysUntil } from '$lib/utils/harvest-predict';
+	import { summarizeStrains, totalPlantCount, getStrainEntries } from '$lib/utils/grow-strains';
 	const PHASE_TARGETS_VPD = PHASE_TARGETS_ALL.vpd;
 	import {
 		metricStats,
@@ -281,13 +282,15 @@
 	let totalDays = $derived(grow ? totalGrowDays(grow, chronCheckins) : 0);
 	let hasAggregates = $derived(totalWaterMl > 0 || avgTemp !== null || phaseDays.length > 0);
 
-	// Harvest-Predict (g + Tage bis Harvest, basierend auf Strain + Plant-Count + Performance)
+	// Harvest-Predict (g + Tage bis Harvest, Multi-Strain aware via totalPlantCount)
 	let harvestPredict = $derived.by(() => {
 		if (!grow || grow.status !== 'active') return null;
-		if (!grow.strain_type || !grow.plant_count) return null;
+		if (!grow.strain_type) return null;
+		const totalPlants = totalPlantCount(grow);
+		if (totalPlants === 0) return null;
 		return predictHarvest({
 			strainType: grow.strain_type === 'auto' ? 'auto' : 'photo',
-			plantCount: grow.plant_count,
+			plantCount: totalPlants,
 			currentGrowDays: totalDays,
 			checkins: chronCheckins.map((c: CheckIn) => ({
 				phase: c.phase,
@@ -558,7 +561,7 @@
 			<div class="flex items-start justify-between gap-3 mt-2">
 				<div class="min-w-0">
 					<h1 class="text-xl font-bold truncate">{grow.name}</h1>
-					<p class="text-sm text-gb-text-muted">{grow.strain} · {grow.strain_type === 'auto' ? 'Auto' : 'Photo'} · {grow.medium}</p>
+					<p class="text-sm text-gb-text-muted truncate">{summarizeStrains(grow, { maxLength: 60 })} · {grow.strain_type === 'auto' ? 'Auto' : 'Photo'} · {grow.medium}</p>
 				</div>
 				{#if grow.status === 'active'}
 					{@const ps = phaseStyle(currentPhasePosition(grow, chronCheckins).phase)}
