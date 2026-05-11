@@ -1,7 +1,7 @@
 # GrowBuddy — Datenschutzerklärung (Draft)
 
 > **Status:** Draft — vor Play-Store-Submission anwaltlich prüfen lassen.
-> URL: https://growbuddy.app/privacy (oder vercel-Subdomain)
+> URL: https://growbuddy-app.vercel.app/privacy (Vercel-Subdomain bis growbuddy.app registriert)
 > Dieser Draft erfüllt **DSGVO**, **CCPA-light** und **Google Play Data Safety**.
 
 ---
@@ -15,7 +15,7 @@
 Lauritz Wirtz
 {ADRESSE_PLATZHALTER}
 55116 Mainz, Deutschland
-E-Mail: privacy@growbuddy.app
+E-Mail: lauritz.wirtz@gmail.com
 
 ## 2. Überblick
 
@@ -45,7 +45,7 @@ wir folgende Daten mit unserem Backend (Supabase, EU-Server):
 
 **Rechtsgrundlage:** Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung — Cloud-Sync).
 **Speicherort:** Supabase EU (Frankfurt am Main, Deutschland).
-**Speicherdauer:** Bis zur Konto-Löschung (auf Anfrage via privacy@growbuddy.app).
+**Speicherdauer:** Bis zur Konto-Löschung (auf Anfrage via lauritz.wirtz@gmail.com).
 
 ### 3.3 Public-Posts (Community-Feed)
 Wenn du einen Grow oder Check-in als "Public" markierst, ist er im Community-Feed
@@ -91,7 +91,7 @@ Du hast jederzeit Anspruch auf:
   → In-App: Profil → Daten → Export
 - **Widerspruch** (Art. 21 DSGVO): Cloud-Sync deaktivieren = Logout
 
-Anfragen an: privacy@growbuddy.app
+Anfragen an: lauritz.wirtz@gmail.com
 
 ## 7. Foto-Berechtigung
 
@@ -125,8 +125,8 @@ Du hast das Recht, dich bei einer Datenschutz-Aufsichtsbehörde zu beschweren:
 
 ## 12. Kontakt
 
-E-Mail: privacy@growbuddy.app
-Allgemeine Anfragen: feedback@growbuddy.app
+E-Mail: lauritz.wirtz@gmail.com
+Allgemeine Anfragen: lauritz.wirtz@gmail.com
 
 ---
 

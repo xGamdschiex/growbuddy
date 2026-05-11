@@ -33,7 +33,7 @@ Datenhaltung, optionale Cloud-Synchronisation.
 • Wachstumsphasen (Sämling, Vegetation, Blüte, Trocknung, Curing)
 • Streak-System für tägliche Disziplin
 
-🧪 DÜNGER-RECHNER (8 Düngerlinien)
+🧪 DÜNGER-RECHNER (11 Düngerlinien)
 • Athena Pro Line + Blended (Mineraldünger)
 • BioBizz Organic (Light-Mix / Coco)
 • CANNA Terra + Coco A+B
@@ -74,11 +74,11 @@ GrowBuddy speichert deine Daten primär lokal auf deinem Gerät. Cloud-Sync
 ist optional und benötigt einen Account (E-Mail oder Google OAuth). Keine
 Werbung, kein Tracking, keine Verkäufe an Dritte.
 
-Datenschutzerklärung: https://growbuddy.app/privacy
+Datenschutzerklärung: https://growbuddy-app.vercel.app/privacy
 
 📧 FEEDBACK
 Beta-Phase — dein Feedback hilft uns, GrowBuddy zu verbessern:
-feedback@growbuddy.app
+lauritz.wirtz@gmail.com
 
 ⚠️ HINWEIS
 GrowBuddy ist ein generelles Plant-Care-Tool und ersetzt keine professionelle
@@ -107,7 +107,7 @@ Char-Count: ~2300 ✓ (von 4000 erlaubt — Platz für Updates)
 - **Tags:** plants, gardening, journal, grow log, hydroponics
 
 ## Open Questions
-- [ ] Domain `growbuddy.app` registriert? Sonst Vercel-Subdomain
-- [ ] Feedback-Email aktiv? (`feedback@growbuddy.app`)
-- [ ] Adaptive-Icon-Asset bereitstellen (oder ich generiere SVG)
-- [ ] App-Trailer-Video (optional, max 30s)?
+- [x] Domain → vorerst Vercel-Subdomain `growbuddy-app.vercel.app` (growbuddy.app TBD)
+- [x] Feedback-Email → `lauritz.wirtz@gmail.com` (bis Domain-Mail verfügbar)
+- [x] Adaptive-Icon-Asset → fertig (Cannabis-Blatt vector XML in `android/.../drawable-v24/ic_launcher_foreground.xml`)
+- [ ] App-Trailer-Video (optional, max 30s) — nice-to-have, kein Blocker

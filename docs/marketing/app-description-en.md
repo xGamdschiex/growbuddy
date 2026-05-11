@@ -33,7 +33,7 @@ sync.
 • Growth phases (seedling, vegetation, flowering, drying, curing)
 • Streak system for daily discipline
 
-🧪 NUTRIENT CALCULATOR (8 nutrient lines)
+🧪 NUTRIENT CALCULATOR (11 nutrient lines)
 • Athena Pro Line + Blended (mineral nutrients)
 • BioBizz Organic (Light-Mix / Coco)
 • CANNA Terra + Coco A+B
@@ -74,11 +74,11 @@ GrowBuddy stores your data primarily locally on your device. Cloud sync is
 optional and requires an account (email or Google OAuth). No ads, no tracking,
 no sales to third parties.
 
-Privacy policy: https://growbuddy.app/privacy
+Privacy policy: https://growbuddy-app.vercel.app/privacy
 
 📧 FEEDBACK
 Beta phase — your feedback helps us improve GrowBuddy:
-feedback@growbuddy.app
+lauritz.wirtz@gmail.com
 
 ⚠️ NOTE
 GrowBuddy is a general plant-care tool and does not replace professional
