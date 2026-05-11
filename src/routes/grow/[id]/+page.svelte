@@ -547,7 +547,14 @@
 	<div class="px-4 pt-6 max-w-lg mx-auto space-y-5">
 		<!-- Header -->
 		<div>
-			<a href="/grow" class="text-gb-text-muted text-sm hover:text-gb-text">&larr; {tr('grow.my_grows')}</a>
+			<div class="flex items-center justify-between gap-3">
+				<a href="/grow" class="text-gb-text-muted text-sm hover:text-gb-text">&larr; {tr('grow.my_grows')}</a>
+				<a href="/grow/{grow.id}/edit"
+					class="text-gb-text-muted text-xs hover:text-gb-text flex items-center gap-1"
+					aria-label="Grow bearbeiten">
+					✏️ Bearbeiten
+				</a>
+			</div>
 			<div class="flex items-start justify-between gap-3 mt-2">
 				<div class="min-w-0">
 					<h1 class="text-xl font-bold truncate">{grow.name}</h1>

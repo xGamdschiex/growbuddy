@@ -1,0 +1,387 @@
+<script lang="ts">
+	/**
+	 * Grow bearbeiten — alle Setup-Felder nachträglich änderbar.
+	 *
+	 * Felder NICHT änderbar hier:
+	 *  - status (Active/Harvested/Abandoned) → separater Flow im Grow-Detail (Ernten/Abbrechen)
+	 *  - is_public → separater Toggle im Grow-Detail
+	 *  - grow_score (auto) / yield_g (durch confirmHarvest)
+	 */
+	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
+	import { growStore } from '$lib/stores/grow';
+	import { isPro } from '$lib/stores/pro';
+	import { t } from '$lib/i18n';
+	import { onMount } from 'svelte';
+	import { getAllFeedLines } from '$lib/calc/feedlines/registry';
+	import type { StrainType, GrowSystem, Grow } from '$lib/stores/grow';
+	import type { Medium } from '$lib/data/science';
+	import { hapticSuccess, hapticMedium } from '$lib/utils/haptic';
+	import { toastStore } from '$lib/stores/toast';
+	import type { GrowStatus } from '$lib/stores/grow';
+
+	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
+	const feedlines = getAllFeedLines();
+
+	let growId = $derived($page.params.id);
+	let growState: any = $state({ grows: [], checkins: [] });
+	let userIsPro = $state(false);
+
+	let grow = $derived<Grow | undefined>(growState?.grows?.find((g: Grow) => g.id === growId));
+	let checkinCount = $derived(growState?.checkins?.filter((c: any) => c.grow_id === growId).length ?? 0);
+
+	// Form-State (wird aus grow gefüllt sobald geladen)
+	let name = $state('');
+	let strain = $state('');
+	let strainType = $state<StrainType>('photo');
+	let medium = $state<Medium>('coco');
+	let space = $state('60x60');
+	let feedlineId = $state('athena-pro');
+	let lightInfo = $state('');
+	let plantCount = $state(1);
+	let notes = $state('');
+	let startDate = $state(new Date().toISOString().slice(0, 10));
+	let system = $state<GrowSystem>('topf');
+	let cocoPerliteRatio = $state(70);
+	let status = $state<GrowStatus>('active');
+	let yieldG = $state(0);
+	let loaded = $state(false);
+
+	let showDeleteConfirm = $state(false);
+
+	onMount(() => {
+		const subs = [
+			growStore.subscribe(v => growState = v),
+			isPro.subscribe(v => userIsPro = v),
+		];
+		return () => subs.forEach(u => u());
+	});
+
+	// Form-State aus grow-Daten füllen (einmal beim ersten Laden)
+	$effect(() => {
+		if (grow && !loaded) {
+			name = grow.name ?? '';
+			strain = grow.strain ?? '';
+			strainType = grow.strain_type ?? 'photo';
+			medium = (grow.medium as Medium) ?? 'coco';
+			space = grow.space ?? '60x60';
+			feedlineId = grow.feedline_id ?? 'athena-pro';
+			lightInfo = grow.light_info ?? '';
+			plantCount = grow.plant_count ?? 1;
+			notes = grow.notes ?? '';
+			startDate = grow.started_at ? new Date(grow.started_at).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
+			system = (grow.system as GrowSystem) ?? 'topf';
+			cocoPerliteRatio = grow.coco_perlite_ratio ?? 70;
+			status = (grow.status as GrowStatus) ?? 'active';
+			yieldG = grow.yield_g ?? 0;
+			loaded = true;
+		}
+	});
+
+	let spaces = $derived([
+		{ value: 'fensterbank', label: tr('grow.space_fensterbank') },
+		{ value: '40x40', label: '40×40 cm' },
+		{ value: '60x60', label: '60×60 cm' },
+		{ value: '80x80', label: '80×80 cm' },
+		{ value: '100x100', label: '100×100 cm' },
+		{ value: '120x60', label: '120×60 cm' },
+		{ value: '120x120', label: '120×120 cm' },
+		{ value: 'raum', label: tr('grow.space_raum') },
+		{ value: 'outdoor', label: tr('grow.space_outdoor') },
+	]);
+
+	let originalStartDate = $derived(grow?.started_at ? new Date(grow.started_at).toISOString().slice(0, 10) : null);
+	let startDateChanged = $derived(originalStartDate && startDate !== originalStartDate);
+
+	function selectSystem(s: GrowSystem) {
+		if (s !== 'topf' && !userIsPro) {
+			toastStore.error('Hydro-Systeme sind Pro-Feature');
+			return;
+		}
+		system = s;
+	}
+
+	function saveGrow() {
+		if (!grow || !strain.trim()) return;
+		const patch: any = {
+			name: name.trim() || `${strain.trim()} #1`,
+			strain: strain.trim(),
+			strain_type: strainType,
+			medium,
+			space,
+			feedline_id: feedlineId,
+			light_info: lightInfo.trim(),
+			plant_count: plantCount,
+			notes: notes.trim(),
+			system,
+			coco_perlite_ratio: medium === 'coco' ? cocoPerliteRatio : undefined,
+			started_at: new Date(startDate).toISOString(),
+			status,
+			yield_g: status === 'harvested' ? yieldG : null,
+		};
+		// Wenn Status auf 'active' zurückgesetzt wird → harvested_at clearen
+		if (status === 'active' && grow.status !== 'active') {
+			patch.harvested_at = null;
+		}
+		growStore.updateGrow(grow.id, patch);
+		hapticSuccess();
+		toastStore.success('Grow aktualisiert');
+		goto(`/grow/${grow.id}`);
+	}
+
+	function cancel() {
+		goto(`/grow/${growId}`);
+	}
+
+	function confirmDelete() {
+		if (!grow) return;
+		growStore.deleteGrow(grow.id);
+		hapticMedium();
+		toastStore.success(`Grow „${grow.name}" gelöscht`);
+		goto('/grow');
+	}
+</script>
+
+<svelte:head>
+	<title>Grow bearbeiten — GrowBuddy</title>
+</svelte:head>
+
+{#if !grow}
+	<div class="px-4 pt-6 max-w-lg mx-auto text-center">
+		<p class="text-gb-text-muted">{tr('grow.not_found')}</p>
+		<a href="/grow" class="text-gb-green text-sm">{tr('grow.back')}</a>
+	</div>
+{:else}
+	<div class="px-4 pt-6 max-w-lg mx-auto space-y-5 pb-24">
+		<div>
+			<a href="/grow/{grow.id}" class="text-gb-text-muted text-sm hover:text-gb-text">&larr; Zurück zum Grow</a>
+			<h1 class="text-xl font-bold mt-2">✏️ Grow bearbeiten</h1>
+			<p class="text-xs text-gb-text-muted mt-1">{checkinCount} Check-in{checkinCount === 1 ? '' : 's'} · Änderungen werden sofort übernommen</p>
+		</div>
+
+		<!-- Strain -->
+		<div>
+			<label for="edit-strain" class="block text-xs text-gb-text-muted mb-1">{tr('grow.strain')} *</label>
+			<input id="edit-strain" type="text" bind:value={strain} placeholder={tr('grow.strain_placeholder')}
+				class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm placeholder:text-gb-border" />
+		</div>
+
+		<!-- Name (optional) -->
+		<div>
+			<label for="edit-name" class="block text-xs text-gb-text-muted mb-1">{tr('grow.name')}</label>
+			<input id="edit-name" type="text" bind:value={name} placeholder={tr('grow.name_placeholder')}
+				class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm placeholder:text-gb-border" />
+		</div>
+
+		<!-- Strain Type -->
+		<div>
+			<span class="block text-xs text-gb-text-muted mb-2">{tr('grow.type')}</span>
+			<div class="grid grid-cols-2 gap-2">
+				<button onclick={() => strainType = 'auto'}
+					class="px-3 py-2.5 rounded-lg text-sm transition-colors
+						{strainType === 'auto' ? 'bg-gb-green text-black font-semibold' : 'bg-gb-surface-2 text-gb-text-muted'}">
+					{tr('general.auto')}
+				</button>
+				<button onclick={() => strainType = 'photo'}
+					class="px-3 py-2.5 rounded-lg text-sm transition-colors
+						{strainType === 'photo' ? 'bg-gb-green text-black font-semibold' : 'bg-gb-surface-2 text-gb-text-muted'}">
+					{tr('general.photo')}
+				</button>
+			</div>
+		</div>
+
+		<!-- Medium -->
+		<div>
+			<span class="block text-xs text-gb-text-muted mb-2">{tr('grow.medium')}</span>
+			<div class="grid grid-cols-3 gap-2">
+				{#each [['soil', tr('grow.medium_soil')], ['coco', tr('grow.medium_coco')], ['hydro', tr('grow.medium_hydro')]] as [val, label]}
+					<button onclick={() => medium = val as Medium}
+						class="px-3 py-2.5 rounded-lg text-sm transition-colors
+							{medium === val ? 'bg-gb-green text-black font-semibold' : 'bg-gb-surface-2 text-gb-text-muted'}">
+						{label}
+					</button>
+				{/each}
+			</div>
+		</div>
+
+		<!-- Coco / Perlite -->
+		{#if medium === 'coco'}
+			<div>
+				<label for="edit-cocoperlite" class="block text-xs text-gb-text-muted mb-2">
+					Kokos/Perlite-Mix: <span class="text-gb-text">{cocoPerliteRatio}% Kokos · {100 - cocoPerliteRatio}% Perlite</span>
+				</label>
+				<input id="edit-cocoperlite" type="range" min="50" max="100" step="5" bind:value={cocoPerliteRatio}
+					class="w-full accent-gb-green" />
+			</div>
+		{/if}
+
+		<!-- System -->
+		<div>
+			<span class="block text-xs text-gb-text-muted mb-2">Anbausystem</span>
+			<div class="grid grid-cols-2 gap-2">
+				{#each [
+					{ val: 'topf', label: '🪴 Topf' },
+					{ val: 'autopot', label: '💧 AutoPot', pro: true },
+					{ val: 'dwc', label: '🫧 DWC', pro: true },
+					{ val: 'rdwc', label: '♻️ RDWC', pro: true }
+				] as opt}
+					<button onclick={() => selectSystem(opt.val as GrowSystem)}
+						disabled={opt.pro && !userIsPro}
+						class="px-3 py-2.5 rounded-lg text-sm text-left transition-colors
+							{system === opt.val ? 'bg-gb-green text-black font-semibold' : 'bg-gb-surface-2 text-gb-text-muted'}
+							{opt.pro && !userIsPro ? 'opacity-50 cursor-not-allowed' : ''}">
+						<div class="flex items-center justify-between">
+							<span>{opt.label}</span>
+							{#if opt.pro && !userIsPro}
+								<span class="text-[10px] bg-gb-accent/20 text-gb-accent px-1.5 py-0.5 rounded">PRO</span>
+							{/if}
+						</div>
+					</button>
+				{/each}
+			</div>
+		</div>
+
+		<!-- Space + Plants -->
+		<div class="grid grid-cols-2 gap-3">
+			<div>
+				<label for="edit-space" class="block text-xs text-gb-text-muted mb-1">{tr('grow.space')}</label>
+				<select id="edit-space" bind:value={space} class="w-full bg-gb-surface border border-gb-border rounded-lg px-2 py-2.5 text-sm">
+					{#each spaces as s}
+						<option value={s.value}>{s.label}</option>
+					{/each}
+				</select>
+			</div>
+			<div>
+				<label for="edit-plants" class="block text-xs text-gb-text-muted mb-1">{tr('grow.plants')}</label>
+				<input id="edit-plants" type="number" bind:value={plantCount} min="1" max="50" step="1"
+					class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm" />
+			</div>
+		</div>
+
+		<!-- Feedline -->
+		<div>
+			<label for="edit-feedline" class="block text-xs text-gb-text-muted mb-1">{tr('grow.feedline')}</label>
+			<select id="edit-feedline" bind:value={feedlineId} class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm">
+				{#each feedlines as fl}
+					<option value={fl.id}>{fl.name}</option>
+				{/each}
+			</select>
+		</div>
+
+		<!-- Licht -->
+		<div>
+			<label for="edit-light" class="block text-xs text-gb-text-muted mb-1">{tr('grow.light')}</label>
+			<input id="edit-light" type="text" bind:value={lightInfo} placeholder={tr('grow.light_placeholder')}
+				class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm placeholder:text-gb-border" />
+		</div>
+
+		<!-- Notizen -->
+		<div>
+			<label for="edit-notes" class="block text-xs text-gb-text-muted mb-1">{tr('grow.notes')}</label>
+			<textarea id="edit-notes" bind:value={notes} rows="2" placeholder={tr('grow.notes_placeholder')}
+				class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm placeholder:text-gb-border resize-none"></textarea>
+		</div>
+
+		<!-- Startdatum -->
+		<div>
+			<label for="edit-startdate" class="block text-xs text-gb-text-muted mb-1">Startdatum</label>
+			<input id="edit-startdate" type="date" bind:value={startDate} max={new Date().toISOString().slice(0, 10)}
+				class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm" />
+			{#if startDateChanged}
+				<p class="text-xs text-gb-warning mt-1 leading-relaxed">
+					⚠️ Bei Änderung werden alle Phasen-Berechnungen (Tage in Phase, aktuelle Position, Harvest-Predict) neu berechnet.
+				</p>
+			{/if}
+		</div>
+
+		<!-- Status (Recovery falls aus Versehen geerntet/abgebrochen) -->
+		<div>
+			<span class="block text-xs text-gb-text-muted mb-2">Status</span>
+			<div class="grid grid-cols-3 gap-2">
+				{#each [
+					{ val: 'active', label: '🌱 Aktiv', desc: 'läuft' },
+					{ val: 'harvested', label: '✂️ Geerntet', desc: 'fertig' },
+					{ val: 'abandoned', label: '❌ Abgebrochen', desc: 'verworfen' }
+				] as opt}
+					<button onclick={() => status = opt.val as GrowStatus}
+						class="px-2 py-2 rounded-lg text-xs transition-colors
+							{status === opt.val ? 'bg-gb-green text-black font-semibold' : 'bg-gb-surface-2 text-gb-text-muted'}">
+						{opt.label}
+					</button>
+				{/each}
+			</div>
+			{#if status !== grow.status}
+				<p class="text-xs text-gb-warning mt-1 leading-relaxed">
+					⚠️ Status-Wechsel: {grow.status} → {status}
+					{#if grow.status !== 'active' && status === 'active'}(Harvest-Datum + Yield werden gelöscht){/if}
+				</p>
+			{/if}
+		</div>
+
+		<!-- Yield (nur bei status=harvested) -->
+		{#if status === 'harvested'}
+			<div>
+				<label for="edit-yield" class="block text-xs text-gb-text-muted mb-1">Ertrag (g, trocken)</label>
+				<input id="edit-yield" type="number" bind:value={yieldG} min="0" max="9999" step="1"
+					class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm" />
+			</div>
+		{/if}
+
+		<!-- Buttons -->
+		<div class="grid grid-cols-2 gap-3 pt-2">
+			<button onclick={cancel}
+				class="bg-gb-surface border border-gb-border text-gb-text-muted font-medium py-3 rounded-lg text-sm
+					hover:bg-gb-surface-2 transition-colors">
+				Abbrechen
+			</button>
+			<button onclick={saveGrow}
+				disabled={!strain.trim()}
+				class="bg-gb-green text-black font-semibold py-3 rounded-lg text-sm
+					hover:bg-gb-green-light transition-colors
+					disabled:opacity-30 disabled:cursor-not-allowed">
+				💾 Speichern
+			</button>
+		</div>
+
+		<!-- Danger Zone: Grow löschen -->
+		<div class="border-t border-gb-border/30 pt-4 mt-6">
+			<p class="text-xs text-gb-text-muted uppercase tracking-wide font-semibold mb-2">⚠️ Danger Zone</p>
+			<button onclick={() => showDeleteConfirm = true}
+				class="w-full bg-gb-error/10 border border-gb-error/30 text-gb-error font-medium py-2.5 rounded-lg text-sm
+					hover:bg-gb-error/20 transition-colors">
+				🗑️ Grow löschen
+			</button>
+			<p class="text-[10px] text-gb-text-muted mt-1 leading-relaxed">
+				Löscht den Grow + alle {checkinCount} Check-ins inkl. Fotos. Kann nicht rückgängig gemacht werden.
+			</p>
+		</div>
+
+		<!-- Delete-Bestätigung Modal -->
+		{#if showDeleteConfirm}
+			<div class="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-4"
+				role="presentation" onclick={() => showDeleteConfirm = false}>
+				<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+				<div class="bg-gb-surface rounded-xl p-5 max-w-md w-full"
+					role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()}>
+					<h3 class="text-lg font-bold mb-3">🗑️ Grow „{grow.name}" wirklich löschen?</h3>
+					<p class="text-sm text-gb-text-muted mb-4 leading-relaxed">
+						{checkinCount} Check-in{checkinCount === 1 ? '' : 's'} + alle Fotos + Notizen werden permanent gelöscht.
+						<strong class="text-gb-text">Diese Aktion kann nicht rückgängig gemacht werden.</strong>
+					</p>
+					<div class="grid grid-cols-2 gap-3">
+						<button onclick={() => showDeleteConfirm = false}
+							class="bg-gb-surface-2 border border-gb-border text-gb-text-muted font-medium py-2.5 rounded-lg text-sm
+								hover:bg-gb-surface transition-colors">
+							Abbrechen
+						</button>
+						<button onclick={confirmDelete}
+							class="bg-gb-error text-white font-semibold py-2.5 rounded-lg text-sm
+								hover:bg-gb-error/80 transition-colors">
+							🗑️ Endgültig löschen
+						</button>
+					</div>
+				</div>
+			</div>
+		{/if}
+	</div>
+{/if}
