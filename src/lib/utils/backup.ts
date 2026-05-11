@@ -40,14 +40,38 @@ export function exportBackup(): string {
 	return JSON.stringify(backup, null, 2);
 }
 
-/** Download als JSON-Datei */
-export function downloadBackup(): void {
+/** Download als JSON-Datei.
+ * Capacitor 8 WebView ignoriert `<a download>`-Clicks, deshalb primär Web Share API
+ * mit File-Object (öffnet Android Share-Sheet → User kann in Files/Gmail/Drive speichern).
+ * Browser-Fallback: klassischer `<a download>` für normales Web.
+ */
+export async function downloadBackup(): Promise<void> {
 	const json = exportBackup();
+	const filename = `growbuddy-backup-${new Date().toISOString().slice(0, 10)}.json`;
+
+	// Capacitor / Android-Pfad: Web Share API mit File
+	try {
+		const file = new File([json], filename, { type: 'application/json' });
+		const navAny = navigator as any;
+		if (navAny.canShare && navAny.canShare({ files: [file] }) && navAny.share) {
+			await navAny.share({
+				files: [file],
+				title: 'GrowBuddy Backup',
+				text: 'GrowBuddy-Datenbackup (JSON)',
+			});
+			return;
+		}
+	} catch (e) {
+		// User-Cancel oder Plattform-Fehler — Fallback unten
+		if ((e as any)?.name === 'AbortError') return;
+	}
+
+	// Browser-Fallback: klassischer Download
 	const blob = new Blob([json], { type: 'application/json' });
 	const url = URL.createObjectURL(blob);
 	const a = document.createElement('a');
 	a.href = url;
-	a.download = `growbuddy-backup-${new Date().toISOString().slice(0, 10)}.json`;
+	a.download = filename;
 	document.body.appendChild(a);
 	a.click();
 	document.body.removeChild(a);
