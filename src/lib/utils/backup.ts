@@ -2,6 +2,9 @@
  * Daten-Backup — JSON Export/Import aller localStorage-Daten
  */
 
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
+import { Capacitor } from '@capacitor/core';
+
 const BACKUP_KEYS = [
 	'growbuddy_grows',
 	'growbuddy_xp',
@@ -41,32 +44,30 @@ export function exportBackup(): string {
 }
 
 /** Download als JSON-Datei.
- * Capacitor 8 WebView ignoriert `<a download>`-Clicks, deshalb primär Web Share API
- * mit File-Object (öffnet Android Share-Sheet → User kann in Files/Gmail/Drive speichern).
- * Browser-Fallback: klassischer `<a download>` für normales Web.
+ * - Native (Capacitor Android): direkt nach /sdcard/Documents/ schreiben (auffindbar in Files-App).
+ *   Capacitor 8 WebView ignoriert `<a download>`-Clicks, Filesystem-Plugin ist der saubere Weg.
+ * - Web-Browser: klassischer `<a download>`-Trick.
+ *
+ * Returns: Pfad-Hinweis für Toast (z.B. "Dokumente/growbuddy-backup-...json")
+ *          oder "Download" für Web.
  */
-export async function downloadBackup(): Promise<void> {
+export async function downloadBackup(): Promise<string> {
 	const json = exportBackup();
 	const filename = `growbuddy-backup-${new Date().toISOString().slice(0, 10)}.json`;
 
-	// Capacitor / Android-Pfad: Web Share API mit File
-	try {
-		const file = new File([json], filename, { type: 'application/json' });
-		const navAny = navigator as any;
-		if (navAny.canShare && navAny.canShare({ files: [file] }) && navAny.share) {
-			await navAny.share({
-				files: [file],
-				title: 'GrowBuddy Backup',
-				text: 'GrowBuddy-Datenbackup (JSON)',
-			});
-			return;
-		}
-	} catch (e) {
-		// User-Cancel oder Plattform-Fehler — Fallback unten
-		if ((e as any)?.name === 'AbortError') return;
+	// Native (Capacitor Android/iOS)
+	if (Capacitor.isNativePlatform()) {
+		await Filesystem.writeFile({
+			path: filename,
+			data: json,
+			directory: Directory.Documents,
+			encoding: Encoding.UTF8,
+			recursive: true,
+		});
+		return `Dokumente/${filename}`;
 	}
 
-	// Browser-Fallback: klassischer Download
+	// Web-Fallback: klassischer Download
 	const blob = new Blob([json], { type: 'application/json' });
 	const url = URL.createObjectURL(blob);
 	const a = document.createElement('a');
@@ -76,6 +77,7 @@ export async function downloadBackup(): Promise<void> {
 	a.click();
 	document.body.removeChild(a);
 	URL.revokeObjectURL(url);
+	return 'Downloads';
 }
 
 /** Importiert Backup aus JSON-String */

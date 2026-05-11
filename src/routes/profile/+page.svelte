@@ -405,7 +405,15 @@
 		<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">Daten</h2>
 		<div class="bg-gb-surface rounded-xl p-4 space-y-3">
 			<div class="flex gap-3">
-				<button onclick={() => { downloadBackup(); markBackupDone(); toastStore.success('Backup heruntergeladen'); }}
+				<button onclick={async () => {
+						try {
+							const path = await downloadBackup();
+							markBackupDone();
+							toastStore.success(`Backup gespeichert: ${path}`);
+						} catch (e) {
+							toastStore.error('Backup fehlgeschlagen: ' + ((e as any)?.message ?? 'unbekannt'));
+						}
+					}}
 					class="flex-1 bg-gb-green/10 border border-gb-green/20 text-gb-green font-medium text-sm py-2.5 rounded-lg hover:bg-gb-green/20 transition-colors">
 					📦 Export
 				</button>
