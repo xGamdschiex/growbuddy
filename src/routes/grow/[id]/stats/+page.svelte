@@ -19,6 +19,7 @@
 	} from '$lib/utils/grow-stats';
 	import MiniChart from '$lib/components/MiniChart.svelte';
 	import MultiSeriesChart, { type ChartSeries } from '$lib/components/MultiSeriesChart.svelte';
+	import { phaseTargetSegments, targetFor } from '$lib/utils/phase-targets';
 	import { onMount } from 'svelte';
 
 	let growId = $derived($page.params.id);
@@ -125,38 +126,21 @@
 	let waterMarkers = $derived(markersFor(waterSeries.days));
 	let nutrientMarkers = $derived(markersFor(nutrientSeries.days));
 
-	// Phase-Targets (nur Temp/RH brauchen sie für Range-Anzeige)
-	const TEMP_TARGETS_BY_PHASE = {
-		Veg: { min: 22, max: 28 }, Bloom: { min: 20, max: 26 }, Flush: { min: 18, max: 24 },
-	} as const;
-	const RH_TARGETS_BY_PHASE = {
-		Veg: { min: 55, max: 70 }, Bloom: { min: 40, max: 55 }, Flush: { min: 35, max: 50 },
-	} as const;
-	function phaseTargetsFor(targetMap: Record<string, { min: number; max: number }>, serieDays: number[]) {
-		if (!serieDays.length) return [];
-		const segs: { atIndex: number; min: number; max: number }[] = [];
-		let lastPhase: string | null = null;
-		serieDays.forEach((d: number, i: number) => {
-			const ci = chronCheckins.find((c: CheckIn) => dayOf(c) === d);
-			const ph = (ci?.phase as string) || 'Veg';
-			if (ph !== lastPhase) {
-				const t = targetMap[ph];
-				if (t) segs.push({ atIndex: i, min: t.min, max: t.max });
-				lastPhase = ph;
-			}
-		});
-		return segs;
-	}
-	let tempPhaseTargets = $derived(phaseTargetsFor(TEMP_TARGETS_BY_PHASE, tempSeries.days));
-	let rhPhaseTargets = $derived(phaseTargetsFor(RH_TARGETS_BY_PHASE, rhSeries.days));
+	// Phase-Targets via zentralisiertem util (siehe lib/utils/phase-targets.ts)
+	let tempPhaseTargets = $derived(phaseTargetSegments('temp', chronCheckins, tempSeries.days, dayOf));
+	let rhPhaseTargets = $derived(phaseTargetSegments('rh', chronCheckins, rhSeries.days, dayOf));
+	let vpdPhaseTargets = $derived(phaseTargetSegments('vpd', chronCheckins, vpdSeries.days, dayOf));
+	let ecPhaseTargets = $derived(phaseTargetSegments('ec', chronCheckins, ecSeries.days, dayOf));
+	let phPhaseTargets = $derived(phaseTargetSegments('ph', chronCheckins, phSeries.days, dayOf));
 
-	// MultiSeriesChart: alle 7 Metriken zur Auswahl
+	// MultiSeriesChart: alle 7 Metriken zur Auswahl. phaseTargets wird nur sichtbar
+	// wenn der User NUR diese eine Series anwählt (sonst Multi-Y-Skala-Konflikt).
 	let allSeries: ChartSeries[] = $derived([
-		{ key: 'temp', label: 'Temp', color: '#f59e0b', unit: '°C', values: tempSeries.values, days: tempSeries.days },
-		{ key: 'rh', label: 'RH', color: '#3b82f6', unit: '%', values: rhSeries.values, days: rhSeries.days },
-		{ key: 'vpd', label: 'VPD', color: '#22c55e', unit: ' kPa', values: vpdSeries.values, days: vpdSeries.days },
-		{ key: 'ec', label: 'EC', color: '#a855f7', unit: '', values: ecSeries.values, days: ecSeries.days },
-		{ key: 'ph', label: 'pH', color: '#ef4444', unit: '', values: phSeries.values, days: phSeries.days },
+		{ key: 'temp', label: 'Temp', color: '#f59e0b', unit: '°C', values: tempSeries.values, days: tempSeries.days, phaseTargets: tempPhaseTargets },
+		{ key: 'rh', label: 'RH', color: '#3b82f6', unit: '%', values: rhSeries.values, days: rhSeries.days, phaseTargets: rhPhaseTargets },
+		{ key: 'vpd', label: 'VPD', color: '#22c55e', unit: ' kPa', values: vpdSeries.values, days: vpdSeries.days, phaseTargets: vpdPhaseTargets },
+		{ key: 'ec', label: 'EC', color: '#a855f7', unit: '', values: ecSeries.values, days: ecSeries.days, phaseTargets: ecPhaseTargets },
+		{ key: 'ph', label: 'pH', color: '#ef4444', unit: '', values: phSeries.values, days: phSeries.days, phaseTargets: phPhaseTargets },
 		{ key: 'water', label: 'Wasser', color: '#0ea5e9', unit: ' L', values: waterSeries.values, days: waterSeries.days },
 		{ key: 'nutrient', label: 'Dünger', color: '#84cc16', unit: ' mL', values: nutrientSeries.values, days: nutrientSeries.days },
 	]);

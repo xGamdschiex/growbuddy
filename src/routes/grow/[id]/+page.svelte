@@ -22,6 +22,9 @@
 	import { getFeedLine } from '$lib/calc/feedlines/registry';
 	import { phaseDaysSummary, totalGrowDays, currentPhasePosition } from '$lib/utils/phase';
 	import { phaseStyle } from '$lib/utils/phase-colors';
+	import { phaseTargetSegments, PHASE_TARGETS as PHASE_TARGETS_ALL } from '$lib/utils/phase-targets';
+	import { predictHarvest, formatDaysUntil } from '$lib/utils/harvest-predict';
+	const PHASE_TARGETS_VPD = PHASE_TARGETS_ALL.vpd;
 	import {
 		metricStats,
 		metricPerPhase,
@@ -229,36 +232,12 @@
 	let waterMarkers = $derived(markersFor(waterSeries.days));
 	let nutrientMarkers = $derived(markersFor(nutrientSeries.days));
 
-	// Phase-spezifische Targets — wissenschaftlich (Veg/Bloom/Flush unterscheiden sich!)
-	const PHASE_TARGETS = {
-		vpd: { Veg: { min: 0.8, max: 1.2 }, Bloom: { min: 1.2, max: 1.5 }, Flush: { min: 1.0, max: 1.4 } },
-		temp: { Veg: { min: 22, max: 28 }, Bloom: { min: 20, max: 26 }, Flush: { min: 18, max: 24 } },
-		rh: { Veg: { min: 55, max: 70 }, Bloom: { min: 40, max: 55 }, Flush: { min: 35, max: 50 } },
-		ec: { Veg: { min: 1.0, max: 1.6 }, Bloom: { min: 1.6, max: 2.2 }, Flush: { min: 0.0, max: 0.4 } },
-		ph: { Veg: { min: 5.8, max: 6.3 }, Bloom: { min: 5.8, max: 6.3 }, Flush: { min: 5.8, max: 6.3 } },
-	} as const;
-
-	function phaseTargetsFor(metric: keyof typeof PHASE_TARGETS, serieDays: number[]) {
-		if (!serieDays.length) return [];
-		const all = chronCheckins;
-		const segs: { atIndex: number; min: number; max: number }[] = [];
-		let lastPhase: string | null = null;
-		serieDays.forEach((d, i) => {
-			const ci = all.find((c: CheckIn) => dayOf(c) === d);
-			const ph = (ci?.phase as string) || 'Veg';
-			if (ph !== lastPhase) {
-				const t = (PHASE_TARGETS[metric] as any)[ph];
-				if (t) segs.push({ atIndex: i, min: t.min, max: t.max });
-				lastPhase = ph;
-			}
-		});
-		return segs;
-	}
-	let vpdPhaseTargets = $derived(phaseTargetsFor('vpd', vpdSeries.days));
-	let tempPhaseTargets = $derived(phaseTargetsFor('temp', tempSeries.days));
-	let rhPhaseTargets = $derived(phaseTargetsFor('rh', rhSeries.days));
-	let ecPhaseTargets = $derived(phaseTargetsFor('ec', ecSeries.days));
-	let phPhaseTargets = $derived(phaseTargetsFor('ph', phSeries.days));
+	// Phase-Targets via zentralisiertem util (siehe lib/utils/phase-targets.ts)
+	let vpdPhaseTargets = $derived(phaseTargetSegments('vpd', chronCheckins, vpdSeries.days, dayOf));
+	let tempPhaseTargets = $derived(phaseTargetSegments('temp', chronCheckins, tempSeries.days, dayOf));
+	let rhPhaseTargets = $derived(phaseTargetSegments('rh', chronCheckins, rhSeries.days, dayOf));
+	let ecPhaseTargets = $derived(phaseTargetSegments('ec', chronCheckins, ecSeries.days, dayOf));
+	let phPhaseTargets = $derived(phaseTargetSegments('ph', chronCheckins, phSeries.days, dayOf));
 
 	// Aggregat-Statistiken
 	function avg(nums: number[]): number | null {
@@ -281,11 +260,11 @@
 	let tempPerPhase = $derived(metricPerPhase(chronCheckins, 'temp'));
 	let vpdPerPhase = $derived(metricPerPhase(chronCheckins, 'vpd'));
 	let ecPerPhase = $derived(metricPerPhase(chronCheckins, 'ec_measured'));
-	// Stress-Counter (VPD = wichtigste Health-Metrik)
+	// Stress-Counter (VPD = wichtigste Health-Metrik) — Targets aus zentralem util
 	let vpdStress = $derived(stressDays(chronCheckins, 'vpd', {
-		Veg: PHASE_TARGETS.vpd.Veg,
-		Bloom: PHASE_TARGETS.vpd.Bloom,
-		Flush: PHASE_TARGETS.vpd.Flush,
+		Veg: PHASE_TARGETS_VPD.Veg,
+		Bloom: PHASE_TARGETS_VPD.Bloom,
+		Flush: PHASE_TARGETS_VPD.Flush,
 	}));
 	// Konsistenz: wie zuverlässig wurde geloggt
 	let consistency = $derived(grow ? checkinConsistency(chronCheckins, grow.started_at) : null);
@@ -301,6 +280,26 @@
 	let phaseDays = $derived(grow ? phaseDaysSummary(grow, chronCheckins) : []);
 	let totalDays = $derived(grow ? totalGrowDays(grow, chronCheckins) : 0);
 	let hasAggregates = $derived(totalWaterMl > 0 || avgTemp !== null || phaseDays.length > 0);
+
+	// Harvest-Predict (g + Tage bis Harvest, basierend auf Strain + Plant-Count + Performance)
+	let harvestPredict = $derived.by(() => {
+		if (!grow || grow.status !== 'active') return null;
+		if (!grow.strain_type || !grow.plant_count) return null;
+		return predictHarvest({
+			strainType: grow.strain_type === 'auto' ? 'auto' : 'photo',
+			plantCount: grow.plant_count,
+			currentGrowDays: totalDays,
+			checkins: chronCheckins.map((c: CheckIn) => ({
+				phase: c.phase,
+				temp: c.temp,
+				rh: c.rh,
+				vpd: c.vpd,
+			})),
+		});
+	});
+
+	// Predict-Modal (Erklärung wie's berechnet wird)
+	let showHarvestInfo = $state(false);
 	// Health-Card sichtbar wenn ≥1 Check-in (Konsistenz-Wert macht Sinn ab Tag 1)
 	let hasHealthData = $derived(chronCheckins.length > 0);
 
@@ -575,6 +574,61 @@
 					<span class="text-xs text-gb-text-muted ml-auto">{ps2.emoji} {pos.phase} · Tag {pos.daysIn}</span>
 				</div>
 				<p class="text-[11px] text-gb-text-muted mt-1">Heutige Position · für Calc + Check-in</p>
+			</div>
+		{/if}
+
+		<!-- Harvest-Predict Card (Yield + Tage bis Harvest) -->
+		{#if harvestPredict && grow.status === 'active'}
+			<button type="button" onclick={() => showHarvestInfo = true}
+				class="w-full bg-gb-surface rounded-xl p-4 border border-gb-border/30 text-left
+					hover:border-gb-green/30 transition-colors">
+				<div class="flex items-center justify-between gap-3">
+					<div>
+						<p class="text-[10px] text-gb-text-muted uppercase tracking-wide font-semibold">🌿 Harvest-Predict</p>
+						<div class="flex items-baseline gap-3 mt-1">
+							<span class="text-2xl font-bold text-gb-green">~{harvestPredict.yieldGrams}g</span>
+							<span class="text-gb-text-muted">·</span>
+							<span class="text-2xl font-bold">{formatDaysUntil(harvestPredict.daysUntilHarvest)}</span>
+						</div>
+						<p class="text-[10px] text-gb-text-muted mt-1">
+							{harvestPredict.yieldRange.min}-{harvestPredict.yieldRange.max}g · Confidence: {harvestPredict.confidence}
+							{#if harvestPredict.performanceMultiplier !== 1.0}
+								· Perf {(harvestPredict.performanceMultiplier * 100).toFixed(0)}%
+							{/if}
+						</p>
+					</div>
+					<span class="text-gb-text-muted text-xl">ℹ️</span>
+				</div>
+			</button>
+		{/if}
+
+		<!-- Harvest-Predict Info-Modal -->
+		{#if showHarvestInfo && harvestPredict}
+			<div class="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-4"
+				role="presentation" onclick={() => showHarvestInfo = false}>
+				<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+				<div class="bg-gb-surface rounded-xl p-5 max-w-md w-full max-h-[80vh] overflow-y-auto"
+					role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()}>
+					<div class="flex items-start justify-between mb-3">
+						<h3 class="text-lg font-bold">🌿 Wie wird die Schätzung berechnet?</h3>
+						<button type="button" onclick={() => showHarvestInfo = false} aria-label="Schließen"
+							class="text-gb-text-muted hover:text-gb-text text-xl leading-none w-8 h-8 flex items-center justify-center">×</button>
+					</div>
+					<div class="space-y-3 text-sm leading-relaxed text-gb-text-muted">
+						<p><strong>Tage bis Harvest</strong> = Erwartete Gesamtdauer minus aktuelle Grow-Tage.
+							{harvestPredict.totalDaysExpected}d für {grow.strain_type === 'auto' ? 'Autoflower' : 'Photoperiode'} − {totalDays}d aktuell.</p>
+						<p><strong>Yield</strong> = Basis-Ertrag pro Pflanze × Pflanzenzahl × Performance-Multiplier ({(harvestPredict.performanceMultiplier * 100).toFixed(0)}%).</p>
+						<p><strong>Performance</strong> richtet sich nach deiner VPD- und Temperatur-In-Range-Rate.
+							Bessere Klima-Werte → höherer Multiplier (max +10%).</p>
+						<p><strong>Confidence: {harvestPredict.confidence}</strong> — basiert auf Check-in-Anzahl. Ab 20 Check-ins wird die Schätzung genauer.</p>
+						<p class="text-xs italic">Range ±25% reflektiert Strain- und Setup-Varianz.
+							Echte Yields hängen stark von Licht (PPFD/Watt), Genetik und Pflege ab.</p>
+					</div>
+					<button type="button" onclick={() => showHarvestInfo = false}
+						class="mt-4 w-full bg-gb-green text-white font-medium py-2.5 rounded-lg hover:bg-gb-green/90 transition-colors">
+						Verstanden
+					</button>
+				</div>
 			</div>
 		{/if}
 

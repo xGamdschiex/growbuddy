@@ -15,6 +15,11 @@
 		unit: string;
 		values: number[];
 		days: number[]; // Tag seit Grow-Start je Datenpunkt
+		/**
+		 * Optionale Phase-Targets (Soll-Bereich). Wird nur sichtbar gerendert wenn
+		 * NUR DIESE Series aktiv ist (sonst zu chaotisch wegen Multi-Y-Skala).
+		 */
+		phaseTargets?: Array<{ atIndex: number; min: number; max: number }>;
 	}
 
 	interface Props {
@@ -168,6 +173,22 @@
 					x2={width - PADDING} y2={PADDING + (height - PADDING - PADDING_BOTTOM) * r}
 					stroke="rgba(255,255,255,0.04)" stroke-width="1" />
 			{/each}
+
+			<!-- Phase-Target-Bänder: nur wenn EINE Series aktiv (sonst Y-Skalen-Konflikt) -->
+			{#if activeSeries.length === 1 && activeSeries[0].phaseTargets && activeSeries[0].phaseTargets.length > 0}
+				{@const s = activeSeries[0]}
+				{@const b = bounds(s)}
+				{@const segs = s.phaseTargets!}
+				{#each segs as seg, i}
+					{@const next = segs[i + 1]}
+					{@const startX = xMap(s.days[seg.atIndex] ?? xRange.min)}
+					{@const endX = next ? xMap(s.days[next.atIndex] ?? xRange.max) : (width - PADDING)}
+					{@const yMin = yMap(seg.max, b)}
+					{@const yMax = yMap(seg.min, b)}
+					<rect x={startX} y={Math.max(0, yMin)} width={Math.max(0, endX - startX)} height={Math.max(0, yMax - yMin)}
+						fill={s.color} opacity="0.12" />
+				{/each}
+			{/if}
 
 			<!-- Polylines pro aktiver Series -->
 			{#each activeSeries as s}
