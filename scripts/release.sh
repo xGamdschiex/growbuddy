@@ -19,9 +19,10 @@ KEYSTORE="$PROJECT_DIR/keystore/growbuddy-release.jks"
 cd "$PROJECT_DIR"
 
 # 1. Version-Bump (package.json + build.gradle)
+# POSIX sed statt grep -P — sonst bricht's auf Windows Git Bash: "grep: -P supports only unibyte and UTF-8 locales"
 echo "→ Version-Bump auf $VERSION"
-PREV_VERSION=$(grep -oP '"version":\s*"\K[^"]+' package.json)
-PREV_CODE=$(grep -oP 'versionCode \K\d+' android/app/build.gradle)
+PREV_VERSION=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' package.json | head -n1)
+PREV_CODE=$(sed -n 's/.*versionCode  *\([0-9][0-9]*\).*/\1/p' android/app/build.gradle | head -n1)
 NEW_CODE=$((PREV_CODE + 1))
 sed -i "s/\"version\": \"$PREV_VERSION\"/\"version\": \"$VERSION\"/" package.json
 sed -i "s/versionCode $PREV_CODE/versionCode $NEW_CODE/" android/app/build.gradle
