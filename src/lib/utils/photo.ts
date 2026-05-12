@@ -6,8 +6,10 @@
  */
 
 export const MAX_PHOTOS = 5;
-export const PHOTO_MAX_SIZE = 1024;
-export const PHOTO_QUALITY = 0.75;
+// Reduziert von 1024×0.75 → 800×0.65 (~50% kleinere base64-Strings — wichtig für
+// localStorage-Quota auf Tester-Geräten). Qualität bleibt für Doku-Zwecke ausreichend.
+export const PHOTO_MAX_SIZE = 800;
+export const PHOTO_QUALITY = 0.65;
 
 function nextTick(): Promise<void> {
 	return new Promise(r => setTimeout(r, 0));
@@ -81,16 +83,25 @@ export async function compressImage(
 /**
  * Komprimiert mehrere Bilder sequenziell mit Yield zwischen Bildern.
  * Verhindert UI-Freeze auf Mid-Range-Android bei 3-5 Bildern.
+ *
+ * Pro-Bild-Try/Catch: wenn 1 Bild fails, werden die anderen weiter verarbeitet.
+ * Die Fehler werden gesammelt und am Ende geworfen WENN gar nichts ging.
  */
 export async function compressBatch(
 	files: File[],
 	maxSize = PHOTO_MAX_SIZE,
 	quality = PHOTO_QUALITY,
-): Promise<string[]> {
-	const out: string[] = [];
+): Promise<{ images: string[]; errors: string[] }> {
+	const images: string[] = [];
+	const errors: string[] = [];
 	for (const f of files) {
-		out.push(await compressImage(f, maxSize, quality));
+		try {
+			images.push(await compressImage(f, maxSize, quality));
+		} catch (e: any) {
+			const msg = e?.message ?? e?.name ?? 'Unbekannter Fehler';
+			errors.push(`${f.name}: ${msg}`);
+		}
 		await nextTick();
 	}
-	return out;
+	return { images, errors };
 }

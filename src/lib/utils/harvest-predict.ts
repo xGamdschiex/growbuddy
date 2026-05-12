@@ -109,6 +109,42 @@ export function predictHarvest(input: HarvestPredictInput): HarvestPredictResult
 	};
 }
 
+/**
+ * Per-Strain Predict: berechnet pro Strain-Entry einen Yield-Predict
+ * mit gleichem Performance-Multiplier (alle Strains im gleichen Grow haben
+ * dieselben Klimabedingungen).
+ *
+ * Gesamt-Yield = Σ der Per-Strain-Yields.
+ */
+export function predictHarvestPerStrain(
+	strainEntries: Array<{ strain: string; plant_count: number }>,
+	baseInput: Omit<HarvestPredictInput, 'plantCount'>,
+): Array<HarvestPredictResult & { strain: string; plantCount: number }> {
+	// Gesamt-Predict einmal berechnen → daraus performanceMultiplier extrahieren
+	const totalPlants = strainEntries.reduce((s, e) => s + (e.plant_count || 0), 0);
+	const total = predictHarvest({ ...baseInput, plantCount: totalPlants });
+
+	// Pro Strain: gleiches strainType + perfMultiplier, eigener plant_count
+	return strainEntries.map((e) => {
+		const defaults = STRAIN_DEFAULTS[baseInput.strainType] ?? STRAIN_DEFAULTS.photo;
+		const baseYield = defaults.yieldPerPlant * Math.max(0, e.plant_count || 0);
+		const yieldGrams = Math.round(baseYield * total.performanceMultiplier);
+		return {
+			strain: e.strain,
+			plantCount: e.plant_count,
+			daysUntilHarvest: total.daysUntilHarvest,
+			totalDaysExpected: total.totalDaysExpected,
+			performanceMultiplier: total.performanceMultiplier,
+			confidence: total.confidence,
+			yieldGrams,
+			yieldRange: {
+				min: Math.round(yieldGrams * 0.75),
+				max: Math.round(yieldGrams * 1.25),
+			},
+		};
+	});
+}
+
 /** Hilfsfunktion: formatiert Tage als "~Nd" oder "in Kürze" wenn ≤ 3. */
 export function formatDaysUntil(days: number): string {
 	if (days <= 0) return 'Erntereif';

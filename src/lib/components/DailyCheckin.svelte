@@ -149,10 +149,18 @@
 		if (!files.length) return;
 		compressing = true;
 		try {
-			const compressed = await compressBatch(files);
-			photos = [...photos, ...compressed].slice(0, MAX_PHOTOS);
-		} catch {
-			toastStore.warning('Foto konnte nicht verarbeitet werden');
+			const { images, errors } = await compressBatch(files);
+			if (images.length > 0) {
+				photos = [...photos, ...images].slice(0, MAX_PHOTOS);
+			}
+			if (errors.length > 0) {
+				// Konkrete Fehler statt generisch — User weiß was los ist
+				toastStore.error(`${errors.length} Foto${errors.length > 1 ? 's' : ''} fehlgeschlagen: ${errors[0]}`);
+				console.error('[DailyCheckin] Foto-Errors:', errors);
+			}
+		} catch (e: any) {
+			toastStore.error('Foto-Upload: ' + (e?.message ?? e?.name ?? 'unbekannter Fehler'));
+			console.error('[DailyCheckin] handlePhoto Exception:', e);
 		} finally {
 			compressing = false;
 		}

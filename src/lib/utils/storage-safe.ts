@@ -6,13 +6,25 @@
 
 import { toastStore } from '$lib/stores/toast';
 
-let quotaWarned = false;
+let lastQuotaWarn = 0;
+
+/** Schätzt verfügbaren localStorage-Quota in Bytes (Grobe Schätzung). */
+export async function estimateStorageQuota(): Promise<{ used: number; quota: number; percent: number } | null> {
+	if (typeof navigator === 'undefined' || !navigator.storage?.estimate) return null;
+	try {
+		const est = await navigator.storage.estimate();
+		const used = est.usage ?? 0;
+		const quota = est.quota ?? 0;
+		return { used, quota, percent: quota > 0 ? (used / quota) * 100 : 0 };
+	} catch {
+		return null;
+	}
+}
 
 export function safeSetItem(key: string, value: string): boolean {
 	if (typeof window === 'undefined') return false;
 	try {
 		localStorage.setItem(key, value);
-		quotaWarned = false;
 		return true;
 	} catch (e: any) {
 		const isQuota =
@@ -20,12 +32,23 @@ export function safeSetItem(key: string, value: string): boolean {
 			e?.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
 			e?.code === 22 ||
 			e?.code === 1014;
-		if (isQuota && !quotaWarned) {
-			quotaWarned = true;
+		// Throttle Warnings: max 1× pro 30s, damit nicht spammed aber nicht ganz silent
+		const now = Date.now();
+		if (isQuota && now - lastQuotaWarn > 30_000) {
+			lastQuotaWarn = now;
 			try {
-				toastStore.warning('Speicher voll — bitte Backup exportieren');
+				toastStore.error(
+					'Speicher voll: Backup exportieren oder alte Check-ins/Fotos löschen, sonst werden Änderungen nicht gespeichert',
+				);
 			} catch {
-				// Store evtl. noch nicht bereit, ignorieren
+				// Store evtl. noch nicht bereit
+			}
+		} else if (!isQuota) {
+			// Andere Fehler (z.B. SecurityError im Inkognito-Mode)
+			try {
+				toastStore.error('Speicher-Fehler: ' + (e?.name ?? 'unbekannt'));
+			} catch {
+				// ignore
 			}
 		}
 		return false;

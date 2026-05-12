@@ -23,7 +23,7 @@
 	import { phaseDaysSummary, totalGrowDays, currentPhasePosition } from '$lib/utils/phase';
 	import { phaseStyle } from '$lib/utils/phase-colors';
 	import { phaseTargetSegments, PHASE_TARGETS as PHASE_TARGETS_ALL } from '$lib/utils/phase-targets';
-	import { predictHarvest, formatDaysUntil } from '$lib/utils/harvest-predict';
+	import { predictHarvest, predictHarvestPerStrain, formatDaysUntil } from '$lib/utils/harvest-predict';
 	import { summarizeStrains, totalPlantCount, getStrainEntries } from '$lib/utils/grow-strains';
 	const PHASE_TARGETS_VPD = PHASE_TARGETS_ALL.vpd;
 	import {
@@ -301,7 +301,25 @@
 		});
 	});
 
-	// Predict-Modal (Erklärung wie's berechnet wird)
+	// Per-Strain-Predict (Aufschlüsselung pro Strain)
+	let harvestPerStrain = $derived.by(() => {
+		if (!grow || grow.status !== 'active' || !grow.strain_type) return [];
+		const entries = getStrainEntries(grow);
+		if (entries.length === 0) return [];
+		return predictHarvestPerStrain(entries, {
+			strainType: grow.strain_type === 'auto' ? 'auto' : 'photo',
+			currentGrowDays: totalDays,
+			checkins: chronCheckins.map((c: CheckIn) => ({
+				phase: c.phase,
+				temp: c.temp,
+				rh: c.rh,
+				vpd: c.vpd,
+			})),
+		});
+	});
+
+	// Modal-State: default Per-Strain-Liste, Info ist Sub-Modal
+	let showHarvestPerStrain = $state(false);
 	let showHarvestInfo = $state(false);
 	// Health-Card sichtbar wenn ≥1 Check-in (Konsistenz-Wert macht Sinn ab Tag 1)
 	let hasHealthData = $derived(chronCheckins.length > 0);
@@ -385,10 +403,17 @@
 		if (!files.length) return;
 		compressing = true;
 		try {
-			const compressed = await compressBatch(files, 800);
-			ciPhotos = [...ciPhotos, ...compressed].slice(0, MAX_PHOTOS);
-		} catch {
-			toastStore.warning('Foto konnte nicht verarbeitet werden');
+			const { images, errors } = await compressBatch(files, 800);
+			if (images.length > 0) {
+				ciPhotos = [...ciPhotos, ...images].slice(0, MAX_PHOTOS);
+			}
+			if (errors.length > 0) {
+				toastStore.error(`${errors.length} Foto${errors.length > 1 ? 's' : ''} fehlgeschlagen: ${errors[0]}`);
+				console.error('[grow/[id]] Foto-Errors:', errors);
+			}
+		} catch (e: any) {
+			toastStore.error('Foto-Upload: ' + (e?.message ?? e?.name ?? 'unbekannter Fehler'));
+			console.error('[grow/[id]] handlePhoto Exception:', e);
 		} finally {
 			compressing = false;
 		}
@@ -589,7 +614,7 @@
 
 		<!-- Harvest-Predict Card (Yield + Tage bis Harvest) -->
 		{#if harvestPredict && grow.status === 'active'}
-			<button type="button" onclick={() => showHarvestInfo = true}
+			<button type="button" onclick={() => showHarvestPerStrain = true}
 				class="w-full bg-gb-surface rounded-xl p-4 border border-gb-border/30 text-left
 					hover:border-gb-green/30 transition-colors">
 				<div class="flex items-center justify-between gap-3">
@@ -605,14 +630,74 @@
 							{#if harvestPredict.performanceMultiplier !== 1.0}
 								· Perf {(harvestPredict.performanceMultiplier * 100).toFixed(0)}%
 							{/if}
+							{#if harvestPerStrain.length > 1}
+								· {harvestPerStrain.length} Strains — tippen für Aufschlüsselung
+							{/if}
 						</p>
 					</div>
-					<span class="text-gb-text-muted text-xl">ℹ️</span>
+					<span class="text-gb-text-muted text-xl">›</span>
 				</div>
 			</button>
 		{/if}
 
-		<!-- Harvest-Predict Info-Modal -->
+		<!-- Per-Strain Predict Modal (Tap-Default) -->
+		{#if showHarvestPerStrain && harvestPredict}
+			<div class="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-4"
+				role="presentation" onclick={() => showHarvestPerStrain = false}>
+				<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+				<div class="bg-gb-surface rounded-xl p-5 max-w-md w-full max-h-[80vh] overflow-y-auto"
+					role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()}>
+					<div class="flex items-start justify-between mb-3 gap-2">
+						<h3 class="text-lg font-bold">🌿 Harvest-Predict</h3>
+						<div class="flex items-center gap-1 shrink-0">
+							<button type="button" onclick={() => { showHarvestPerStrain = false; showHarvestInfo = true; }}
+								aria-label="Berechnung erklären"
+								class="text-gb-text-muted hover:text-gb-text text-base leading-none w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gb-surface-2 transition-colors">
+								ℹ️
+							</button>
+							<button type="button" onclick={() => showHarvestPerStrain = false} aria-label="Schließen"
+								class="text-gb-text-muted hover:text-gb-text text-xl leading-none w-8 h-8 flex items-center justify-center">×</button>
+						</div>
+					</div>
+
+					<!-- Gemeinsame Zeit-Anzeige -->
+					<div class="bg-gb-bg/40 rounded-lg p-3 mb-3 text-center">
+						<p class="text-xs text-gb-text-muted">Voraussichtlich noch</p>
+						<p class="text-xl font-bold text-gb-text mt-0.5">{formatDaysUntil(harvestPredict.daysUntilHarvest)} bis Harvest</p>
+						<p class="text-[10px] text-gb-text-muted mt-1">
+							{harvestPredict.totalDaysExpected}d gesamt · {totalDays}d schon · Performance {(harvestPredict.performanceMultiplier * 100).toFixed(0)}%
+						</p>
+					</div>
+
+					<!-- Per-Strain-Aufschlüsselung -->
+					<div class="space-y-2">
+						<p class="text-xs text-gb-text-muted font-semibold uppercase tracking-wide">Ertrag pro Strain</p>
+						{#each harvestPerStrain as ps}
+							<div class="flex items-center justify-between gap-3 bg-gb-bg/40 rounded-lg px-3 py-2.5">
+								<div class="min-w-0 flex-1">
+									<p class="text-sm font-medium truncate">{ps.strain}</p>
+									<p class="text-[10px] text-gb-text-muted">{ps.plantCount} Pflanze{ps.plantCount === 1 ? '' : 'n'} · {ps.yieldRange.min}-{ps.yieldRange.max}g</p>
+								</div>
+								<span class="text-base font-bold text-gb-green shrink-0">~{ps.yieldGrams}g</span>
+							</div>
+						{/each}
+
+						<!-- Σ Gesamt -->
+						<div class="flex items-center justify-between gap-3 border-t border-gb-border/30 pt-3 mt-2 px-3">
+							<p class="text-sm font-semibold">Σ Gesamt</p>
+							<span class="text-lg font-bold text-gb-green">~{harvestPredict.yieldGrams}g</span>
+						</div>
+					</div>
+
+					<button type="button" onclick={() => showHarvestPerStrain = false}
+						class="mt-4 w-full bg-gb-green text-white font-medium py-2.5 rounded-lg hover:bg-gb-green/90 transition-colors">
+						Verstanden
+					</button>
+				</div>
+			</div>
+		{/if}
+
+		<!-- Harvest-Predict Info-Modal (Sub-Modal, geöffnet via ℹ️ aus Per-Strain) -->
 		{#if showHarvestInfo && harvestPredict}
 			<div class="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-4"
 				role="presentation" onclick={() => showHarvestInfo = false}>

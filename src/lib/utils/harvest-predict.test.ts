@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { predictHarvest, formatDaysUntil, formatYieldRange } from './harvest-predict';
+import { predictHarvest, predictHarvestPerStrain, formatDaysUntil, formatYieldRange } from './harvest-predict';
 
 describe('harvest-predict — predictHarvest', () => {
 	it('Photo Default ohne Check-ins: 120d total, 70g/Pflanze', () => {
@@ -62,6 +62,52 @@ describe('harvest-predict — predictHarvest', () => {
 		const r = predictHarvest({ strainType: 'photo', plantCount: 1, currentGrowDays: 0, checkins: [] });
 		expect(r.yieldRange.min).toBe(Math.round(r.yieldGrams * 0.75));
 		expect(r.yieldRange.max).toBe(Math.round(r.yieldGrams * 1.25));
+	});
+});
+
+describe('harvest-predict — predictHarvestPerStrain', () => {
+	it('Multi-Strain: Summe der Per-Strain-Yields = Total-Yield', () => {
+		const entries = [
+			{ strain: 'A', plant_count: 2 },
+			{ strain: 'B', plant_count: 1 },
+			{ strain: 'C', plant_count: 1 },
+		];
+		const total = predictHarvest({ strainType: 'photo', plantCount: 4, currentGrowDays: 30, checkins: [] });
+		const perStrain = predictHarvestPerStrain(entries, { strainType: 'photo', currentGrowDays: 30, checkins: [] });
+		const sumPer = perStrain.reduce((s, e) => s + e.yieldGrams, 0);
+		expect(sumPer).toBe(total.yieldGrams);
+	});
+
+	it('Pro Strain proportional zu plant_count', () => {
+		const entries = [
+			{ strain: 'Duo', plant_count: 2 },
+			{ strain: 'Solo', plant_count: 1 },
+		];
+		const per = predictHarvestPerStrain(entries, { strainType: 'photo', currentGrowDays: 30, checkins: [] });
+		expect(per[0].yieldGrams).toBe(per[1].yieldGrams * 2);
+	});
+
+	it('Alle Strains haben gleichen performanceMultiplier + daysUntilHarvest', () => {
+		const cis = Array.from({ length: 10 }, () => ({ phase: 'Veg', vpd: 1.0, temp: 24 }));
+		const per = predictHarvestPerStrain(
+			[{ strain: 'A', plant_count: 2 }, { strain: 'B', plant_count: 1 }],
+			{ strainType: 'photo', currentGrowDays: 30, checkins: cis }
+		);
+		expect(per[0].performanceMultiplier).toBe(per[1].performanceMultiplier);
+		expect(per[0].daysUntilHarvest).toBe(per[1].daysUntilHarvest);
+	});
+
+	it('1 Strain → 1 Entry', () => {
+		const per = predictHarvestPerStrain(
+			[{ strain: 'Solo', plant_count: 3 }],
+			{ strainType: 'auto', currentGrowDays: 0, checkins: [] }
+		);
+		expect(per).toHaveLength(1);
+		expect(per[0].plantCount).toBe(3);
+	});
+
+	it('Leere Liste → leeres Array', () => {
+		expect(predictHarvestPerStrain([], { strainType: 'photo', currentGrowDays: 0, checkins: [] })).toEqual([]);
 	});
 });
 
