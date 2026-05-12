@@ -1,18 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import { predictHarvest, predictHarvestPerStrain, formatDaysUntil, formatYieldRange } from './harvest-predict';
 
-describe('harvest-predict — predictHarvest', () => {
-	it('Photo Default ohne Check-ins: 120d total, 70g/Pflanze', () => {
+describe('harvest-predict — predictHarvest (Default-Lifecycle ohne Bloom-Start)', () => {
+	it('Photo Default: vegWeeks(5)+floweringWeeks(9) = 14 Wo = 98d, 70g/Pflanze', () => {
 		const r = predictHarvest({ strainType: 'photo', plantCount: 1, currentGrowDays: 0, checkins: [] });
-		expect(r.totalDaysExpected).toBe(120);
-		expect(r.daysUntilHarvest).toBe(120);
+		expect(r.totalDaysExpected).toBe(98);
+		expect(r.daysUntilHarvest).toBe(98);
 		expect(r.yieldGrams).toBe(70);
 		expect(r.confidence).toBe('low');
 	});
 
-	it('Auto Default: 80d total, 50g/Pflanze', () => {
+	it('Auto Default: vegWeeks(4)+floweringWeeks(5) = 9 Wo = 63d, 50g/Pflanze', () => {
 		const r = predictHarvest({ strainType: 'auto', plantCount: 1, currentGrowDays: 0, checkins: [] });
-		expect(r.totalDaysExpected).toBe(80);
+		expect(r.totalDaysExpected).toBe(63);
 		expect(r.yieldGrams).toBe(50);
 	});
 
@@ -25,6 +25,66 @@ describe('harvest-predict — predictHarvest', () => {
 	it('currentDays > totalDays → daysUntilHarvest = 0', () => {
 		const r = predictHarvest({ strainType: 'auto', plantCount: 1, currentGrowDays: 100, checkins: [] });
 		expect(r.daysUntilHarvest).toBe(0);
+	});
+});
+
+describe('harvest-predict — predictHarvest mit Bloom-Start', () => {
+	// Lauris realer Bug: 39d Grow, Bloom seit Tag 26 → ~6-7 Wo bis Harvest, NICHT ~11 Wo
+	it('Photo W3 Bloom (bloomStartDay=26, currentDay=39, 9 Wo Bloom): ~50d Rest', () => {
+		const r = predictHarvest({
+			strainType: 'photo',
+			plantCount: 1,
+			currentGrowDays: 39,
+			bloomStartDay: 26,
+			checkins: [],
+		});
+		// harvestDay = 26 + 9*7 = 89, currentDay = 39 → 50d Rest
+		expect(r.totalDaysExpected).toBe(89);
+		expect(r.daysUntilHarvest).toBe(50);
+	});
+
+	it('Custom floweringWeeks=8: harvestDay anders', () => {
+		const r = predictHarvest({
+			strainType: 'photo',
+			plantCount: 1,
+			currentGrowDays: 30,
+			bloomStartDay: 25,
+			floweringWeeks: 8,
+			checkins: [],
+		});
+		// harvestDay = 25 + 8*7 = 81
+		expect(r.totalDaysExpected).toBe(81);
+		expect(r.daysUntilHarvest).toBe(51);
+	});
+
+	it('Sehr kurze Bloom (5 Wo): kommt früher zur Ernte', () => {
+		const r9 = predictHarvest({ strainType: 'photo', plantCount: 1, currentGrowDays: 30, bloomStartDay: 25, floweringWeeks: 9, checkins: [] });
+		const r5 = predictHarvest({ strainType: 'photo', plantCount: 1, currentGrowDays: 30, bloomStartDay: 25, floweringWeeks: 5, checkins: [] });
+		expect(r5.daysUntilHarvest).toBeLessThan(r9.daysUntilHarvest);
+	});
+
+	it('floweringWeeks=0 oder negativ → Default greift', () => {
+		const r = predictHarvest({
+			strainType: 'photo',
+			plantCount: 1,
+			currentGrowDays: 30,
+			bloomStartDay: 25,
+			floweringWeeks: 0,
+			checkins: [],
+		});
+		// Fallback auf photo-Default 9 Wo
+		expect(r.totalDaysExpected).toBe(25 + 63);
+	});
+
+	it('bloomStartDay = null → Veg-Default-Logik', () => {
+		const r = predictHarvest({
+			strainType: 'photo',
+			plantCount: 1,
+			currentGrowDays: 10,
+			bloomStartDay: null,
+			checkins: [],
+		});
+		expect(r.totalDaysExpected).toBe(98); // 5 + 9 = 14 Wo
 	});
 
 	it('5+ Check-ins mit guten Werten → confidence medium, perfMult > 0.7', () => {
@@ -66,7 +126,7 @@ describe('harvest-predict — predictHarvest', () => {
 });
 
 describe('harvest-predict — predictHarvestPerStrain', () => {
-	it('Multi-Strain: Summe der Per-Strain-Yields = Total-Yield', () => {
+	it('Multi-Strain ohne flowering_weeks: Summe = Total-Yield', () => {
 		const entries = [
 			{ strain: 'A', plant_count: 2 },
 			{ strain: 'B', plant_count: 1 },
@@ -78,6 +138,22 @@ describe('harvest-predict — predictHarvestPerStrain', () => {
 		expect(sumPer).toBe(total.yieldGrams);
 	});
 
+	it('Pro Strain eigene flowering_weeks → unterschiedliche daysUntilHarvest', () => {
+		const entries = [
+			{ strain: 'Schnell', plant_count: 1, flowering_weeks: 7 },
+			{ strain: 'Langsam', plant_count: 1, flowering_weeks: 10 },
+		];
+		const per = predictHarvestPerStrain(entries, {
+			strainType: 'photo',
+			currentGrowDays: 30,
+			bloomStartDay: 25,
+			checkins: [],
+		});
+		expect(per[0].daysUntilHarvest).toBeLessThan(per[1].daysUntilHarvest);
+		expect(per[0].floweringWeeks).toBe(7);
+		expect(per[1].floweringWeeks).toBe(10);
+	});
+
 	it('Pro Strain proportional zu plant_count', () => {
 		const entries = [
 			{ strain: 'Duo', plant_count: 2 },
@@ -87,13 +163,20 @@ describe('harvest-predict — predictHarvestPerStrain', () => {
 		expect(per[0].yieldGrams).toBe(per[1].yieldGrams * 2);
 	});
 
-	it('Alle Strains haben gleichen performanceMultiplier + daysUntilHarvest', () => {
+	it('Alle Strains haben gleichen performanceMultiplier (gleiche Klimadaten)', () => {
 		const cis = Array.from({ length: 10 }, () => ({ phase: 'Veg', vpd: 1.0, temp: 24 }));
 		const per = predictHarvestPerStrain(
 			[{ strain: 'A', plant_count: 2 }, { strain: 'B', plant_count: 1 }],
 			{ strainType: 'photo', currentGrowDays: 30, checkins: cis }
 		);
 		expect(per[0].performanceMultiplier).toBe(per[1].performanceMultiplier);
+	});
+
+	it('Gleiche flowering_weeks → gleiches daysUntilHarvest', () => {
+		const per = predictHarvestPerStrain(
+			[{ strain: 'A', plant_count: 2 }, { strain: 'B', plant_count: 1 }],
+			{ strainType: 'photo', currentGrowDays: 30, bloomStartDay: 25, checkins: [] }
+		);
 		expect(per[0].daysUntilHarvest).toBe(per[1].daysUntilHarvest);
 	});
 

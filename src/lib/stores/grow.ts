@@ -18,6 +18,8 @@ export type GrowSystem = 'topf' | 'autopot' | 'dwc' | 'rdwc';
 export interface GrowStrainEntry {
 	strain: string;
 	plant_count: number;
+	/** Blütezeit in Wochen — pro Strain wegen unterschiedlicher Sorten. Default: 9 (photo) / 5 (auto). */
+	flowering_weeks?: number;
 }
 
 export interface Grow {

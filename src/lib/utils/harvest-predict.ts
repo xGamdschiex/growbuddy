@@ -18,16 +18,28 @@ import { inRangeStats, type MetricKey } from './phase-targets';
 
 export type StrainType = 'auto' | 'photo';
 
-/** Default-Gesamtdauer + Yield/Pflanze pro Strain-Typ. */
+/**
+ * Default-Werte pro Strain-Typ:
+ *  - vegWeeks: typische Veg-Dauer (wird genutzt wenn der Grow noch nicht in Bloom ist)
+ *  - floweringWeeks: typische Bloom-Dauer (User kann pro Strain überschreiben)
+ *  - yieldPerPlant: Basis-Ertrag (Photo > Auto wegen meist größerer Pflanzen)
+ */
 const STRAIN_DEFAULTS = {
-	auto: { totalDays: 80, yieldPerPlant: 50 }, // 70-90d total, 30-80g/Pflanze
-	photo: { totalDays: 120, yieldPerPlant: 70 }, // 100-140d total, 50-150g/Pflanze
+	auto: { vegWeeks: 4, floweringWeeks: 5, yieldPerPlant: 50 },
+	photo: { vegWeeks: 5, floweringWeeks: 9, yieldPerPlant: 70 },
 } as const;
 
 export interface HarvestPredictInput {
 	strainType: StrainType;
 	plantCount: number;
 	currentGrowDays: number;
+	/** Wenn gesetzt: Bloom-Wochen für DIESEN Strain (User-Override). Default je nach strainType. */
+	floweringWeeks?: number;
+	/**
+	 * Tag im Grow, an dem die Bloom-Phase begann (aus check-ins ableiten).
+	 * Wenn null/undefined: Grow ist noch nicht in Bloom (Veg/Seedling).
+	 */
+	bloomStartDay?: number | null;
 	/** Check-ins (chronologisch sortiert) mit Temp/RH/VPD-Werten zur Performance-Bestimmung */
 	checkins: Array<{
 		phase?: string | null;
@@ -50,17 +62,32 @@ export interface HarvestPredictResult {
 /**
  * Hauptfunktion: berechnet Harvest-Schätzung.
  *
+ * Algorithmus:
+ *  - Wenn `bloomStartDay` gesetzt (Grow schon in Bloom): harvestDay = bloomStartDay + floweringWeeks×7
+ *  - Sonst (Veg/Seedling): harvestDay = vegWeeks×7 + floweringWeeks×7 (full lifecycle estimate)
+ *
  * Edge-Cases:
  *  - plant_count <= 0 → 0g Yield, totalDays/2 als Rest
  *  - keine Check-ins → confidence='low', perfMultiplier=1.0 (Default)
  *  - currentGrowDays > totalDaysExpected → daysUntilHarvest = 0 (Auto-Harvest)
  */
 export function predictHarvest(input: HarvestPredictInput): HarvestPredictResult {
-	const { strainType, plantCount, currentGrowDays, checkins } = input;
+	const { strainType, plantCount, currentGrowDays, checkins, bloomStartDay } = input;
 	const defaults = STRAIN_DEFAULTS[strainType] ?? STRAIN_DEFAULTS.photo;
+	const floweringWeeks = input.floweringWeeks && input.floweringWeeks > 0
+		? input.floweringWeeks
+		: defaults.floweringWeeks;
+	const floweringDays = floweringWeeks * 7;
 
-	const totalDaysExpected = defaults.totalDays;
-	const daysUntilHarvest = Math.max(0, totalDaysExpected - currentGrowDays);
+	// Erwartetes Harvest-Datum: relativ zu Bloom-Start (wenn in Bloom) oder via vegWeeks+floweringWeeks
+	let harvestDay: number;
+	if (typeof bloomStartDay === 'number' && bloomStartDay >= 0) {
+		harvestDay = bloomStartDay + floweringDays;
+	} else {
+		harvestDay = defaults.vegWeeks * 7 + floweringDays;
+	}
+	const totalDaysExpected = harvestDay;
+	const daysUntilHarvest = Math.max(0, harvestDay - currentGrowDays);
 
 	// Performance-Multiplier aus In-Range-Raten von VPD, Temp.
 	let performanceMultiplier = 1.0;
@@ -114,28 +141,40 @@ export function predictHarvest(input: HarvestPredictInput): HarvestPredictResult
  * mit gleichem Performance-Multiplier (alle Strains im gleichen Grow haben
  * dieselben Klimabedingungen).
  *
- * Gesamt-Yield = Σ der Per-Strain-Yields.
+ * Pro Strain kann eigene `flowering_weeks` (Bloom-Dauer) gesetzt sein → eigenes
+ * daysUntilHarvest.
+ *
+ * Gesamt-Yield = Σ der Per-Strain-Yields. Gesamt-daysUntilHarvest = max der Strains
+ * (= wann der LETZTE Strain fertig ist).
  */
 export function predictHarvestPerStrain(
-	strainEntries: Array<{ strain: string; plant_count: number }>,
-	baseInput: Omit<HarvestPredictInput, 'plantCount'>,
-): Array<HarvestPredictResult & { strain: string; plantCount: number }> {
-	// Gesamt-Predict einmal berechnen → daraus performanceMultiplier extrahieren
+	strainEntries: Array<{ strain: string; plant_count: number; flowering_weeks?: number }>,
+	baseInput: Omit<HarvestPredictInput, 'plantCount' | 'floweringWeeks'>,
+): Array<HarvestPredictResult & { strain: string; plantCount: number; floweringWeeks: number }> {
+	const defaults = STRAIN_DEFAULTS[baseInput.strainType] ?? STRAIN_DEFAULTS.photo;
+	// Gemeinsamer Performance-Multiplier (gleiches Klima für alle Strains)
 	const totalPlants = strainEntries.reduce((s, e) => s + (e.plant_count || 0), 0);
-	const total = predictHarvest({ ...baseInput, plantCount: totalPlants });
+	const refTotal = predictHarvest({ ...baseInput, plantCount: totalPlants });
 
-	// Pro Strain: gleiches strainType + perfMultiplier, eigener plant_count
 	return strainEntries.map((e) => {
-		const defaults = STRAIN_DEFAULTS[baseInput.strainType] ?? STRAIN_DEFAULTS.photo;
+		const fw = e.flowering_weeks && e.flowering_weeks > 0 ? e.flowering_weeks : defaults.floweringWeeks;
+		// Strain-individueller Predict: gleiche Bloom-Start aber eigene flowering_weeks
+		const perStrain = predictHarvest({
+			...baseInput,
+			plantCount: e.plant_count || 0,
+			floweringWeeks: fw,
+		});
+		// Performance-Multiplier vom Gesamt-Predict übernehmen (klimaabhängig, gleich für alle)
 		const baseYield = defaults.yieldPerPlant * Math.max(0, e.plant_count || 0);
-		const yieldGrams = Math.round(baseYield * total.performanceMultiplier);
+		const yieldGrams = Math.round(baseYield * refTotal.performanceMultiplier);
 		return {
 			strain: e.strain,
 			plantCount: e.plant_count,
-			daysUntilHarvest: total.daysUntilHarvest,
-			totalDaysExpected: total.totalDaysExpected,
-			performanceMultiplier: total.performanceMultiplier,
-			confidence: total.confidence,
+			floweringWeeks: fw,
+			daysUntilHarvest: perStrain.daysUntilHarvest,
+			totalDaysExpected: perStrain.totalDaysExpected,
+			performanceMultiplier: refTotal.performanceMultiplier,
+			confidence: refTotal.confidence,
 			yieldGrams,
 			yieldRange: {
 				min: Math.round(yieldGrams * 0.75),

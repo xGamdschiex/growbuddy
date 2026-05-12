@@ -160,10 +160,10 @@
 			<p class="text-xs text-gb-text-muted mt-1">{checkinCount} Check-in{checkinCount === 1 ? '' : 's'} · Änderungen werden sofort übernommen</p>
 		</div>
 
-		<!-- Strains (Multi) -->
+		<!-- Strains (Multi: pro Strain Name + Pflanzen-Anzahl + Blütezeit) -->
 		<div>
 			<span class="block text-xs text-gb-text-muted mb-2">Strain(s) + Anzahl Pflanzen *</span>
-			<StrainList bind:entries={strainEntries} placeholder={tr('grow.strain_placeholder')} />
+			<StrainList bind:entries={strainEntries} placeholder={tr('grow.strain_placeholder')} {strainType} />
 		</div>
 
 		<!-- Name (optional) -->

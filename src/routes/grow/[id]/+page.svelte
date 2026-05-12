@@ -282,26 +282,43 @@
 	let totalDays = $derived(grow ? totalGrowDays(grow, chronCheckins) : 0);
 	let hasAggregates = $derived(totalWaterMl > 0 || avgTemp !== null || phaseDays.length > 0);
 
-	// Harvest-Predict (g + Tage bis Harvest, Multi-Strain aware via totalPlantCount)
+	// Bloom-Start aus Check-ins ableiten: erster CI mit phase='Bloom' → Tag im Grow
+	let bloomStartDay = $derived.by<number | null>(() => {
+		const firstBloom = chronCheckins.find((c: CheckIn) => c.phase === 'Bloom');
+		if (!firstBloom) return null;
+		return dayOf(firstBloom);
+	});
+
+	let harvestPredictCheckins = $derived(chronCheckins.map((c: CheckIn) => ({
+		phase: c.phase,
+		temp: c.temp,
+		rh: c.rh,
+		vpd: c.vpd,
+	})));
+
+	// Harvest-Predict (Multi-Strain aware: nutzt bloomStartDay wenn in Bloom, sonst Veg-Default)
 	let harvestPredict = $derived.by(() => {
 		if (!grow || grow.status !== 'active') return null;
 		if (!grow.strain_type) return null;
 		const totalPlants = totalPlantCount(grow);
 		if (totalPlants === 0) return null;
+		// Gewichteter Durchschnitt der flowering_weeks falls Multi-Strain (für Total-Anzeige)
+		const entries = getStrainEntries(grow);
+		const totalForWeights = entries.reduce((s, e) => s + (e.plant_count || 0), 0) || 1;
+		const avgFlowerWeeks = entries.length > 0
+			? entries.reduce((s, e) => s + (e.flowering_weeks ?? (grow.strain_type === 'auto' ? 5 : 9)) * (e.plant_count || 0), 0) / totalForWeights
+			: undefined;
 		return predictHarvest({
 			strainType: grow.strain_type === 'auto' ? 'auto' : 'photo',
 			plantCount: totalPlants,
 			currentGrowDays: totalDays,
-			checkins: chronCheckins.map((c: CheckIn) => ({
-				phase: c.phase,
-				temp: c.temp,
-				rh: c.rh,
-				vpd: c.vpd,
-			})),
+			floweringWeeks: avgFlowerWeeks,
+			bloomStartDay,
+			checkins: harvestPredictCheckins,
 		});
 	});
 
-	// Per-Strain-Predict (Aufschlüsselung pro Strain)
+	// Per-Strain-Predict (Aufschlüsselung pro Strain — eigene flowering_weeks → eigene Tage)
 	let harvestPerStrain = $derived.by(() => {
 		if (!grow || grow.status !== 'active' || !grow.strain_type) return [];
 		const entries = getStrainEntries(grow);
@@ -309,12 +326,8 @@
 		return predictHarvestPerStrain(entries, {
 			strainType: grow.strain_type === 'auto' ? 'auto' : 'photo',
 			currentGrowDays: totalDays,
-			checkins: chronCheckins.map((c: CheckIn) => ({
-				phase: c.phase,
-				temp: c.temp,
-				rh: c.rh,
-				vpd: c.vpd,
-			})),
+			bloomStartDay,
+			checkins: harvestPredictCheckins,
 		});
 	});
 
@@ -676,9 +689,14 @@
 							<div class="flex items-center justify-between gap-3 bg-gb-bg/40 rounded-lg px-3 py-2.5">
 								<div class="min-w-0 flex-1">
 									<p class="text-sm font-medium truncate">{ps.strain}</p>
-									<p class="text-[10px] text-gb-text-muted">{ps.plantCount} Pflanze{ps.plantCount === 1 ? '' : 'n'} · {ps.yieldRange.min}-{ps.yieldRange.max}g</p>
+									<p class="text-[10px] text-gb-text-muted">
+										{ps.plantCount} Pflanze{ps.plantCount === 1 ? '' : 'n'} · {ps.floweringWeeks} Wo Bloom · noch {formatDaysUntil(ps.daysUntilHarvest)}
+									</p>
 								</div>
-								<span class="text-base font-bold text-gb-green shrink-0">~{ps.yieldGrams}g</span>
+								<div class="text-right shrink-0">
+									<p class="text-base font-bold text-gb-green">~{ps.yieldGrams}g</p>
+									<p class="text-[10px] text-gb-text-muted">{ps.yieldRange.min}-{ps.yieldRange.max}g</p>
+								</div>
 							</div>
 						{/each}
 

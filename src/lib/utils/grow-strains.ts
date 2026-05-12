@@ -10,6 +10,12 @@
 
 import type { Grow, GrowStrainEntry } from '$lib/stores/grow';
 
+/** Default-Blütezeit pro Strain-Typ (User kann pro Strain überschreiben). */
+export const DEFAULT_FLOWERING_WEEKS = {
+	auto: 5,   // Auto: ~5 Wochen Bloom (10-12 Wo Gesamtzyklus)
+	photo: 9,  // Photo: ~9 Wochen Bloom typisch
+} as const;
+
 /**
  * Gibt die Strain-Liste eines Grows zurück.
  * - Mit `strains`-Array: nutze das
@@ -21,6 +27,14 @@ export function getStrainEntries(grow: Pick<Grow, 'strain' | 'plant_count' | 'st
 	}
 	if (!grow.strain) return [];
 	return [{ strain: grow.strain, plant_count: Math.max(1, grow.plant_count ?? 1) }];
+}
+
+/** Liefert flowering_weeks für einen Strain (mit Fallback auf Default). */
+export function getFloweringWeeks(entry: GrowStrainEntry, strainType: 'auto' | 'photo'): number {
+	if (typeof entry.flowering_weeks === 'number' && entry.flowering_weeks > 0) {
+		return entry.flowering_weeks;
+	}
+	return DEFAULT_FLOWERING_WEEKS[strainType];
 }
 
 /** Gesamt-Pflanzenzahl (Summe aller Strain-Entries). */

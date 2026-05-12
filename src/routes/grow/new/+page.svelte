@@ -97,7 +97,7 @@
 	<!-- Strains (Multi: pro Strain Name + Pflanzen-Anzahl) -->
 	<div>
 		<span class="block text-xs text-gb-text-muted mb-2">Strain(s) + Anzahl Pflanzen *</span>
-		<StrainList bind:entries={strainEntries} placeholder={tr('grow.strain_placeholder')} />
+		<StrainList bind:entries={strainEntries} placeholder={tr('grow.strain_placeholder')} {strainType} />
 	</div>
 
 	<!-- Name (optional) -->
