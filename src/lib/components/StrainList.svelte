@@ -37,9 +37,31 @@
 		entries = entries.map((e, idx) => idx === i ? { ...e, plant_count: safe } : e);
 	}
 
-	function updateFloweringWeeks(i: number, value: number) {
-		const safe = Math.max(3, Math.min(16, Math.round(value)));
-		entries = entries.map((e, idx) => idx === i ? { ...e, flowering_weeks: safe } : e);
+	/**
+	 * Raw-Input während Tippen — KEIN Clamp (sonst springt "1" sofort auf "3" und User kann nie "12" tippen).
+	 * Clamp passiert erst on-blur via `clampFloweringWeeks`.
+	 */
+	function updateFloweringWeeksRaw(i: number, raw: string) {
+		if (raw === '') {
+			entries = entries.map((e, idx) => idx === i ? { ...e, flowering_weeks: undefined } : e);
+			return;
+		}
+		const n = parseInt(raw, 10);
+		if (Number.isNaN(n)) return;
+		entries = entries.map((e, idx) => idx === i ? { ...e, flowering_weeks: n } : e);
+	}
+
+	/** Clamp on-blur: leeres/invalides Feld → Default, sonst Range 1-20 Wo. */
+	function clampFloweringWeeks(i: number) {
+		const cur = entries[i]?.flowering_weeks;
+		if (cur === undefined || cur === null || Number.isNaN(cur)) {
+			entries = entries.map((e, idx) => idx === i ? { ...e, flowering_weeks: defaultFlowerWeeks } : e);
+			return;
+		}
+		const clamped = Math.max(1, Math.min(20, Math.round(cur)));
+		if (clamped !== cur) {
+			entries = entries.map((e, idx) => idx === i ? { ...e, flowering_weeks: clamped } : e);
+		}
 	}
 
 	let total = $derived(entries.reduce((s, e) => s + (e.plant_count || 0), 0));
@@ -73,17 +95,19 @@
 					✕
 				</button>
 			</div>
-			<!-- Bloom-Wochen Sub-Input -->
+			<!-- Bloom-Wochen Sub-Input (kein min/max constraint im HTML, damit User frei tippen kann) -->
 			<div class="flex items-center gap-2 pl-1">
 				<label for="strain-bloom-{i}" class="text-[11px] text-gb-text-muted">Blütezeit:</label>
 				<input
 					id="strain-bloom-{i}"
 					type="number"
-					value={entry.flowering_weeks ?? defaultFlowerWeeks}
-					oninput={(e) => updateFloweringWeeks(i, parseInt((e.currentTarget as HTMLInputElement).value || String(defaultFlowerWeeks)))}
-					min="3" max="16" step="1"
+					value={entry.flowering_weeks ?? ''}
+					placeholder={String(defaultFlowerWeeks)}
+					oninput={(e) => updateFloweringWeeksRaw(i, (e.currentTarget as HTMLInputElement).value)}
+					onblur={() => clampFloweringWeeks(i)}
+					inputmode="numeric"
 					aria-label="Blütezeit in Wochen"
-					class="w-12 bg-gb-surface border border-gb-border rounded px-1.5 py-1 text-[12px] text-center" />
+					class="w-14 bg-gb-surface border border-gb-border rounded px-1.5 py-1 text-[12px] text-center" />
 				<span class="text-[11px] text-gb-text-muted">Wochen (Standard {defaultFlowerWeeks})</span>
 			</div>
 		</div>

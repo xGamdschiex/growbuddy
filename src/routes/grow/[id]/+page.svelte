@@ -331,6 +331,18 @@
 		});
 	});
 
+	// Erste Ernte: Strain mit kürzester verbleibender Zeit (für Übersichts-Card)
+	let nextHarvestStrain = $derived.by(() => {
+		if (harvestPerStrain.length === 0) return null;
+		return harvestPerStrain.reduce((min, s) =>
+			s.daysUntilHarvest < min.daysUntilHarvest ? s : min
+		);
+	});
+	let allStrainsSameTime = $derived(
+		harvestPerStrain.length <= 1 ||
+			harvestPerStrain.every((s) => s.daysUntilHarvest === harvestPerStrain[0].daysUntilHarvest)
+	);
+
 	// Modal-State: default Per-Strain-Liste, Info ist Sub-Modal
 	let showHarvestPerStrain = $state(false);
 	let showHarvestInfo = $state(false);
@@ -625,8 +637,9 @@
 			</div>
 		{/if}
 
-		<!-- Harvest-Predict Card (Yield + Tage bis Harvest) -->
+		<!-- Harvest-Predict Card (Yield + Tage bis Harvest — erste Ernte wenn Multi-Strain) -->
 		{#if harvestPredict && grow.status === 'active'}
+			{@const displayDays = nextHarvestStrain?.daysUntilHarvest ?? harvestPredict.daysUntilHarvest}
 			<button type="button" onclick={() => showHarvestPerStrain = true}
 				class="w-full bg-gb-surface rounded-xl p-4 border border-gb-border/30 text-left
 					hover:border-gb-green/30 transition-colors">
@@ -636,17 +649,23 @@
 						<div class="flex items-baseline gap-3 mt-1">
 							<span class="text-2xl font-bold text-gb-green">~{harvestPredict.yieldGrams}g</span>
 							<span class="text-gb-text-muted">·</span>
-							<span class="text-2xl font-bold">{formatDaysUntil(harvestPredict.daysUntilHarvest)}</span>
+							<span class="text-2xl font-bold">{formatDaysUntil(displayDays)}</span>
 						</div>
 						<p class="text-[10px] text-gb-text-muted mt-1">
 							{harvestPredict.yieldRange.min}-{harvestPredict.yieldRange.max}g · Confidence: {harvestPredict.confidence}
 							{#if harvestPredict.performanceMultiplier !== 1.0}
 								· Perf {(harvestPredict.performanceMultiplier * 100).toFixed(0)}%
 							{/if}
-							{#if harvestPerStrain.length > 1}
-								· {harvestPerStrain.length} Strains — tippen für Aufschlüsselung
-							{/if}
 						</p>
+						{#if harvestPerStrain.length > 1 && nextHarvestStrain}
+							<p class="text-[10px] text-gb-text-muted mt-0.5">
+								{#if allStrainsSameTime}
+									{harvestPerStrain.length} Strains — tippen für Aufschlüsselung
+								{:else}
+									🥇 „{nextHarvestStrain.strain}" zuerst · {harvestPerStrain.length} Strains tippen
+								{/if}
+							</p>
+						{/if}
 					</div>
 					<span class="text-gb-text-muted text-xl">›</span>
 				</div>
@@ -682,21 +701,50 @@
 						</p>
 					</div>
 
-					<!-- Per-Strain-Aufschlüsselung -->
+					<!-- Per-Strain-Aufschlüsselung mit Bloom-Progress-Bar -->
 					<div class="space-y-2">
 						<p class="text-xs text-gb-text-muted font-semibold uppercase tracking-wide">Ertrag pro Strain</p>
-						{#each harvestPerStrain as ps}
-							<div class="flex items-center justify-between gap-3 bg-gb-bg/40 rounded-lg px-3 py-2.5">
-								<div class="min-w-0 flex-1">
-									<p class="text-sm font-medium truncate">{ps.strain}</p>
+						{#each harvestPerStrain as ps, idx}
+							{@const bloomDaysTotal = ps.floweringWeeks * 7}
+							{@const bloomDaysElapsed = bloomStartDay !== null ? Math.max(0, totalDays - bloomStartDay) : 0}
+							{@const progressPct = bloomStartDay !== null && bloomDaysTotal > 0
+								? Math.min(100, (bloomDaysElapsed / bloomDaysTotal) * 100)
+								: 0}
+							{@const isFirstHarvest = nextHarvestStrain && ps.strain === nextHarvestStrain.strain && !allStrainsSameTime}
+							<div class="space-y-1.5 bg-gb-bg/40 rounded-lg px-3 py-2.5 {isFirstHarvest ? 'ring-1 ring-gb-green/40' : ''}">
+								<div class="flex items-center justify-between gap-3">
+									<div class="min-w-0 flex-1">
+										<p class="text-sm font-medium truncate flex items-center gap-1.5">
+											{#if isFirstHarvest}<span class="text-xs">🥇</span>{/if}
+											{ps.strain}
+										</p>
+										<p class="text-[10px] text-gb-text-muted">
+											{ps.plantCount} Pflanze{ps.plantCount === 1 ? '' : 'n'} · {ps.floweringWeeks} Wo Bloom
+										</p>
+									</div>
+									<div class="text-right shrink-0">
+										<p class="text-base font-bold text-gb-green">~{ps.yieldGrams}g</p>
+										<p class="text-[10px] text-gb-text-muted">{ps.yieldRange.min}-{ps.yieldRange.max}g</p>
+									</div>
+								</div>
+								<!-- Bloom-Progress-Bar (nur wenn in Bloom) -->
+								{#if bloomStartDay !== null}
+									<div class="space-y-0.5">
+										<div class="h-1.5 bg-gb-surface rounded-full overflow-hidden">
+											<div
+												class="h-full {progressPct >= 100 ? 'bg-gb-accent' : 'bg-gb-green'} transition-all"
+												style="width: {progressPct.toFixed(0)}%"
+											></div>
+										</div>
+										<p class="text-[10px] text-gb-text-muted text-right">
+											{progressPct.toFixed(0)}% Bloom · noch {formatDaysUntil(ps.daysUntilHarvest)}
+										</p>
+									</div>
+								{:else}
 									<p class="text-[10px] text-gb-text-muted">
-										{ps.plantCount} Pflanze{ps.plantCount === 1 ? '' : 'n'} · {ps.floweringWeeks} Wo Bloom · noch {formatDaysUntil(ps.daysUntilHarvest)}
+										Noch in Veg · gesamt noch {formatDaysUntil(ps.daysUntilHarvest)}
 									</p>
-								</div>
-								<div class="text-right shrink-0">
-									<p class="text-base font-bold text-gb-green">~{ps.yieldGrams}g</p>
-									<p class="text-[10px] text-gb-text-muted">{ps.yieldRange.min}-{ps.yieldRange.max}g</p>
-								</div>
+								{/if}
 							</div>
 						{/each}
 
