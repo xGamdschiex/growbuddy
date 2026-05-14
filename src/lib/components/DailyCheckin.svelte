@@ -102,7 +102,7 @@
 	let nutrients = $state(false);
 	let waterMl = $state<number | null>(null);
 	let nutrientMl = $state<number | null>(null);
-	let training = $state<string | null>(null);
+	let trainings = $state<string[]>([]);
 	let notes = $state('');
 	let photos = $state<string[]>([]);
 	let submitting = $state(false);
@@ -229,7 +229,7 @@
 			nutrients_given: nutrients,
 			water_ml: waterMl,
 			nutrient_ml: nutrientMl,
-			training,
+			training: trainings.length > 0 ? trainings.join(',') : null,
 			notes: notes.trim(),
 		});
 
@@ -500,7 +500,8 @@
 						<div class="sec-head"><span class="sec-title">Training</span></div>
 						<div class="chip-row wrap">
 							{#each TRAININGS as t}
-								<button type="button" class="chip accent" class:active={training === t} onclick={() => training = training === t ? null : t}>{t}</button>
+								<button type="button" class="chip accent" class:active={trainings.includes(t)}
+								onclick={() => trainings = trainings.includes(t) ? trainings.filter((x) => x !== t) : [...trainings, t]}>{t}</button>
 							{/each}
 						</div>
 					</div>

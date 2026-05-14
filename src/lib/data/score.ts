@@ -85,7 +85,10 @@ export function calculateGrowScore(grow: Grow, checkins: CheckIn[]): ScoreBreakd
 
 	// ─��─ Training (10%) ──────────────────��────────────────────
 	const trainingCheckins = checkins.filter(c => c.training).length;
-	const uniqueTrainings = new Set(checkins.filter(c => c.training).map(c => c.training)).size;
+	// training kann komma-getrennt sein (Multi-Select) → für Vielfalt einzeln zählen
+	const uniqueTrainings = new Set(
+		checkins.flatMap(c => (c.training ? c.training.split(',').map(s => s.trim()).filter(Boolean) : []))
+	).size;
 	// Bonus für Vielfalt, aber mindestens 1 Training ergibt 50%
 	let trainingScore = 0;
 	if (trainingCheckins > 0) {

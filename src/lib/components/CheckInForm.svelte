@@ -75,7 +75,9 @@
 				temp: ci.temp, rh: ci.rh, ec: convEc(ci.ec_measured), ph: ci.ph_measured,
 				watered: ci.watered, nutrients: ci.nutrients_given,
 				waterMl: ci.water_ml ?? null, nutrientMl: ci.nutrient_ml ?? null,
-				training: ci.training, notes: ci.notes,
+				// training: komma-getrennt gespeichert (Multi-Select) → Array
+				training: ci.training ? ci.training.split(',').map((s) => s.trim()).filter(Boolean) : [],
+				notes: ci.notes,
 				photos: ci.photo_urls?.length ? [...ci.photo_urls]
 					: ci.photos_data?.length ? [...ci.photos_data]
 					: (ci.photo_url ? [ci.photo_url] : (ci.photo_data ? [ci.photo_data] : [])),
@@ -91,7 +93,7 @@
 			temp: last?.temp ?? null, rh: last?.rh ?? null,
 			ec: last ? convEc(last.ec_measured) : null, ph: last?.ph_measured ?? null,
 			watered: false, nutrients: false, waterMl: null as number | null, nutrientMl: null as number | null,
-			training: null as string | null, notes: '', photos: [] as string[],
+			training: [] as string[], notes: '', photos: [] as string[],
 			more: typeof localStorage !== 'undefined' && localStorage.getItem('growbuddy_ci_more') === '1',
 			prefilled: !!last && (last.temp !== null || last.rh !== null || last.ec_measured !== null || last.ph_measured !== null),
 		};
@@ -111,7 +113,7 @@
 	let ciNutrients = $state(init.nutrients);
 	let ciWaterMl = $state<number | null>(init.waterMl);
 	let ciNutrientMl = $state<number | null>(init.nutrientMl);
-	let ciTraining = $state<string | null>(init.training);
+	let ciTrainings = $state<string[]>(init.training);
 	let ciNotes = $state(init.notes);
 	let ciPhotos = $state<string[]>(init.photos);
 	let ciMore = $state(init.more);
@@ -238,7 +240,7 @@
 			nutrients_given: ciNutrients,
 			water_ml: ciWaterMl,
 			nutrient_ml: ciNutrientMl,
-			training: ciTraining,
+			training: ciTrainings.length > 0 ? ciTrainings.join(',') : null,
 			notes: ciNotes.trim(),
 		};
 
@@ -456,7 +458,8 @@
 				<div class="ci-sec-head"><span class="ci-sec-title">{tr('checkin.training')}</span></div>
 				<div class="ci-chip-row ci-wrap">
 					{#each CI_TRAININGS as tName}
-						<button type="button" class="ci-chip ci-accent" class:active={ciTraining === tName} onclick={() => ciTraining = ciTraining === tName ? null : tName}>{tName}</button>
+						<button type="button" class="ci-chip ci-accent" class:active={ciTrainings.includes(tName)}
+							onclick={() => ciTrainings = ciTrainings.includes(tName) ? ciTrainings.filter((x) => x !== tName) : [...ciTrainings, tName]}>{tName}</button>
 					{/each}
 				</div>
 			</div>
