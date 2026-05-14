@@ -101,7 +101,14 @@
 			return;
 		}
 		const cleanedEntries = strainEntries.filter(e => e.strain && e.strain.trim() && e.plant_count > 0)
-			.map(e => ({ strain: e.strain.trim(), plant_count: e.plant_count }));
+			.map(e => ({
+				strain: e.strain.trim(),
+				plant_count: e.plant_count,
+				// flowering_weeks pro Strain mitspeichern (sonst geht die Blütezeit-Eingabe verloren)
+				...(typeof e.flowering_weeks === 'number' && e.flowering_weeks > 0
+					? { flowering_weeks: e.flowering_weeks }
+					: {}),
+			}));
 		const joinedStrain = joinedStrainName(cleanedEntries);
 		const totalPlants = totalPlantCount({ strain: joinedStrain, plant_count: 0, strains: cleanedEntries });
 		const patch: any = {
