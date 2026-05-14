@@ -19,6 +19,7 @@
 	} from '$lib/utils/grow-stats';
 	import MiniChart from '$lib/components/MiniChart.svelte';
 	import MultiSeriesChart, { type ChartSeries } from '$lib/components/MultiSeriesChart.svelte';
+	import HealthCard from '$lib/components/HealthCard.svelte';
 	import { phaseTargetSegments, targetFor } from '$lib/utils/phase-targets';
 	import { onMount } from 'svelte';
 
@@ -182,41 +183,9 @@
 				<p class="text-sm text-gb-text-muted">Noch keine Daten — leg ein paar Check-ins an, dann erscheint hier deine Auswertung.</p>
 			</div>
 		{:else}
-			<!-- Health-Card (volle Breite, prominent) -->
+			<!-- Health-Card (Komponente, geteilt mit grow/[id]) -->
 			{#if consistency}
-				<div class="bg-gb-surface rounded-xl p-4 space-y-3">
-					<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">Health</h2>
-					<div class="grid grid-cols-3 gap-2">
-						<div class="text-center">
-							<p class="text-2xl font-bold {consistency.percent !== null && consistency.percent >= 80 ? 'text-gb-green' : consistency.percent !== null && consistency.percent >= 50 ? 'text-gb-warning' : 'text-gb-text-muted'}">
-								{consistency.percent ?? '—'}{consistency.percent !== null ? '%' : ''}
-							</p>
-							<p class="text-[10px] text-gb-text-muted leading-tight mt-0.5">Konsistenz<br/><span class="text-[9px]">{consistency.daysWithCheckin}/{consistency.totalDays} Tage</span></p>
-						</div>
-						<div class="text-center">
-							{#if vpdStress.total > 0}
-								<p class="text-2xl font-bold {vpdStress.okPercent !== null && vpdStress.okPercent >= 70 ? 'text-gb-green' : vpdStress.okPercent !== null && vpdStress.okPercent >= 40 ? 'text-gb-warning' : 'text-gb-danger'}">
-									{vpdStress.okPercent}%
-								</p>
-								<p class="text-[10px] text-gb-text-muted leading-tight mt-0.5">VPD optimal<br/><span class="text-[9px]">{vpdStress.ok}/{vpdStress.total} Tage</span></p>
-							{:else}
-								<p class="text-2xl font-bold text-gb-text-muted">—</p>
-								<p class="text-[10px] text-gb-text-muted leading-tight mt-0.5">VPD optimal<br/><span class="text-[9px]">noch keine Daten</span></p>
-							{/if}
-						</div>
-						<div class="text-center">
-							{#if consistency.daysSinceLastCheckin !== null}
-								<p class="text-2xl font-bold {consistency.daysSinceLastCheckin === 0 ? 'text-gb-green' : consistency.daysSinceLastCheckin <= 2 ? 'text-gb-text' : 'text-gb-warning'}">
-									{consistency.daysSinceLastCheckin === 0 ? 'heute' : `${consistency.daysSinceLastCheckin}d`}
-								</p>
-								<p class="text-[10px] text-gb-text-muted leading-tight mt-0.5">letzter<br/>Check-in</p>
-							{:else}
-								<p class="text-2xl font-bold text-gb-text-muted">—</p>
-								<p class="text-[10px] text-gb-text-muted leading-tight mt-0.5">letzter<br/>Check-in</p>
-							{/if}
-						</div>
-					</div>
-				</div>
+				<HealthCard {consistency} {vpdStress} />
 			{/if}
 
 			<!-- Klima + Wasser-Werte als Grid -->
