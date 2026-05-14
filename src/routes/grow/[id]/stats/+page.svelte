@@ -77,8 +77,9 @@
 
 	// Chart-Series (Temp/RH/Wasser/Dünger) — auf Stats-Page (Übersicht hat VPD/EC/pH)
 	function dayOf(c: CheckIn): number {
-		if (!grow) return 0;
-		return Math.floor((new Date(c.created_at).getTime() - new Date(grow.started_at).getTime()) / 86400000) + 1;
+		if (!grow) return 1;
+		// Math.max(1,…): Check-in vor started_at (z.B. nach Startdatum-Edit) darf X-Achse nicht brechen
+		return Math.max(1, Math.floor((new Date(c.created_at).getTime() - new Date(grow.started_at).getTime()) / 86400000) + 1);
 	}
 	function seriesFrom(key: 'temp' | 'rh' | 'vpd' | 'ec_measured' | 'ph_measured') {
 		const filtered = chronCheckins.filter((c: CheckIn) => (c as any)[key] != null);

@@ -28,11 +28,9 @@
 	const PHASE_TARGETS_VPD = PHASE_TARGETS_ALL.vpd;
 	import {
 		metricStats,
-		metricPerPhase,
 		stressDays,
 		checkinConsistency,
 		type MetricStats,
-		type CheckinNumKey,
 	} from '$lib/utils/grow-stats';
 
 	import { onMount } from 'svelte';
@@ -210,8 +208,7 @@
 	// Phasen-Marker: erster Index je neuem Phase-Wert
 	function markersFor(serieDays: number[]): { atIndex: number; label: string }[] {
 		if (!serieDays.length) return [];
-		const filtered = chronCheckins.filter((_: CheckIn, i: number) => true);
-		// einfacherer Ansatz: für jeden Datenpunkt die Phase aus dem ursprünglichen Check-in nehmen
+		// für jeden Datenpunkt die Phase aus dem ursprünglichen Check-in nehmen
 		const all = chronCheckins;
 		const out: { atIndex: number; label: string }[] = [];
 		let lastPhase: string | null = null;
@@ -258,10 +255,6 @@
 	let vpdStats: MetricStats = $derived(metricStats(chronCheckins.map((c: CheckIn) => c.vpd)));
 	let ecStats: MetricStats = $derived(metricStats(chronCheckins.map((c: CheckIn) => c.ec_measured)));
 	let phStats: MetricStats = $derived(metricStats(chronCheckins.map((c: CheckIn) => c.ph_measured)));
-	// Phase-Sub-Aggregate (Veg/Bloom/Flush separat)
-	let tempPerPhase = $derived(metricPerPhase(chronCheckins, 'temp'));
-	let vpdPerPhase = $derived(metricPerPhase(chronCheckins, 'vpd'));
-	let ecPerPhase = $derived(metricPerPhase(chronCheckins, 'ec_measured'));
 	// Stress-Counter (VPD = wichtigste Health-Metrik) — Targets aus zentralem util
 	let vpdStress = $derived(stressDays(chronCheckins, 'vpd', {
 		Veg: PHASE_TARGETS_VPD.Veg,
@@ -273,12 +266,10 @@
 	// Heute schon geloggt? → Button-State im Grow-Detail
 	let checkedInToday = $derived(consistency?.daysSinceLastCheckin === 0);
 
-	// Legacy-aliases (für UI-Fragments unten beibehalten)
+	// Aliases für hasAggregates-Check
 	let avgTemp = $derived(tempStats.avg);
-	let avgRh = $derived(rhStats.avg);
 	let avgVpd = $derived(vpdStats.avg);
 	let avgEc = $derived(ecStats.avg);
-	let avgPh = $derived(phStats.avg);
 	// Phase-Tage neu (v1.3.34): Lauri-Logik via Helper.
 	// Σ phaseDays = totalGrowDays = Header-Zahl (garantiert konsistent).
 	let phaseDays = $derived(grow ? phaseDaysSummary(grow, chronCheckins) : []);
