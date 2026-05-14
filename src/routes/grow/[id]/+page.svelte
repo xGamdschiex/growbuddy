@@ -93,7 +93,8 @@
 	let ciTraining: string | null = $state(null);
 	let ciNotes = $state('');
 	let ciPhotos: string[] = $state([]);
-	let ciMore = $state(false);
+	let ciMore = $state(typeof localStorage !== 'undefined' && localStorage.getItem('growbuddy_ci_more') === '1');
+	let ciPrefilled = $state(false);
 
 	let ciVpd = $derived(ciTemp !== null && ciRh !== null ? calcVPD(ciTemp, ciRh) : null);
 	let ciVpdStatusVal = $derived(ciVpd !== null ? getVPDStatus(ciVpd, ciPhase === 'Bloom' || ciPhase === 'Flush' ? 'early_flower' : 'vegetative') : 'idle');
@@ -269,6 +270,8 @@
 	}));
 	// Konsistenz: wie zuverlässig wurde geloggt
 	let consistency = $derived(grow ? checkinConsistency(chronCheckins, grow.started_at) : null);
+	// Heute schon geloggt? → Button-State im Grow-Detail
+	let checkedInToday = $derived(consistency?.daysSinceLastCheckin === 0);
 
 	// Legacy-aliases (für UI-Fragments unten beibehalten)
 	let avgTemp = $derived(tempStats.avg);
@@ -280,7 +283,9 @@
 	// Σ phaseDays = totalGrowDays = Header-Zahl (garantiert konsistent).
 	let phaseDays = $derived(grow ? phaseDaysSummary(grow, chronCheckins) : []);
 	let totalDays = $derived(grow ? totalGrowDays(grow, chronCheckins) : 0);
-	let hasAggregates = $derived(totalWaterMl > 0 || avgTemp !== null || phaseDays.length > 0);
+	let hasAggregates = $derived(
+		totalWaterMl > 0 || avgTemp !== null || avgEc !== null || avgVpd !== null || phaseDays.length > 0
+	);
 
 	// Bloom-Start aus Check-ins ableiten: erster CI mit phase='Bloom' → Tag im Grow
 	let bloomStartDay = $derived.by<number | null>(() => {
@@ -342,6 +347,21 @@
 		harvestPerStrain.length <= 1 ||
 			harvestPerStrain.every((s) => s.daysUntilHarvest === harvestPerStrain[0].daysUntilHarvest)
 	);
+
+	// Retro-Predict für geerntete Grows: was hätte die App vorhergesagt?
+	// → Predicted-vs-Actual macht die Schätzung über mehrere Harvests glaubwürdig.
+	let retroPredict = $derived.by(() => {
+		if (!grow || grow.status !== 'harvested' || !grow.strain_type) return null;
+		const totalPlants = totalPlantCount(grow);
+		if (totalPlants === 0) return null;
+		return predictHarvest({
+			strainType: grow.strain_type === 'auto' ? 'auto' : 'photo',
+			plantCount: totalPlants,
+			currentGrowDays: totalDays,
+			bloomStartDay,
+			checkins: harvestPredictCheckins,
+		});
+	});
 
 	// Modal-State: default Per-Strain-Liste, Info ist Sub-Modal
 	let showHarvestPerStrain = $state(false);
@@ -407,9 +427,11 @@
 		showHarvest = false;
 	}
 
+	let showAbandonConfirm = $state(false);
 	function abandonGrow() {
 		if (!grow) return;
 		growStore.abandonGrow(grow.id);
+		showAbandonConfirm = false;
 		goto('/grow');
 	}
 
@@ -481,6 +503,29 @@
 		}, 50);
 	}
 
+	/**
+	 * Öffnet das Check-in-Formular für einen NEUEN Eintrag.
+	 * Prefill: Temp/RH/EC/pH aus dem letzten Check-in — Klima ändert sich langsam,
+	 * tägliches Neutippen der gleichen Werte ist unnötige Reibung. User sieht die
+	 * vorausgefüllten Werte + Hinweis und passt nur an was sich geändert hat.
+	 */
+	function openCheckin() {
+		if (!editingId) {
+			const last = checkins[0]; // checkins: created_at DESC → [0] = jüngster
+			if (last) {
+				ciTemp = last.temp;
+				ciRh = last.rh;
+				ciEc = last.ec_measured !== null
+					? +fromMsPerCm(last.ec_measured, ciEcUnit).toFixed(ciEcUnit === 'mS/cm' ? 2 : 0)
+					: null;
+				ciPh = last.ph_measured;
+				ciPrefilled = last.temp !== null || last.rh !== null
+					|| last.ec_measured !== null || last.ph_measured !== null;
+			}
+		}
+		showCheckin = true;
+	}
+
 	function cancelCheckin() {
 		showCheckin = false;
 		editingId = null;
@@ -493,7 +538,9 @@
 		ciNutrientMl = null;
 		ciTraining = null;
 		ciTemp = null; ciRh = null; ciEc = null; ciPh = null;
-		ciMore = false;
+		ciPrefilled = false;
+		// ciMore zurück auf die gemerkte Präferenz (nicht hart false)
+		ciMore = typeof localStorage !== 'undefined' && localStorage.getItem('growbuddy_ci_more') === '1';
 	}
 
 	const CI_PHASES = ['Seedling', 'Veg', 'Bloom', 'Flush', 'Dry', 'Cure'];
@@ -840,7 +887,7 @@
 						<span class="text-base shrink-0">🧪</span>
 						<div class="min-w-0">
 							<p class="text-[10px] text-gb-text-muted uppercase tracking-wide">{tr('grow.info_feedline')}</p>
-							<p class="text-xs truncate">{grow.feedline_id}</p>
+							<p class="text-xs truncate">{getFeedLine(grow.feedline_id)?.name ?? grow.feedline_id}</p>
 						</div>
 					</div>
 				{/if}
@@ -898,9 +945,12 @@
 		<!-- Check-in Button -->
 		{#if grow.status === 'active'}
 			{#if !showCheckin}
-				<button onclick={() => showCheckin = true}
-					class="w-full bg-gb-green text-black font-semibold py-3 rounded-lg text-sm hover:bg-gb-green-light transition-colors">
-					{tr('grow.daily_checkin')}
+				<button onclick={openCheckin}
+					class="w-full font-semibold py-3 rounded-lg text-sm transition-colors
+						{checkedInToday
+							? 'bg-gb-surface border border-gb-green/40 text-gb-green hover:bg-gb-surface-2'
+							: 'bg-gb-green text-black hover:bg-gb-green-light'}">
+					{checkedInToday ? '✓ Heute erledigt · Weiterer Check-in' : tr('grow.daily_checkin')}
 				</button>
 			{:else}
 				<!-- Check-in Form (Mockup-Design) -->
@@ -972,7 +1022,7 @@
 					<div class="ci-card">
 						<div class="ci-sec-head">
 							<span class="ci-sec-title">Klima</span>
-							<span class="ci-sec-hint">Temp · RH → VPD</span>
+							<span class="ci-sec-hint">{ciPrefilled ? '↺ aus letztem Check-in' : 'Temp · RH → VPD'}</span>
 						</div>
 						<div class="ci-grid2 ci-mb10">
 							<label class="ci-field">
@@ -1007,7 +1057,10 @@
 					</div>
 
 					<!-- Disclosure -->
-					<button type="button" class="ci-disc" onclick={() => ciMore = !ciMore}>
+					<button type="button" class="ci-disc" onclick={() => {
+						ciMore = !ciMore;
+						if (typeof localStorage !== 'undefined') localStorage.setItem('growbuddy_ci_more', ciMore ? '1' : '0');
+					}}>
 						<div class="ci-disc-l">
 							<div class="ci-disc-ico">{ciMore ? '−' : '+'}</div>
 							<div>
@@ -1122,7 +1175,7 @@
 						class="flex-1 bg-gb-warning/10 border border-gb-warning/20 text-gb-warning font-semibold py-2.5 rounded-lg text-sm hover:bg-gb-warning/20 transition-colors">
 						{tr('grow.harvest_btn')}
 					</button>
-					<button onclick={abandonGrow}
+					<button onclick={() => { showAbandonConfirm = true; hapticMedium(); }}
 						class="bg-gb-danger/10 border border-gb-danger/20 text-gb-danger px-4 py-2.5 rounded-lg text-sm hover:bg-gb-danger/20 transition-colors">
 						{tr('grow.abandon_btn')}
 					</button>
@@ -1205,6 +1258,17 @@
 						</div>
 					{/if}
 				</div>
+				{#if retroPredict && grow.yield_g != null}
+					{@const delta = grow.yield_g - retroPredict.yieldGrams}
+					{@const deltaPct = retroPredict.yieldGrams > 0 ? Math.round((delta / retroPredict.yieldGrams) * 100) : 0}
+					<div class="mt-3 pt-3 border-t border-gb-green/15 text-xs text-gb-text-muted">
+						🔮 Predict war <span class="text-gb-text font-medium">~{retroPredict.yieldGrams}g</span>
+						· Ist <span class="text-gb-text font-medium">{grow.yield_g}g</span>
+						<span class="{delta >= 0 ? 'text-gb-green' : 'text-gb-warning'}">
+							({delta >= 0 ? '+' : ''}{delta}g{deltaPct !== 0 ? ` · ${deltaPct >= 0 ? '+' : ''}${deltaPct}%` : ''})
+						</span>
+					</div>
+				{/if}
 			</div>
 		{/if}
 
@@ -1435,13 +1499,13 @@
 								{/if}
 							</div>
 						</div>
-						{#if ci.temp || ci.ec_measured || ci.ph_measured}
+						{#if ci.temp != null || ci.rh != null || ci.vpd != null || ci.ec_measured != null || ci.ph_measured != null}
 							<div class="flex gap-3 text-xs text-gb-text-muted">
-								{#if ci.temp}<span>{ci.temp}°C</span>{/if}
-								{#if ci.rh}<span>{ci.rh}%</span>{/if}
-								{#if ci.vpd}<span>VPD {ci.vpd.toFixed(2)}</span>{/if}
-								{#if ci.ec_measured}<span>EC {ci.ec_measured}</span>{/if}
-								{#if ci.ph_measured}<span>pH {ci.ph_measured}</span>{/if}
+								{#if ci.temp != null}<span>{ci.temp}°C</span>{/if}
+								{#if ci.rh != null}<span>{ci.rh}%</span>{/if}
+								{#if ci.vpd != null}<span>VPD {ci.vpd.toFixed(2)}</span>{/if}
+								{#if ci.ec_measured != null}<span>EC {ci.ec_measured}</span>{/if}
+								{#if ci.ph_measured != null}<span>pH {ci.ph_measured}</span>{/if}
 							</div>
 						{/if}
 						{#if ci.notes}
@@ -1493,6 +1557,38 @@
 						class="flex-1 bg-gb-danger text-white font-medium rounded-xl"
 						style="min-height:48px">
 						Löschen
+					</button>
+				</div>
+			</div>
+		</div>
+	{/if}
+
+	{#if showAbandonConfirm}
+		<div class="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center p-4"
+			onclick={() => showAbandonConfirm = false}
+			onkeydown={(e) => { if (e.key === 'Escape') showAbandonConfirm = false; }}
+			role="presentation">
+			<div class="bg-gb-surface w-full max-w-sm rounded-2xl p-5 space-y-4"
+				onclick={(e) => e.stopPropagation()}
+				onkeydown={(e) => e.stopPropagation()}
+				role="dialog" aria-modal="true" tabindex="-1">
+				<div>
+					<p class="font-semibold text-base">Grow „{grow.name}" abbrechen?</p>
+					<p class="text-sm text-gb-text-muted mt-1">
+						Der Grow wird als abgebrochen markiert und verschwindet aus deinen aktiven Grows.
+						Check-ins bleiben erhalten — du kannst den Status später im Bearbeiten-Menü wiederherstellen.
+					</p>
+				</div>
+				<div class="flex gap-3 pt-1">
+					<button onclick={() => showAbandonConfirm = false}
+						class="flex-1 bg-gb-bg border border-gb-border text-gb-text font-medium rounded-xl"
+						style="min-height:48px">
+						Zurück
+					</button>
+					<button onclick={abandonGrow}
+						class="flex-1 bg-gb-danger text-white font-medium rounded-xl"
+						style="min-height:48px">
+						Abbrechen
 					</button>
 				</div>
 			</div>

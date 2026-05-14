@@ -23,7 +23,7 @@
 	import SpacePicker from '$lib/components/SpacePicker.svelte';
 	import { getStrainEntries, joinedStrainName, totalPlantCount, validateStrains } from '$lib/utils/grow-strains';
 
-	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
+	let tr: (key: string, params?: Record<string, string | number>) => string = $state((k: string) => k);
 	const feedlines = getAllFeedLines();
 
 	let growId = $derived($page.params.id);
@@ -54,6 +54,7 @@
 
 	onMount(() => {
 		const subs = [
+			t.subscribe(v => tr = v),
 			growStore.subscribe(v => growState = v),
 			isPro.subscribe(v => userIsPro = v),
 		];

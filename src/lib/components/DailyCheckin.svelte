@@ -12,7 +12,7 @@
 	import { hapticSuccess } from '$lib/utils/haptic';
 	import { calcVPD, getVPDStatus } from '$lib/data/science';
 	import { clampNumber } from '$lib/utils/validation';
-	import { toMsPerCm, type ECEinheit } from '$lib/calc/units';
+	import { toMsPerCm, fromMsPerCm, type ECEinheit } from '$lib/calc/units';
 	import { calcStore } from '$lib/stores/calc';
 	import { compressBatch, MAX_PHOTOS } from '$lib/utils/photo';
 	import { getFeedLine } from '$lib/calc/feedlines/registry';
@@ -106,7 +106,29 @@
 	let notes = $state('');
 	let photos = $state<string[]>([]);
 	let submitting = $state(false);
-	let more = $state(false);
+	let more = $state(typeof localStorage !== 'undefined' && localStorage.getItem('growbuddy_ci_more') === '1');
+
+	// Smart-Prefill: Temp/RH/EC/pH aus dem letzten Check-in des gewählten Grows.
+	// Klima ändert sich langsam — tägliches Neutippen der gleichen Werte ist Reibung.
+	let prefilled = $state(false);
+	let prefilledForGrow: string | null = $state(null);
+	$effect(() => {
+		if (!selectedGrowId || selectedGrowId === prefilledForGrow) return;
+		const last = allCheckins
+			.filter(c => c.grow_id === selectedGrowId)
+			.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+		if (last) {
+			temp = last.temp;
+			rh = last.rh;
+			ec = last.ec_measured !== null
+				? +fromMsPerCm(last.ec_measured, ecUnit).toFixed(ecUnit === 'mS/cm' ? 2 : 0)
+				: null;
+			ph = last.ph_measured;
+			prefilled = last.temp !== null || last.rh !== null
+				|| last.ec_measured !== null || last.ph_measured !== null;
+		}
+		prefilledForGrow = selectedGrowId;
+	});
 
 	let vpd = $derived(temp !== null && rh !== null ? calcVPD(temp, rh) : null);
 	let vpdPhaseKey = $derived(phase === 'Bloom' || phase === 'Flush' ? 'early_flower' : 'vegetative');
@@ -354,7 +376,7 @@
 		<div class="card">
 			<div class="sec-head">
 				<span class="sec-title">Klima</span>
-				<span class="sec-hint">Temp · RH → VPD</span>
+				<span class="sec-hint">{prefilled ? '↺ aus letztem Check-in' : 'Temp · RH → VPD'}</span>
 			</div>
 			<div class="grid-2 mb10">
 				<label class="field">
@@ -390,7 +412,10 @@
 
 		{#if !compact}
 			<!-- Disclosure -->
-			<button type="button" class="disc" onclick={() => more = !more}>
+			<button type="button" class="disc" onclick={() => {
+				more = !more;
+				if (typeof localStorage !== 'undefined') localStorage.setItem('growbuddy_ci_more', more ? '1' : '0');
+			}}>
 				<div class="disc-l">
 					<div class="disc-ico">{more ? '−' : '+'}</div>
 					<div>
