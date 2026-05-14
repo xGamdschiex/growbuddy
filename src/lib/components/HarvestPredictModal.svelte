@@ -38,7 +38,7 @@
 
 {#if view === 'strains'}
 	<!-- Per-Strain Predict Modal -->
-	<div class="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-4"
+	<div class="fixed inset-0 z-[200] bg-black/60 flex items-end sm:items-center justify-center p-4"
 		role="presentation" onclick={onClose}>
 		<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 		<div class="bg-gb-surface rounded-xl p-5 max-w-md w-full max-h-[80vh] overflow-y-auto"
@@ -127,7 +127,7 @@
 	</div>
 {:else}
 	<!-- Harvest-Predict Info-View (via ℹ️) -->
-	<div class="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-4"
+	<div class="fixed inset-0 z-[200] bg-black/60 flex items-end sm:items-center justify-center p-4"
 		role="presentation" onclick={onClose}>
 		<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 		<div class="bg-gb-surface rounded-xl p-5 max-w-md w-full max-h-[80vh] overflow-y-auto"

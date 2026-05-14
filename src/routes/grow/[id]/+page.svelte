@@ -885,7 +885,7 @@
 	{/if}
 
 	{#if pendingDeleteId}
-		<div class="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center p-4"
+		<div class="fixed inset-0 bg-black/70 z-[200] flex items-center justify-center p-4"
 			onclick={() => pendingDeleteId = null}
 			onkeydown={(e) => { if (e.key === 'Escape') pendingDeleteId = null; }}
 			role="presentation">
@@ -914,7 +914,7 @@
 	{/if}
 
 	{#if showAbandonConfirm}
-		<div class="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center p-4"
+		<div class="fixed inset-0 bg-black/70 z-[200] flex items-center justify-center p-4"
 			onclick={() => showAbandonConfirm = false}
 			onkeydown={(e) => { if (e.key === 'Escape') showAbandonConfirm = false; }}
 			role="presentation">

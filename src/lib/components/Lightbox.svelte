@@ -119,7 +119,7 @@
 <svelte:window onkeydown={handleKey} />
 
 <div
-	class="fixed inset-0 z-50 bg-black/95 flex items-center justify-center touch-none select-none overflow-hidden"
+	class="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center touch-none select-none overflow-hidden"
 	role="dialog"
 	aria-modal="true"
 	ontouchstart={handleTouchStart}
