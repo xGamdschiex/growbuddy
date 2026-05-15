@@ -60,7 +60,14 @@
 	// Pro-Status
 	let userIsPro = $state(false);
 
-	// Public-Check-in Repair (für Bestandsdaten von vor v1.3.26)
+	// Public-Check-in Repair (für Bestandsdaten von vor v1.3.26):
+	// Repair-Link nur sichtbar wenn echte Inkonsistenz besteht (Anzahl Check-ins
+	// mit abweichendem is_public-Flag > 0). Sonst Noise im UI.
+	let publicMismatchCount = $derived(
+		grow ? (growState?.checkins ?? []).filter((c: CheckIn) =>
+			c.grow_id === grow.id && c.is_public !== (grow.is_public ?? false)
+		).length : 0
+	);
 	let repairBusy = $state(false);
 	async function repairPublicCheckins() {
 		if (!grow || repairBusy) return;
@@ -389,17 +396,11 @@
 					✏️ Bearbeiten
 				</a>
 			</div>
-			<div class="flex items-start justify-between gap-3 mt-2">
-				<div class="min-w-0">
-					<h1 class="text-xl font-bold truncate">{grow.name}</h1>
-					<p class="text-sm text-gb-text-muted truncate">{summarizeStrains(grow, { maxLength: 60 })} · {grow.strain_type === 'auto' ? 'Auto' : 'Photo'} · {grow.medium}</p>
-				</div>
-				{#if grow.status === 'active'}
-					{@const ps = phaseStyle(currentPhasePosition(grow, chronCheckins).phase)}
-					<span class="shrink-0 text-xs {ps.text} {ps.bgSoft} px-2.5 py-1 rounded-full font-semibold whitespace-nowrap">
-						{ps.emoji} {currentPhasePosition(grow, chronCheckins).phase}
-					</span>
-				{/if}
+			<!-- v1.3.78: Phase-Chip aus dem Header entfernt — die "Aktuelle Position"-Hero-Card direkt darunter zeigt die Phase mit Emoji+Wochenzahl bereits prominent (war Duplikat). -->
+			<div class="mt-2 min-w-0">
+				<h1 class="text-xl font-bold truncate">{grow.name}</h1>
+				<!-- v1.3.78: Multi-Strain-Liste darf 2 Zeilen wrappen + maxLength 60→140 (kein Truncate mehr in der Mitte eines Strain-Namens). -->
+				<p class="text-sm text-gb-text-muted leading-snug">{summarizeStrains(grow, { maxLength: 140 })} · {grow.strain_type === 'auto' ? 'Auto' : 'Photo'} · {grow.medium}</p>
 			</div>
 		</div>
 
@@ -467,109 +468,7 @@
 			/>
 		{/if}
 
-		<!-- Stats -->
-		<div class="grid grid-cols-3 gap-3">
-			<div class="bg-gb-surface rounded-xl p-3 text-center">
-				<p class="text-2xl font-bold text-gb-green">{totalDays}</p>
-				<p class="text-xs text-gb-text-muted">{tr('grow.days')}</p>
-				{#if phaseDays.length >= 1}
-					<p class="text-[10px] text-gb-text-muted mt-0.5 leading-tight">
-						{phaseDays.map(p => `${p.phase} ${p.days}`).join(' · ')}
-					</p>
-				{/if}
-			</div>
-			<div class="bg-gb-surface rounded-xl p-3 text-center">
-				<p class="text-2xl font-bold">{checkins.length}</p>
-				<p class="text-xs text-gb-text-muted">{tr('grow.checkins')}</p>
-			</div>
-			<div class="bg-gb-surface rounded-xl p-3 text-center">
-				<p class="text-2xl font-bold">{grow.plant_count}</p>
-				<p class="text-xs text-gb-text-muted">{tr('grow.plants')}</p>
-			</div>
-		</div>
-
-		<!-- Info-Grid -->
-		{#if grow.space || grow.light_info || grow.feedline_id || grow.notes}
-			<div class="bg-gb-surface rounded-xl p-3 grid grid-cols-2 gap-2 text-sm">
-				{#if grow.space}
-					<div class="flex items-start gap-2 min-w-0">
-						<span class="text-base shrink-0">📐</span>
-						<div class="min-w-0">
-							<p class="text-[10px] text-gb-text-muted uppercase tracking-wide">{tr('grow.info_space')}</p>
-							<p class="text-xs truncate">{grow.space}</p>
-						</div>
-					</div>
-				{/if}
-				{#if grow.light_info}
-					<div class="flex items-start gap-2 min-w-0">
-						<span class="text-base shrink-0">💡</span>
-						<div class="min-w-0">
-							<p class="text-[10px] text-gb-text-muted uppercase tracking-wide">{tr('grow.info_light')}</p>
-							<p class="text-xs truncate">{grow.light_info}</p>
-						</div>
-					</div>
-				{/if}
-				{#if grow.feedline_id}
-					<div class="flex items-start gap-2 min-w-0">
-						<span class="text-base shrink-0">🧪</span>
-						<div class="min-w-0">
-							<p class="text-[10px] text-gb-text-muted uppercase tracking-wide">{tr('grow.info_feedline')}</p>
-							<p class="text-xs truncate">{getFeedLine(grow.feedline_id)?.name ?? grow.feedline_id}</p>
-						</div>
-					</div>
-				{/if}
-				{#if grow.notes}
-					<div class="flex items-start gap-2 min-w-0 col-span-2">
-						<span class="text-base shrink-0">📝</span>
-						<div class="min-w-0">
-							<p class="text-[10px] text-gb-text-muted uppercase tracking-wide">{tr('grow.info_notes')}</p>
-							<p class="text-xs">{grow.notes}</p>
-						</div>
-					</div>
-				{/if}
-			</div>
-		{/if}
-
-		<!-- Public-Toggle (Phase 2 Community) — div statt button damit inneres Repair-button valid HTML ist -->
-		<div role="button" tabindex="0"
-			onclick={() => {
-				const newVal = !grow.is_public;
-				growStore.updateGrow(grow.id, { is_public: newVal });
-				// Force re-read damit UI sicher reagiert (Workaround für Reactivity-Edge-Case)
-				growStore.subscribe(s => growState = s)();
-				toastStore.success(newVal ? '🌍 Grow ist jetzt öffentlich' : '🔒 Grow ist jetzt privat');
-			}}
-			onkeydown={(e) => {
-				if (e.key === 'Enter' || e.key === ' ') {
-					e.preventDefault();
-					const newVal = !grow.is_public;
-					growStore.updateGrow(grow.id, { is_public: newVal });
-					growStore.subscribe(s => growState = s)();
-					toastStore.success(newVal ? '🌍 Grow ist jetzt öffentlich' : '🔒 Grow ist jetzt privat');
-				}
-			}}
-			class="w-full bg-gb-surface border border-gb-border rounded-xl p-3 flex items-center justify-between gap-3 text-left cursor-pointer"
-			style="min-height:56px">
-			<div class="min-w-0 flex-1 space-y-0.5">
-				<p class="font-medium text-sm">{grow.is_public ? '🌍 Öffentlich' : '🔒 Privat'}</p>
-				<p class="text-xs text-gb-text-muted leading-snug">
-					{grow.is_public ? 'Im Community-Feed sichtbar' : 'Nur du siehst diesen Grow'}
-				</p>
-				{#if grow.is_public}
-					<button type="button" onclick={(e) => { e.stopPropagation(); repairPublicCheckins(); }}
-						disabled={repairBusy}
-						class="text-[11px] text-gb-info hover:underline disabled:opacity-50 mt-1">
-						{repairBusy ? 'Synchronisiere…' : '🔧 Alte Check-ins nachsynchronisieren'}
-					</button>
-				{/if}
-			</div>
-			<div class="relative h-6 w-11 rounded-full transition-colors" class:bg-gb-green={grow.is_public} class:bg-gb-bg={!grow.is_public}>
-				<div class="absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all"
-					class:left-0.5={!grow.is_public} class:left-[22px]={grow.is_public}></div>
-			</div>
-		</div>
-
-		<!-- Check-in Button -->
+		<!-- ═══ ACTIONS — Check-in / Harvest / Abandon (v1.3.78: hochgezogen direkt nach Predict) ═══ -->
 		{#if grow.status === 'active'}
 			{#if !showCheckin}
 				<button onclick={openCheckin}
@@ -693,6 +592,108 @@
 			</div>
 		{/if}
 
+		<!-- Stats -->
+		<div class="grid grid-cols-3 gap-3">
+			<div class="bg-gb-surface rounded-xl p-3 text-center">
+				<p class="text-2xl font-bold text-gb-green">{totalDays}</p>
+				<p class="text-xs text-gb-text-muted">{tr('grow.days')}</p>
+				{#if phaseDays.length >= 1}
+					<p class="text-[10px] text-gb-text-muted mt-0.5 leading-tight">
+						{phaseDays.map(p => `${p.phase} ${p.days}`).join(' · ')}
+					</p>
+				{/if}
+			</div>
+			<div class="bg-gb-surface rounded-xl p-3 text-center">
+				<p class="text-2xl font-bold">{checkins.length}</p>
+				<p class="text-xs text-gb-text-muted">{tr('grow.checkins')}</p>
+			</div>
+			<div class="bg-gb-surface rounded-xl p-3 text-center">
+				<p class="text-2xl font-bold">{grow.plant_count}</p>
+				<p class="text-xs text-gb-text-muted">{tr('grow.plants')}</p>
+			</div>
+		</div>
+
+		<!-- Info-Grid -->
+		{#if grow.space || grow.light_info || grow.feedline_id || grow.notes}
+			<div class="bg-gb-surface rounded-xl p-3 grid grid-cols-2 gap-2 text-sm">
+				{#if grow.space}
+					<div class="flex items-start gap-2 min-w-0">
+						<span class="text-base shrink-0">📐</span>
+						<div class="min-w-0">
+							<p class="text-[10px] text-gb-text-muted uppercase tracking-wide">{tr('grow.info_space')}</p>
+							<p class="text-xs truncate">{grow.space}</p>
+						</div>
+					</div>
+				{/if}
+				{#if grow.light_info}
+					<div class="flex items-start gap-2 min-w-0">
+						<span class="text-base shrink-0">💡</span>
+						<div class="min-w-0">
+							<p class="text-[10px] text-gb-text-muted uppercase tracking-wide">{tr('grow.info_light')}</p>
+							<p class="text-xs truncate">{grow.light_info}</p>
+						</div>
+					</div>
+				{/if}
+				{#if grow.feedline_id}
+					<div class="flex items-start gap-2 min-w-0">
+						<span class="text-base shrink-0">🧪</span>
+						<div class="min-w-0">
+							<p class="text-[10px] text-gb-text-muted uppercase tracking-wide">{tr('grow.info_feedline')}</p>
+							<p class="text-xs truncate">{getFeedLine(grow.feedline_id)?.name ?? grow.feedline_id}</p>
+						</div>
+					</div>
+				{/if}
+				{#if grow.notes}
+					<div class="flex items-start gap-2 min-w-0 col-span-2">
+						<span class="text-base shrink-0">📝</span>
+						<div class="min-w-0">
+							<p class="text-[10px] text-gb-text-muted uppercase tracking-wide">{tr('grow.info_notes')}</p>
+							<p class="text-xs">{grow.notes}</p>
+						</div>
+					</div>
+				{/if}
+			</div>
+		{/if}
+
+		<!-- Sichtbarkeit (v1.3.78: kompaktiert — Single-Row + Repair-Link nur wenn echte Inkonsistenz) -->
+		<div role="button" tabindex="0"
+			onclick={() => {
+				const newVal = !grow.is_public;
+				growStore.updateGrow(grow.id, { is_public: newVal });
+				growStore.subscribe(s => growState = s)();
+				toastStore.success(newVal ? '🌍 Grow ist jetzt öffentlich' : '🔒 Grow ist jetzt privat');
+			}}
+			onkeydown={(e) => {
+				if (e.key === 'Enter' || e.key === ' ') {
+					e.preventDefault();
+					const newVal = !grow.is_public;
+					growStore.updateGrow(grow.id, { is_public: newVal });
+					growStore.subscribe(s => growState = s)();
+					toastStore.success(newVal ? '🌍 Grow ist jetzt öffentlich' : '🔒 Grow ist jetzt privat');
+				}
+			}}
+			class="w-full bg-gb-surface border border-gb-border rounded-xl px-3 py-2.5 flex items-center justify-between gap-3 text-left cursor-pointer">
+			<div class="min-w-0 flex-1">
+				<p class="text-sm">
+					<span class="font-medium">{grow.is_public ? '🌍 Öffentlich' : '🔒 Privat'}</span>
+					<span class="text-gb-text-muted text-xs">
+						· {grow.is_public ? 'Im Community-Feed' : 'Nur du siehst diesen Grow'}
+					</span>
+				</p>
+				{#if grow.is_public && publicMismatchCount > 0}
+					<button type="button" onclick={(e) => { e.stopPropagation(); repairPublicCheckins(); }}
+						disabled={repairBusy}
+						class="text-[11px] text-gb-info hover:underline disabled:opacity-50 mt-1">
+						{repairBusy ? 'Synchronisiere…' : `🔧 ${publicMismatchCount} Check-in${publicMismatchCount === 1 ? '' : 's'} nachsynchronisieren`}
+					</button>
+				{/if}
+			</div>
+			<div class="relative h-6 w-11 rounded-full transition-colors shrink-0" class:bg-gb-green={grow.is_public} class:bg-gb-bg={!grow.is_public}>
+				<div class="absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all"
+					class:left-0.5={!grow.is_public} class:left-[22px]={grow.is_public}></div>
+			</div>
+		</div>
+
 		<!-- Health-Card (Komponente, geteilt mit stats-Page) -->
 		{#if hasHealthData}
 			<HealthCard {consistency} {vpdStress} />
@@ -722,9 +723,10 @@
 						</div>
 					{/if}
 				</div>
+				<!-- v1.3.78: Großer Stats-Link-Card → schlanker Text-Link (paritätisch zum „Mehr Charts"-Link im Charts-Block). -->
 				<a href="/grow/{grow.id}/stats"
-					class="block bg-gb-surface rounded-xl p-3 text-center hover:bg-gb-surface-2 transition-colors">
-					<span class="text-sm">📊 Vollständige Statistik <span class="text-gb-text-muted">→</span></span>
+					class="block text-center text-xs text-gb-text-muted hover:text-gb-text py-2">
+					📊 Vollständige Statistik →
 				</a>
 			</div>
 		{/if}
