@@ -143,7 +143,7 @@
 	let ciVpdColor = $derived(
 		ciVpdStatusVal === 'optimal' ? 'var(--color-gb-green)' :
 		ciVpdStatusVal === 'warn' ? 'var(--color-gb-warning)' :
-		ciVpd === null ? '#666' : 'var(--color-gb-danger)'
+		ciVpd === null ? 'var(--color-gb-text-dim)' : 'var(--color-gb-danger)'
 	);
 	let ciVpdLabel = $derived(
 		ciVpdStatusVal === 'optimal' ? 'optimal' :
@@ -531,7 +531,7 @@
 		text-transform: uppercase;
 		color: var(--color-gb-text-muted);
 	}
-	.ci-sec-hint { font-size: 11px; color: #666; }
+	.ci-sec-hint { font-size: 11px; color: var(--color-gb-text-dim); }
 
 	.ci-chip {
 		min-height: 36px;
@@ -557,7 +557,7 @@
 	.ci-chip.ci-accent.active {
 		background: rgba(168,85,247,0.16);
 		border-color: var(--color-gb-accent);
-		color: #d8b4fe;
+		color: var(--color-gb-accent-light);
 	}
 	.ci-chip-row {
 		display: flex;
@@ -583,7 +583,7 @@
 		font-family: inherit;
 	}
 	.ci-input:focus { border-color: var(--color-gb-green); outline: none; }
-	.ci-input::placeholder { color: #555; }
+	.ci-input::placeholder { color: var(--color-gb-text-dim); }
 	.ci-input.ci-notes { resize: none; min-height: 80px; }
 
 	.ci-stepper {
@@ -696,7 +696,7 @@
 		justify-content: space-between;
 		margin-top: 6px;
 		font-size: 10px;
-		color: #666;
+		color: var(--color-gb-text-dim);
 	}
 
 	.ci-disc {
@@ -724,7 +724,7 @@
 	}
 	.ci-disc-title { font-size: 14px; font-weight: 500; }
 	.ci-disc-sub { font-size: 11px; color: var(--color-gb-text-muted); margin-top: 1px; }
-	.ci-chev { color: #555; font-size: 18px; }
+	.ci-chev { color: var(--color-gb-text-dim); font-size: 18px; }
 
 	.ci-fold {
 		overflow: hidden;
@@ -793,7 +793,7 @@
 		top: 2px; left: 2px;
 		width: 18px; height: 18px;
 		border-radius: 999px;
-		background: #666;
+		background: var(--color-gb-text-dim);
 		transition: all 0.15s ease;
 	}
 	.ci-sw.on { background: rgba(34,197,94,0.25); border-color: var(--color-gb-green); }
@@ -816,7 +816,7 @@
 		border-radius: 8px;
 		background: rgba(168,85,247,0.18);
 		display: flex; align-items: center; justify-content: center;
-		color: #d8b4fe;
+		color: var(--color-gb-accent-light);
 		flex-shrink: 0;
 	}
 	.ci-fp-t { min-width: 0; }
@@ -828,14 +828,14 @@
 	}
 	.ci-fp-name {
 		font-size: 13px; font-weight: 600;
-		color: #e9d5ff;
+		color: var(--color-gb-accent-light);
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}
 	.ci-fp-link {
 		font-size: 11px;
-		color: #d8b4fe;
+		color: var(--color-gb-accent-light);
 		text-decoration: none;
 		padding: 6px 8px;
 		white-space: nowrap;
@@ -845,7 +845,7 @@
 		width: 100%;
 		min-height: 52px;
 		background: var(--color-gb-green);
-		color: #000;
+		color: var(--color-gb-bg);
 		font-weight: 700;
 		font-size: 15px;
 		border: none;

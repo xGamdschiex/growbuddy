@@ -23,6 +23,7 @@
 	import { phaseTargetSegments, PHASE_TARGETS as PHASE_TARGETS_ALL } from '$lib/utils/phase-targets';
 	import { predictHarvest, predictHarvestPerStrain, formatDaysUntil } from '$lib/utils/harvest-predict';
 	import { summarizeStrains, totalPlantCount, getStrainEntries } from '$lib/utils/grow-strains';
+	import { CHART_COLORS } from '$lib/utils/chart-colors';
 	const PHASE_TARGETS_VPD = PHASE_TARGETS_ALL.vpd;
 	import {
 		metricStats,
@@ -736,17 +737,17 @@
 					{#if vpdData.length >= 2}
 						<MiniChart data={vpdData} days={vpdSeries.days} phaseMarkers={vpdMarkers}
 							phaseTargets={vpdPhaseTargets} showMinMax
-							color="#22c55e" label="VPD" unit=" kPa" />
+							color={CHART_COLORS.vpd} label="VPD" unit=" kPa" />
 					{/if}
 					{#if ecData.length >= 2}
 						<MiniChart data={ecData} days={ecSeries.days} phaseMarkers={ecMarkers}
 							phaseTargets={ecPhaseTargets} showMinMax
-							color="#a855f7" label="EC" unit=" mS" />
+							color={CHART_COLORS.ec} label="EC" unit=" mS" />
 					{/if}
 					{#if phData.length >= 2}
 						<MiniChart data={phData} days={phSeries.days} phaseMarkers={phMarkers}
 							phaseTargets={phPhaseTargets} showMinMax
-							color="#ef4444" label="pH" unit="" />
+							color={CHART_COLORS.ph} label="pH" unit="" />
 					{/if}
 					<a href="/grow/{grow.id}/stats"
 						class="block text-center text-xs text-gb-text-muted hover:text-gb-text py-2">
@@ -762,11 +763,11 @@
 					{#if vpdData.length >= 2}
 						<MiniChart data={vpdData} days={vpdSeries.days} phaseMarkers={vpdMarkers}
 							phaseTargets={vpdPhaseTargets} showMinMax
-							color="#22c55e" label="VPD" unit=" kPa" />
+							color={CHART_COLORS.vpd} label="VPD" unit=" kPa" />
 					{:else if ecData.length >= 2}
 						<MiniChart data={ecData} days={ecSeries.days} phaseMarkers={ecMarkers}
 							phaseTargets={ecPhaseTargets} showMinMax
-							color="#a855f7" label="EC" unit=" mS" />
+							color={CHART_COLORS.ec} label="EC" unit=" mS" />
 					{/if}
 
 					<div class="bg-gradient-to-br from-gb-accent/15 to-gb-accent/5 border border-gb-accent/30 rounded-xl p-4">
@@ -885,7 +886,7 @@
 	{/if}
 
 	{#if pendingDeleteId}
-		<div class="fixed inset-0 bg-black/70 z-[200] flex items-center justify-center p-4"
+		<div class="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4"
 			onclick={() => pendingDeleteId = null}
 			onkeydown={(e) => { if (e.key === 'Escape') pendingDeleteId = null; }}
 			role="presentation">
@@ -914,7 +915,7 @@
 	{/if}
 
 	{#if showAbandonConfirm}
-		<div class="fixed inset-0 bg-black/70 z-[200] flex items-center justify-center p-4"
+		<div class="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4"
 			onclick={() => showAbandonConfirm = false}
 			onkeydown={(e) => { if (e.key === 'Escape') showAbandonConfirm = false; }}
 			role="presentation">

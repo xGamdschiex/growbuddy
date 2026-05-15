@@ -7,6 +7,7 @@
 	 *
 	 * Tap → vertikale Linie + Tooltip mit Original-Werten aller aktiver Series.
 	 */
+	import { CHART_COLORS } from '$lib/utils/chart-colors';
 
 	export interface ChartSeries {
 		key: string;
@@ -209,13 +210,13 @@
 				{#if ext}
 					<!-- Min-Label (unter dem Punkt) -->
 					<text x={ext.min.x} y={ext.min.y + 12} font-size="9" font-weight="600"
-						text-anchor="middle" fill={s.color} stroke="#0a0a0a" stroke-width="3" paint-order="stroke">
+						text-anchor="middle" fill={s.color} stroke={CHART_COLORS.bgStroke} stroke-width="3" paint-order="stroke">
 						{fmt(ext.min.value, s.unit)}
 					</text>
 					<!-- Max-Label (über dem Punkt) -->
 					{#if ext.max.x !== ext.min.x || ext.max.y !== ext.min.y}
 						<text x={ext.max.x} y={ext.max.y - 5} font-size="9" font-weight="600"
-							text-anchor="middle" fill={s.color} stroke="#0a0a0a" stroke-width="3" paint-order="stroke">
+							text-anchor="middle" fill={s.color} stroke={CHART_COLORS.bgStroke} stroke-width="3" paint-order="stroke">
 							{fmt(ext.max.value, s.unit)}
 						</text>
 					{/if}
@@ -223,7 +224,7 @@
 					{#if ext.last.x !== ext.min.x && ext.last.x !== ext.max.x}
 						<text x={Math.min(ext.last.x + 4, width - 2)} y={ext.last.y + 3} font-size="9" font-weight="600"
 							text-anchor={ext.last.x > width - 30 ? 'end' : 'start'}
-							fill={s.color} stroke="#0a0a0a" stroke-width="3" paint-order="stroke">
+							fill={s.color} stroke={CHART_COLORS.bgStroke} stroke-width="3" paint-order="stroke">
 							{fmt(ext.last.value, s.unit)}
 						</text>
 					{/if}
@@ -238,7 +239,7 @@
 					{@const p = valueAt(s, activeDay)}
 					{#if p}
 						{@const b = bounds(s)}
-						<circle cx={xMap(p.day)} cy={yMap(p.value, b)} r="4" fill={s.color} stroke="#0a0a0a" stroke-width="1.5" />
+						<circle cx={xMap(p.day)} cy={yMap(p.value, b)} r="4" fill={s.color} stroke={CHART_COLORS.bgStroke} stroke-width="1.5" />
 					{/if}
 				{/each}
 			{/if}

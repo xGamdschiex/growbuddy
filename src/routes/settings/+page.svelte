@@ -299,7 +299,7 @@
 	</div>
 
 	{#if showDeleteAccount}
-		<div class="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center p-4"
+		<div class="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-4"
 			onclick={() => { if (!deletingAccount) { showDeleteAccount = false; deleteConfirmText = ''; } }}
 			onkeydown={(e) => { if (e.key === 'Escape' && !deletingAccount) { showDeleteAccount = false; deleteConfirmText = ''; } }}
 			role="presentation">

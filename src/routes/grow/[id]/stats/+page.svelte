@@ -21,6 +21,7 @@
 	import MultiSeriesChart, { type ChartSeries } from '$lib/components/MultiSeriesChart.svelte';
 	import HealthCard from '$lib/components/HealthCard.svelte';
 	import { phaseTargetSegments, targetFor } from '$lib/utils/phase-targets';
+	import { CHART_COLORS } from '$lib/utils/chart-colors';
 	import { onMount } from 'svelte';
 
 	let growId = $derived($page.params.id);
@@ -138,13 +139,13 @@
 	// MultiSeriesChart: alle 7 Metriken zur Auswahl. phaseTargets wird nur sichtbar
 	// wenn der User NUR diese eine Series anwählt (sonst Multi-Y-Skala-Konflikt).
 	let allSeries: ChartSeries[] = $derived([
-		{ key: 'temp', label: 'Temp', color: '#f59e0b', unit: '°C', values: tempSeries.values, days: tempSeries.days, phaseTargets: tempPhaseTargets },
-		{ key: 'rh', label: 'RH', color: '#3b82f6', unit: '%', values: rhSeries.values, days: rhSeries.days, phaseTargets: rhPhaseTargets },
-		{ key: 'vpd', label: 'VPD', color: '#22c55e', unit: ' kPa', values: vpdSeries.values, days: vpdSeries.days, phaseTargets: vpdPhaseTargets },
-		{ key: 'ec', label: 'EC', color: '#a855f7', unit: '', values: ecSeries.values, days: ecSeries.days, phaseTargets: ecPhaseTargets },
-		{ key: 'ph', label: 'pH', color: '#ef4444', unit: '', values: phSeries.values, days: phSeries.days, phaseTargets: phPhaseTargets },
-		{ key: 'water', label: 'Wasser', color: '#0ea5e9', unit: ' L', values: waterSeries.values, days: waterSeries.days },
-		{ key: 'nutrient', label: 'Dünger', color: '#84cc16', unit: ' mL', values: nutrientSeries.values, days: nutrientSeries.days },
+		{ key: 'temp', label: 'Temp', color: CHART_COLORS.temp, unit: '°C', values: tempSeries.values, days: tempSeries.days, phaseTargets: tempPhaseTargets },
+		{ key: 'rh', label: 'RH', color: CHART_COLORS.rh, unit: '%', values: rhSeries.values, days: rhSeries.days, phaseTargets: rhPhaseTargets },
+		{ key: 'vpd', label: 'VPD', color: CHART_COLORS.vpd, unit: ' kPa', values: vpdSeries.values, days: vpdSeries.days, phaseTargets: vpdPhaseTargets },
+		{ key: 'ec', label: 'EC', color: CHART_COLORS.ec, unit: '', values: ecSeries.values, days: ecSeries.days, phaseTargets: ecPhaseTargets },
+		{ key: 'ph', label: 'pH', color: CHART_COLORS.ph, unit: '', values: phSeries.values, days: phSeries.days, phaseTargets: phPhaseTargets },
+		{ key: 'water', label: 'Wasser', color: CHART_COLORS.water, unit: ' L', values: waterSeries.values, days: waterSeries.days },
+		{ key: 'nutrient', label: 'Dünger', color: CHART_COLORS.nutrient, unit: ' mL', values: nutrientSeries.values, days: nutrientSeries.days },
 	]);
 	// Default-aktive Metriken: VPD + EC + Wasser (häufigste Health-Indikatoren)
 	let enabledKeys = $state<string[]>(['vpd', 'ec', 'water']);
@@ -326,7 +327,7 @@
 								<button type="button" onclick={() => toggleKey(s.key)}
 									class="text-[11px] px-2.5 py-1 rounded-full border font-medium transition-colors flex items-center gap-1.5 {active ? 'border-transparent text-white' : 'border-gb-border text-gb-text-muted bg-gb-bg/50 hover:text-gb-text'}"
 									style={active ? `background-color: ${s.color}` : ''}>
-									<span class="w-1.5 h-1.5 rounded-full" style="background-color: {active ? '#fff' : s.color}"></span>
+									<span class="w-1.5 h-1.5 rounded-full" style="background-color: {active ? CHART_COLORS.textOnDark : s.color}"></span>
 									{s.label}
 								</button>
 							{/each}
@@ -353,20 +354,20 @@
 						{#if tempSeries.values.length >= 2}
 							<MiniChart data={tempSeries.values} days={tempSeries.days} phaseMarkers={tempMarkers}
 								phaseTargets={tempPhaseTargets} showMinMax
-								color="#f59e0b" label="Temperatur" unit="°C" />
+								color={CHART_COLORS.temp} label="Temperatur" unit="°C" />
 						{/if}
 						{#if rhSeries.values.length >= 2}
 							<MiniChart data={rhSeries.values} days={rhSeries.days} phaseMarkers={rhMarkers}
 								phaseTargets={rhPhaseTargets} showMinMax
-								color="#3b82f6" label="Luftfeuchte" unit="%" />
+								color={CHART_COLORS.rh} label="Luftfeuchte" unit="%" />
 						{/if}
 						{#if waterSeries.values.length >= 2}
 							<MiniChart data={waterSeries.values} days={waterSeries.days} phaseMarkers={waterMarkers}
-								showMinMax color="#0ea5e9" label="Wasser kumulativ" unit=" L" />
+								showMinMax color={CHART_COLORS.water} label="Wasser kumulativ" unit=" L" />
 						{/if}
 						{#if nutrientSeries.values.length >= 2}
 							<MiniChart data={nutrientSeries.values} days={nutrientSeries.days} phaseMarkers={nutrientMarkers}
-								showMinMax color="#84cc16" label="Dünger" unit=" mL" />
+								showMinMax color={CHART_COLORS.nutrient} label="Dünger" unit=" mL" />
 						{/if}
 					{:else}
 						<div class="bg-gradient-to-br from-gb-accent/15 to-gb-accent/5 border border-gb-accent/30 rounded-xl p-4">

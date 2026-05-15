@@ -583,7 +583,7 @@
 <!-- Apply-Modal -->
 {#if showApply}
 	<div
-		class="fixed inset-0 z-[60] bg-black/80 flex items-end sm:items-center justify-center px-4 pt-4 pb-24 sm:p-4"
+		class="fixed inset-0 z-[60] bg-black/60 flex items-end sm:items-center justify-center px-4 pt-4 pb-24 sm:p-4"
 		role="dialog"
 		aria-modal="true"
 		onclick={() => (showApply = false)}

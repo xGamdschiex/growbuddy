@@ -2,6 +2,7 @@
 	/**
 	 * MiniChart V2 — SVG Sparkline mit Tap-Tooltip, X-Achse, Phasen-Markern, Min/Max-Labels.
 	 */
+	import { CHART_COLORS } from '$lib/utils/chart-colors';
 
 	interface PhaseMarker {
 		atIndex: number;
@@ -33,7 +34,7 @@
 	let {
 		data,
 		days,
-		color = '#22c55e',
+		color = CHART_COLORS.vpd,
 		height = 100,
 		width = 320,
 		showDots = true,

@@ -12,9 +12,15 @@
 	--color-gb-text: #f5f5f5;
 	--color-gb-text-muted: #a3a3a3;
 	--color-gb-accent: #a855f7;
+	--color-gb-accent-light: #d8b4fe;
 	--color-gb-warning: #f59e0b;
 	--color-gb-danger: #ef4444;
 	--color-gb-info: #3b82f6;
+	/* Fainter muted level für placeholders, chevrons, sub-hints (zwischen text-muted und border) */
+	--color-gb-text-dim: #737373;
+	/* Chart-spezifische Akzente (für SVG fill direkt referenzierbar via chart-colors.ts) */
+	--color-gb-water: #0ea5e9;
+	--color-gb-nutrient: #84cc16;
 }
 
 /* ─── Base Styles ────────────────────────────────────────── */
