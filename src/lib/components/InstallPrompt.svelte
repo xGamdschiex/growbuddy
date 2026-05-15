@@ -126,7 +126,7 @@
 						Später
 					</button>
 					<button onclick={install}
-						class="flex-1 bg-gb-green text-black font-medium text-xs py-2 rounded-lg hover:bg-gb-green/90 transition-colors">
+						class="flex-1 bg-gb-green text-gb-bg font-medium text-xs py-2 rounded-lg hover:bg-gb-green/90 transition-colors">
 						Installieren
 					</button>
 				</div>

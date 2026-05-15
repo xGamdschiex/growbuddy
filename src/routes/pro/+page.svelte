@@ -116,12 +116,12 @@
 		<div class="bg-gb-surface rounded-xl p-1 flex">
 			<button onclick={() => billing = 'monthly'}
 				class="flex-1 py-2.5 rounded-lg text-sm font-medium transition-colors
-					{billing === 'monthly' ? 'bg-gb-green text-black' : 'text-gb-text-muted'}">
+					{billing === 'monthly' ? 'bg-gb-green text-gb-bg' : 'text-gb-text-muted'}">
 				{tr('pro.monthly')}
 			</button>
 			<button onclick={() => billing = 'yearly'}
 				class="flex-1 py-2.5 rounded-lg text-sm font-medium transition-colors relative
-					{billing === 'yearly' ? 'bg-gb-green text-black' : 'text-gb-text-muted'}">
+					{billing === 'yearly' ? 'bg-gb-green text-gb-bg' : 'text-gb-text-muted'}">
 				{tr('pro.yearly')}
 				<span class="absolute -top-2 -right-1 bg-gb-accent text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">-33%</span>
 			</button>
@@ -147,7 +147,7 @@
 				</button>
 			{/if}
 			<button onclick={subscribe}
-				class="w-full bg-gb-green text-black font-semibold py-3.5 rounded-xl text-sm hover:bg-gb-green/80 transition-colors">
+				class="w-full bg-gb-green text-gb-bg font-semibold py-3.5 rounded-xl text-sm hover:bg-gb-green/80 transition-colors">
 				{tr('pro.subscribe_btn')}
 			</button>
 

@@ -60,33 +60,18 @@
 			<h1 class="text-2xl font-bold">{tr('home.title')}</h1>
 			<p class="text-gb-text-muted text-sm">{tr('home.subtitle')}</p>
 		</div>
-		<div class="flex items-center gap-2">
-			<a href="/profile" aria-label="Cloud-Status"
-				title={loggedIn ? (sync.status === 'syncing' ? 'Sync läuft…' : sync.status === 'error' ? 'Sync-Fehler' : 'Cloud aktiv') : 'Nicht eingeloggt — Daten nur lokal'}
-				class="w-10 h-10 rounded-full flex items-center justify-center transition-colors
-					{loggedIn ? (sync.status === 'error' ? 'bg-gb-danger/15 text-gb-danger' : 'bg-gb-green/15 text-gb-green') : 'bg-gb-surface-2 text-gb-text-muted'}">
-				{#if sync.status === 'syncing'}
-					<svg class="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-						<path d="M12 4v4m0 8v4m4.24-12.24l-2.83 2.83m-4.24 4.24l-2.83 2.83M20 12h-4M8 12H4m12.24 4.24l-2.83-2.83M9.17 9.17L6.34 6.34" />
-					</svg>
-				{:else if loggedIn}
-					<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-						<path d="M17.5 19a4.5 4.5 0 10-.88-8.92A6 6 0 007 10a4 4 0 00-.5 7.97" />
-						<path d="M9 15l2 2 4-4" stroke-linecap="round" stroke-linejoin="round" />
-					</svg>
-				{:else}
-					<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-						<path d="M17.5 19a4.5 4.5 0 10-.88-8.92A6 6 0 007 10a4 4 0 00-.5 7.97" />
-					</svg>
-				{/if}
-			</a>
-			<a href="/profile" aria-label="Profil"
-				class="w-10 h-10 rounded-full bg-gb-surface-2 flex items-center justify-center hover:bg-gb-surface transition-colors">
-				<svg class="w-5 h-5 text-gb-green" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-					<path d="M12 22V16m0 0c-2-4-6-6-10-6 4 0 8-2 10-6 2 4 6 6 10 6-4 0-8 2-10 6z" />
-				</svg>
-			</a>
-		</div>
+		<a href="/profile" aria-label="Profil & Cloud-Status"
+			title={loggedIn ? (sync.status === 'syncing' ? 'Sync läuft…' : sync.status === 'error' ? 'Sync-Fehler' : 'Cloud aktiv') : 'Nicht eingeloggt — Daten nur lokal'}
+			class="relative w-10 h-10 rounded-full bg-gb-surface-2 flex items-center justify-center hover:bg-gb-surface transition-colors shrink-0">
+			<svg class="w-5 h-5 text-gb-green" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path d="M12 22V16m0 0c-2-4-6-6-10-6 4 0 8-2 10-6 2 4 6 6 10 6-4 0-8 2-10 6z" />
+			</svg>
+			<!-- Cloud-Status-Dot (rechts unten am Profil-Avatar) -->
+			<span aria-hidden="true"
+				class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ring-2 ring-gb-bg
+					{loggedIn ? (sync.status === 'error' ? 'bg-gb-danger' : sync.status === 'syncing' ? 'bg-gb-info animate-pulse' : 'bg-gb-green') : 'bg-gb-text-dim'}">
+			</span>
+		</a>
 	</div>
 
 	<!-- ═══ HERO: Daily Check-in ═══ -->
@@ -197,7 +182,7 @@
 								<span>VPD {lastCheckin.vpd.toFixed(2)}</span>
 							{/if}
 							{#if !lastCheckin.temp && !lastCheckin.rh && !lastCheckin.vpd}
-								<span class="text-gb-text-muted">W{lastCheckin.week}T{lastCheckin.day}</span>
+								<span>✓ Letzter Check-in (W{lastCheckin.week}T{lastCheckin.day}) ohne Klima-Werte</span>
 							{/if}
 						</div>
 					{:else}
@@ -213,13 +198,14 @@
 			<div class="text-4xl mb-2">🌱</div>
 			<p class="font-bold text-base">Starte deinen ersten Grow</p>
 			<p class="text-xs text-gb-text-muted mt-1">Lege Strain, Medium und Phase fest — dann täglich Check-in machen.</p>
-			<span class="inline-block mt-3 bg-gb-green text-black font-semibold text-sm px-4 py-2 rounded-lg">+ Neuer Grow</span>
+			<span class="inline-block mt-3 bg-gb-green text-gb-bg font-semibold text-sm px-4 py-2 rounded-lg">+ Neuer Grow</span>
 		</a>
 	{/if}
 
 	<!-- Quick Actions -->
 	<div class="space-y-2">
 		<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">{tr('home.quick_actions')}</h2>
+		<!-- v1.3.77 Reorder: Grow-Aktionen (New, AI Doctor) → Tools (Calc, VPD) → Browse (Insights, Feed) -->
 		<div class="grid grid-cols-2 gap-3">
 			<a href="/grow/new" class="bg-gb-green/10 border border-gb-green/20 rounded-xl p-4 hover:bg-gb-green/20 transition-colors">
 				<svg class="w-6 h-6 text-gb-green mb-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -228,19 +214,19 @@
 				<p class="font-medium text-sm">{tr('home.new_grow')}</p>
 				<p class="text-xs text-gb-text-muted">{tr('home.start_grow')}</p>
 			</a>
-			<a href="/calc" class="bg-gb-accent/10 border border-gb-accent/20 rounded-xl p-4 hover:bg-gb-accent/20 transition-colors">
-				<svg class="w-6 h-6 text-gb-accent mb-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-					<path d="M9 3h6m-5 0v6.5L4 18a1 1 0 001 1h14a1 1 0 001-1l-6-8.5V3m-4 0h4" />
-				</svg>
-				<p class="font-medium text-sm">{tr('home.calc')}</p>
-				<p class="text-xs text-gb-text-muted">{tr('home.calc_sub')}</p>
-			</a>
 			<a href="/tools/doctor" class="bg-gb-info/10 border border-gb-info/20 rounded-xl p-4 hover:bg-gb-info/20 transition-colors">
 				<svg class="w-6 h-6 text-gb-info mb-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 					<path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
 				</svg>
 				<p class="font-medium text-sm">AI Doctor</p>
 				<p class="text-xs text-gb-text-muted">Pflanzen-Diagnose</p>
+			</a>
+			<a href="/calc" class="bg-gb-accent/10 border border-gb-accent/20 rounded-xl p-4 hover:bg-gb-accent/20 transition-colors">
+				<svg class="w-6 h-6 text-gb-accent mb-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<path d="M9 3h6m-5 0v6.5L4 18a1 1 0 001 1h14a1 1 0 001-1l-6-8.5V3m-4 0h4" />
+				</svg>
+				<p class="font-medium text-sm">{tr('home.calc')}</p>
+				<p class="text-xs text-gb-text-muted">{tr('home.calc_sub')}</p>
 			</a>
 			<a href="/tools/vpd" class="bg-gb-warning/10 border border-gb-warning/20 rounded-xl p-4 hover:bg-gb-warning/20 transition-colors">
 				<svg class="w-6 h-6 text-gb-warning mb-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -291,16 +277,4 @@
 		</div>
 	{/if}
 
-	<!-- Empty State -->
-	{#if active.length === 0 && harvested.length === 0}
-		<div class="bg-gb-surface rounded-xl p-6 text-center">
-			<svg class="w-12 h-12 text-gb-text-muted mx-auto mb-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
-				<path d="M12 22V16m0 0c-2-4-6-6-10-6 4 0 8-2 10-6 2 4 6 6 10 6-4 0-8 2-10 6z" />
-			</svg>
-			<p class="text-gb-text-muted text-sm mb-3">{tr('home.no_grows')}</p>
-			<a href="/grow/new" class="inline-block bg-gb-green text-black font-semibold text-sm px-5 py-2.5 rounded-lg hover:bg-gb-green/80 transition-colors">
-				{tr('home.first_grow')}
-			</a>
-		</div>
-	{/if}
 </div>

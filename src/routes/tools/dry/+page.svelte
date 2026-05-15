@@ -51,12 +51,12 @@
 	<div class="grid grid-cols-2 gap-2">
 		<button onclick={() => mode = 'drying'}
 			class="py-2.5 rounded-lg text-sm transition-colors
-				{mode === 'drying' ? 'bg-gb-green text-black font-semibold' : 'bg-gb-surface-2 text-gb-text-muted'}">
+				{mode === 'drying' ? 'bg-gb-green text-gb-bg font-semibold' : 'bg-gb-surface-2 text-gb-text-muted'}">
 			{tr('dry.drying')}
 		</button>
 		<button onclick={() => mode = 'curing'}
 			class="py-2.5 rounded-lg text-sm transition-colors
-				{mode === 'curing' ? 'bg-gb-green text-black font-semibold' : 'bg-gb-surface-2 text-gb-text-muted'}">
+				{mode === 'curing' ? 'bg-gb-green text-gb-bg font-semibold' : 'bg-gb-surface-2 text-gb-text-muted'}">
 			{tr('dry.curing')}
 		</button>
 	</div>
@@ -81,7 +81,7 @@
 			{:else}
 				<p class="text-gb-text-muted mb-4">{tr('dry.start_info')}</p>
 				<button onclick={start}
-					class="bg-gb-green text-black font-semibold px-6 py-3 rounded-lg text-sm hover:bg-gb-green-light transition-colors">
+					class="bg-gb-green text-gb-bg font-semibold px-6 py-3 rounded-lg text-sm hover:bg-gb-green-light transition-colors">
 					{tr('dry.start_btn')}
 				</button>
 			{/if}

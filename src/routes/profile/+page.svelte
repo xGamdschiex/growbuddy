@@ -542,7 +542,7 @@
 							{/if}
 							<div class="flex gap-2">
 								<button onclick={saveProfile} disabled={savingProfile}
-									class="flex-1 bg-gb-green text-black font-medium text-sm py-2 rounded-lg disabled:opacity-50">
+									class="flex-1 bg-gb-green text-gb-bg font-medium text-sm py-2 rounded-lg disabled:opacity-50">
 									{savingProfile ? '...' : 'Speichern'}
 								</button>
 								<button onclick={cancelEditProfile} disabled={savingProfile}
@@ -611,7 +611,7 @@
 						class="w-full bg-gb-bg border border-gb-border rounded-lg px-3 py-2.5 text-sm" />
 					<button onclick={sendMagicLink}
 						disabled={loginLoading || !loginEmail.trim()}
-						class="w-full bg-gb-green text-black font-medium text-sm py-2.5 rounded-lg hover:bg-gb-green/80 transition-colors disabled:opacity-50">
+						class="w-full bg-gb-green text-gb-bg font-medium text-sm py-2.5 rounded-lg hover:bg-gb-green/80 transition-colors disabled:opacity-50">
 						{loginLoading ? '...' : tr('auth.send_link')}
 					</button>
 				</div>

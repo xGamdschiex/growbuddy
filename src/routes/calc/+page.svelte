@@ -379,7 +379,7 @@
 								onkeydown={(e) => { if (e.key === 'Enter') lookupCity(); }}
 								class="flex-1 bg-gb-bg border border-gb-border rounded-lg px-3 py-3 text-sm" />
 							<button onclick={lookupCity} disabled={lookupLoading || !stadtInput.trim()}
-								class="bg-gb-green text-black font-semibold px-4 py-2.5 rounded-lg text-sm disabled:opacity-50 shrink-0">
+								class="bg-gb-green text-gb-bg font-semibold px-4 py-2.5 rounded-lg text-sm disabled:opacity-50 shrink-0">
 								{lookupLoading ? '...' : tr('calc.lookup_btn')}
 							</button>
 						</div>
@@ -570,7 +570,7 @@
 		<!-- Apply als Check-in -->
 		<button
 			onclick={openApply}
-			class="w-full bg-gb-green text-black font-semibold px-4 py-3.5 rounded-xl text-sm shadow-lg shadow-gb-green/20 active:scale-[0.98] transition-transform"
+			class="w-full bg-gb-green text-gb-bg font-semibold px-4 py-3.5 rounded-xl text-sm shadow-lg shadow-gb-green/20 active:scale-[0.98] transition-transform"
 		>
 			🧪 Nährlösung angemischt & gegeben
 		</button>
@@ -634,7 +634,7 @@
 				<button
 					onclick={applyAsCheckin}
 					disabled={!applyGrowId}
-					class="flex-1 bg-gb-green text-black px-4 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50"
+					class="flex-1 bg-gb-green text-gb-bg px-4 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50"
 				>
 					Anlegen
 				</button>

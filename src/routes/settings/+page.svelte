@@ -200,12 +200,12 @@
 				<div class="flex gap-1">
 					<button onclick={() => locale.set('de')}
 						class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors
-							{currentLocale === 'de' ? 'bg-gb-green text-black' : 'bg-gb-bg text-gb-text-muted'}">
+							{currentLocale === 'de' ? 'bg-gb-green text-gb-bg' : 'bg-gb-bg text-gb-text-muted'}">
 						DE
 					</button>
 					<button onclick={() => locale.set('en')}
 						class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors
-							{currentLocale === 'en' ? 'bg-gb-green text-black' : 'bg-gb-bg text-gb-text-muted'}">
+							{currentLocale === 'en' ? 'bg-gb-green text-gb-bg' : 'bg-gb-bg text-gb-text-muted'}">
 						EN
 					</button>
 				</div>

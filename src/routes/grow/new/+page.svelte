@@ -120,12 +120,12 @@
 		<div class="grid grid-cols-2 gap-2">
 			<button onclick={() => strainType = 'auto'}
 				class="px-3 py-2.5 rounded-lg text-sm transition-colors
-					{strainType === 'auto' ? 'bg-gb-green text-black font-semibold' : 'bg-gb-surface-2 text-gb-text-muted'}">
+					{strainType === 'auto' ? 'bg-gb-green text-gb-bg font-semibold' : 'bg-gb-surface-2 text-gb-text-muted'}">
 				{tr('general.auto')}
 			</button>
 			<button onclick={() => strainType = 'photo'}
 				class="px-3 py-2.5 rounded-lg text-sm transition-colors
-					{strainType === 'photo' ? 'bg-gb-green text-black font-semibold' : 'bg-gb-surface-2 text-gb-text-muted'}">
+					{strainType === 'photo' ? 'bg-gb-green text-gb-bg font-semibold' : 'bg-gb-surface-2 text-gb-text-muted'}">
 				{tr('general.photo')}
 			</button>
 		</div>
@@ -138,7 +138,7 @@
 			{#each [['soil', tr('grow.medium_soil')], ['coco', tr('grow.medium_coco')], ['hydro', tr('grow.medium_hydro')]] as [val, label]}
 				<button onclick={() => medium = val as Medium}
 					class="px-3 py-2.5 rounded-lg text-sm transition-colors
-						{medium === val ? 'bg-gb-green text-black font-semibold' : 'bg-gb-surface-2 text-gb-text-muted'}">
+						{medium === val ? 'bg-gb-green text-gb-bg font-semibold' : 'bg-gb-surface-2 text-gb-text-muted'}">
 					{label}
 				</button>
 			{/each}
@@ -172,7 +172,7 @@
 				<button onclick={() => selectSystem(opt.val as GrowSystem)}
 					disabled={opt.pro && !userIsPro}
 					class="px-3 py-2.5 rounded-lg text-sm text-left transition-colors
-						{system === opt.val ? 'bg-gb-green text-black font-semibold' : 'bg-gb-surface-2 text-gb-text-muted'}
+						{system === opt.val ? 'bg-gb-green text-gb-bg font-semibold' : 'bg-gb-surface-2 text-gb-text-muted'}
 						{opt.pro && !userIsPro ? 'opacity-50 cursor-not-allowed' : ''}">
 					<div class="flex items-center justify-between">
 						<span>{opt.label}</span>
@@ -244,7 +244,7 @@
 	<button
 		onclick={startGrow}
 		disabled={!strainsValid.ok || atLimit}
-		class="w-full bg-gb-green text-black font-semibold py-3 rounded-lg text-sm
+		class="w-full bg-gb-green text-gb-bg font-semibold py-3 rounded-lg text-sm
 			hover:bg-gb-green-light transition-colors
 			disabled:opacity-30 disabled:cursor-not-allowed"
 	>

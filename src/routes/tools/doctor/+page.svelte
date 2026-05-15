@@ -240,7 +240,7 @@
 			<!-- Analyze Button -->
 			{#if !diagnosis && !loading}
 				<button onclick={analyze}
-					class="w-full bg-gb-green text-black font-semibold py-3 rounded-lg text-sm hover:bg-gb-green-light transition-colors">
+					class="w-full bg-gb-green text-gb-bg font-semibold py-3 rounded-lg text-sm hover:bg-gb-green-light transition-colors">
 					🔍 Diagnose starten
 				</button>
 			{/if}

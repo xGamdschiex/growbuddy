@@ -59,7 +59,7 @@
 				<button
 					onclick={() => phase = p.key}
 					class="px-3 py-2 rounded-lg text-sm transition-colors
-						{phase === p.key ? 'bg-gb-green text-black font-semibold' : 'bg-gb-surface-2 text-gb-text-muted hover:text-gb-text'}"
+						{phase === p.key ? 'bg-gb-green text-gb-bg font-semibold' : 'bg-gb-surface-2 text-gb-text-muted hover:text-gb-text'}"
 				>
 					{p.label}
 				</button>

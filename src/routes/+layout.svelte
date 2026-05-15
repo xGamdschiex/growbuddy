@@ -308,7 +308,7 @@
 
 <!-- Offline Banner -->
 {#if isOffline}
-	<div class="fixed top-0 inset-x-0 z-[110] bg-gb-warning text-black text-center py-1.5 text-xs font-medium animate-[slideDown_0.3s_ease-out]">
+	<div class="fixed top-0 inset-x-0 z-[110] bg-gb-warning text-gb-bg text-center py-1.5 text-xs font-medium animate-[slideDown_0.3s_ease-out]">
 		📡 Offline — Daten werden lokal gespeichert
 	</div>
 {/if}
@@ -367,10 +367,10 @@
 		{#each toasts as toast (toast.id)}
 			<div class="pointer-events-auto max-w-sm w-full px-4 py-2.5 rounded-xl shadow-lg text-sm font-medium
 				animate-[slideDown_0.3s_ease-out]
-				{toast.type === 'xp' ? 'bg-gb-green/90 text-black' :
+				{toast.type === 'xp' ? 'bg-gb-green/90 text-gb-bg' :
 				 toast.type === 'achievement' ? 'bg-gb-accent/90 text-white' :
-				 toast.type === 'success' ? 'bg-gb-green/90 text-black' :
-				 toast.type === 'warning' ? 'bg-gb-warning/90 text-black' :
+				 toast.type === 'success' ? 'bg-gb-green/90 text-gb-bg' :
+				 toast.type === 'warning' ? 'bg-gb-warning/90 text-gb-bg' :
 				 'bg-gb-surface-2 text-gb-text'}">
 				{#if toast.icon}<span class="mr-1">{toast.icon}</span>{/if}
 				{toast.message}

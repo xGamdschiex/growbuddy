@@ -576,7 +576,7 @@
 					class="w-full font-semibold py-3 rounded-lg text-sm transition-colors
 						{checkedInToday
 							? 'bg-gb-surface border border-gb-green/40 text-gb-green hover:bg-gb-surface-2'
-							: 'bg-gb-green text-black hover:bg-gb-green-light'}">
+							: 'bg-gb-green text-gb-bg hover:bg-gb-green-light'}">
 					{checkedInToday ? '✓ Heute erledigt · Weiterer Check-in' : tr('grow.daily_checkin')}
 				</button>
 			{:else}
@@ -649,7 +649,7 @@
 					<!-- Confirm/Cancel -->
 					<div class="flex gap-3">
 						<button onclick={confirmHarvest}
-							class="flex-1 bg-gb-green text-black font-semibold py-3 rounded-lg text-sm hover:bg-gb-green/80 transition-colors">
+							class="flex-1 bg-gb-green text-gb-bg font-semibold py-3 rounded-lg text-sm hover:bg-gb-green/80 transition-colors">
 							{tr('harvest.confirm')}
 						</button>
 						<button onclick={() => showHarvest = false}

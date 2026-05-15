@@ -189,7 +189,7 @@
 
 			{#if !isOwnProfile && auth.user}
 				<button onclick={handleFollow} disabled={followBusy}
-					class="mt-4 px-5 py-2 rounded-lg font-medium text-sm disabled:opacity-50 transition-colors {following ? 'bg-gb-bg border border-gb-border text-gb-text' : 'bg-gb-green text-black'}"
+					class="mt-4 px-5 py-2 rounded-lg font-medium text-sm disabled:opacity-50 transition-colors {following ? 'bg-gb-bg border border-gb-border text-gb-text' : 'bg-gb-green text-gb-bg'}"
 					style="min-height:40px">
 					{following ? '✓ Folge ich' : '+ Folgen'}
 				</button>

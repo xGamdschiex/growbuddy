@@ -17,12 +17,12 @@
 	<div class="bg-gb-surface rounded-xl p-1 flex">
 		<button onclick={() => tab = 'impressum'}
 			class="flex-1 py-2.5 rounded-lg text-sm font-medium transition-colors
-				{tab === 'impressum' ? 'bg-gb-green text-black' : 'text-gb-text-muted'}">
+				{tab === 'impressum' ? 'bg-gb-green text-gb-bg' : 'text-gb-text-muted'}">
 			{tr('legal.impressum')}
 		</button>
 		<button onclick={() => tab = 'datenschutz'}
 			class="flex-1 py-2.5 rounded-lg text-sm font-medium transition-colors
-				{tab === 'datenschutz' ? 'bg-gb-green text-black' : 'text-gb-text-muted'}">
+				{tab === 'datenschutz' ? 'bg-gb-green text-gb-bg' : 'text-gb-text-muted'}">
 			{tr('legal.privacy')}
 		</button>
 	</div>

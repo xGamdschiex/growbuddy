@@ -55,7 +55,7 @@
 			<h1 class="text-xl font-bold">{tr('grow.title')}</h1>
 			<p class="text-gb-text-muted text-sm">{tr('grow.active_sub', { active: active.length, harvested: harvested.length })}</p>
 		</div>
-		<a href="/grow/new" class="bg-gb-green text-black font-semibold text-sm px-4 py-2 rounded-lg hover:bg-gb-green-light transition-colors">
+		<a href="/grow/new" class="bg-gb-green text-gb-bg font-semibold text-sm px-4 py-2 rounded-lg hover:bg-gb-green-light transition-colors">
 			{tr('grow.new_short')}
 		</a>
 	</div>
@@ -67,7 +67,7 @@
 				<path d="M12 22V16m0 0c-2-4-6-6-10-6 4 0 8-2 10-6 2 4 6 6 10 6-4 0-8 2-10 6z" />
 			</svg>
 			<p class="text-gb-text-muted mb-4">{tr('grow.no_grows')}</p>
-			<a href="/grow/new" class="inline-block bg-gb-green text-black font-semibold text-sm px-5 py-2.5 rounded-lg hover:bg-gb-green-light transition-colors">
+			<a href="/grow/new" class="inline-block bg-gb-green text-gb-bg font-semibold text-sm px-5 py-2.5 rounded-lg hover:bg-gb-green-light transition-colors">
 				{tr('grow.start_first')}
 			</a>
 		</div>

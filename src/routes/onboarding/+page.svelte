@@ -199,7 +199,7 @@
 
 			<div class="pt-6 space-y-3">
 				<button onclick={next}
-					class="w-full bg-gb-green text-black font-semibold py-3.5 rounded-xl text-sm hover:bg-gb-green/80 transition-colors"
+					class="w-full bg-gb-green text-gb-bg font-semibold py-3.5 rounded-xl text-sm hover:bg-gb-green/80 transition-colors"
 					style="min-height:48px">
 					{step === slides.length - 1 ? tr('onboarding.start') : tr('onboarding.next')}
 				</button>
@@ -273,7 +273,7 @@
 					</div>
 
 					<button onclick={continueFree}
-						class="w-full bg-gb-green text-black font-semibold py-3.5 rounded-xl text-sm hover:bg-gb-green/80 transition-colors">
+						class="w-full bg-gb-green text-gb-bg font-semibold py-3.5 rounded-xl text-sm hover:bg-gb-green/80 transition-colors">
 						{tr('onboarding.free_btn')}
 					</button>
 				</div>
@@ -322,7 +322,7 @@
 							class="w-full bg-gb-surface border border-gb-border rounded-xl px-3 py-3 text-sm" style="min-height:48px" />
 						<button onclick={cloudEmail}
 							disabled={loginLoading || !loginEmail.trim()}
-							class="w-full bg-gb-green text-black font-semibold py-3 rounded-xl text-sm hover:bg-gb-green/80 transition-colors disabled:opacity-50"
+							class="w-full bg-gb-green text-gb-bg font-semibold py-3 rounded-xl text-sm hover:bg-gb-green/80 transition-colors disabled:opacity-50"
 							style="min-height:48px">
 							{#if loginLoading}
 								<span class="inline-flex items-center gap-2">
