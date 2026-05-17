@@ -47,16 +47,18 @@
 		<h1 class="text-xl font-bold mt-2">{tr('dry.title')}</h1>
 	</div>
 
-	<!-- Mode Toggle -->
+	<!-- Mode Toggle (v1.3.81: 44px Touch-Target) -->
 	<div class="grid grid-cols-2 gap-2">
 		<button onclick={() => mode = 'drying'}
-			class="py-2.5 rounded-lg text-sm transition-colors
-				{mode === 'drying' ? 'bg-gb-green text-gb-bg font-semibold' : 'bg-gb-surface-2 text-gb-text-muted'}">
+			class="rounded-lg text-sm transition-colors
+				{mode === 'drying' ? 'bg-gb-green text-gb-bg font-semibold' : 'bg-gb-surface-2 text-gb-text-muted'}"
+			style="min-height:44px">
 			{tr('dry.drying')}
 		</button>
 		<button onclick={() => mode = 'curing'}
-			class="py-2.5 rounded-lg text-sm transition-colors
-				{mode === 'curing' ? 'bg-gb-green text-gb-bg font-semibold' : 'bg-gb-surface-2 text-gb-text-muted'}">
+			class="rounded-lg text-sm transition-colors
+				{mode === 'curing' ? 'bg-gb-green text-gb-bg font-semibold' : 'bg-gb-surface-2 text-gb-text-muted'}"
+			style="min-height:44px">
 			{tr('dry.curing')}
 		</button>
 	</div>

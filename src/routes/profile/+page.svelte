@@ -404,6 +404,7 @@
 	<div class="space-y-3">
 		<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">Daten</h2>
 		<div class="bg-gb-surface rounded-xl p-4 space-y-3">
+			<!-- Backup Buttons (v1.3.81: 40→44px Touch-Target) -->
 			<div class="flex gap-3">
 				<button onclick={async () => {
 						try {
@@ -414,10 +415,12 @@
 							toastStore.error('Backup fehlgeschlagen: ' + ((e as any)?.message ?? 'unbekannt'));
 						}
 					}}
-					class="flex-1 bg-gb-green/10 border border-gb-green/20 text-gb-green font-medium text-sm py-2.5 rounded-lg hover:bg-gb-green/20 transition-colors">
+					class="flex-1 bg-gb-green/10 border border-gb-green/20 text-gb-green font-medium text-sm rounded-lg hover:bg-gb-green/20 transition-colors flex items-center justify-center"
+					style="min-height:44px">
 					📦 Export
 				</button>
-				<label class="flex-1 bg-gb-info/10 border border-gb-info/20 text-gb-info font-medium text-sm py-2.5 rounded-lg hover:bg-gb-info/20 transition-colors text-center cursor-pointer">
+				<label class="flex-1 bg-gb-info/10 border border-gb-info/20 text-gb-info font-medium text-sm rounded-lg hover:bg-gb-info/20 transition-colors text-center cursor-pointer flex items-center justify-center"
+					style="min-height:44px">
 					📥 Import
 					<input type="file" accept=".json" class="hidden" onchange={async (e) => {
 						const input = e.target as HTMLInputElement;
@@ -478,8 +481,10 @@
 						<p class="text-sm font-medium">{tr('auth.logged_in_as')}</p>
 						<p class="text-xs text-gb-text-muted">{auth.user?.email ?? ''}</p>
 					</div>
+					<!-- v1.3.81: 28→44px Touch-Target -->
 					<button onclick={logout}
-						class="text-xs text-gb-danger bg-gb-danger/10 px-3 py-1.5 rounded-lg font-medium hover:bg-gb-danger/20">
+						class="text-xs text-gb-danger bg-gb-danger/10 px-3 rounded-lg font-medium hover:bg-gb-danger/20"
+						style="min-height:44px">
 						{tr('auth.logout')}
 					</button>
 				</div>
@@ -510,8 +515,10 @@
 									<p class="text-xs text-gb-text-muted truncate mt-0.5">{profile.bio}</p>
 								{/if}
 							</div>
+							<!-- v1.3.81: 28→44px Touch-Target -->
 							<button onclick={startEditProfile}
-								class="text-xs text-gb-info bg-gb-info/10 px-3 py-1.5 rounded-lg font-medium hover:bg-gb-info/20 shrink-0">
+								class="text-xs text-gb-info bg-gb-info/10 px-3 rounded-lg font-medium hover:bg-gb-info/20 shrink-0"
+								style="min-height:44px">
 								Bearbeiten
 							</button>
 						</div>
@@ -540,13 +547,16 @@
 							{#if profileError}
 								<p class="text-xs text-gb-danger">{profileError}</p>
 							{/if}
+							<!-- v1.3.81: 32→44px Touch-Target -->
 							<div class="flex gap-2">
 								<button onclick={saveProfile} disabled={savingProfile}
-									class="flex-1 bg-gb-green text-gb-bg font-medium text-sm py-2 rounded-lg disabled:opacity-50">
+									class="flex-1 bg-gb-green text-gb-bg font-medium text-sm rounded-lg disabled:opacity-50"
+									style="min-height:44px">
 									{savingProfile ? '...' : 'Speichern'}
 								</button>
 								<button onclick={cancelEditProfile} disabled={savingProfile}
-									class="flex-1 bg-gb-bg border border-gb-border text-gb-text font-medium text-sm py-2 rounded-lg">
+									class="flex-1 bg-gb-bg border border-gb-border text-gb-text font-medium text-sm rounded-lg"
+									style="min-height:44px">
 									Abbrechen
 								</button>
 							</div>
@@ -554,16 +564,18 @@
 					{/if}
 				</div>
 
-				<!-- Sync Buttons -->
+				<!-- Sync Buttons (v1.3.81: 40→44px Touch-Target) -->
 				<div class="flex gap-3">
 					<button onclick={pushSync}
 						disabled={sync.status === 'syncing'}
-						class="flex-1 bg-gb-green/10 border border-gb-green/20 text-gb-green font-medium text-sm py-2.5 rounded-lg hover:bg-gb-green/20 transition-colors disabled:opacity-50">
+						class="flex-1 bg-gb-green/10 border border-gb-green/20 text-gb-green font-medium text-sm rounded-lg hover:bg-gb-green/20 transition-colors disabled:opacity-50"
+						style="min-height:44px">
 						{sync.status === 'syncing' ? tr('sync.syncing') : '☁️↑ ' + tr('sync.push')}
 					</button>
 					<button onclick={pullSync}
 						disabled={sync.status === 'syncing'}
-						class="flex-1 bg-gb-info/10 border border-gb-info/20 text-gb-info font-medium text-sm py-2.5 rounded-lg hover:bg-gb-info/20 transition-colors disabled:opacity-50">
+						class="flex-1 bg-gb-info/10 border border-gb-info/20 text-gb-info font-medium text-sm rounded-lg hover:bg-gb-info/20 transition-colors disabled:opacity-50"
+						style="min-height:44px">
 						{sync.status === 'syncing' ? tr('sync.syncing') : '☁️↓ ' + tr('sync.pull')}
 					</button>
 				</div>
@@ -587,9 +599,10 @@
 			<div class="bg-gb-surface rounded-xl p-5 space-y-4">
 				<p class="text-sm text-center text-gb-text-muted">{tr('auth.login_for_sync')}</p>
 
-				<!-- Google Login -->
+				<!-- Google Login (v1.3.81: 40→44px Touch-Target) -->
 				<button onclick={loginGoogle} disabled={googleLoginBusy}
-					class="w-full flex items-center justify-center gap-2 bg-white text-gray-700 font-medium text-sm py-2.5 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-60">
+					class="w-full flex items-center justify-center gap-2 bg-white text-gray-700 font-medium text-sm rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-60"
+					style="min-height:44px">
 					{#if googleLoginBusy}
 						<span class="w-4 h-4 border-2 border-gray-700 border-t-transparent rounded-full animate-spin"></span>
 						<span>Öffne Login…</span>
@@ -605,13 +618,15 @@
 					<div class="flex-1 h-px bg-gb-border"></div>
 				</div>
 
-				<!-- Magic Link -->
+				<!-- Magic Link (v1.3.81: 40→44px Touch-Target für Input + Submit) -->
 				<div class="space-y-2">
 					<input type="email" bind:value={loginEmail} placeholder={tr('auth.email_placeholder')}
-						class="w-full bg-gb-bg border border-gb-border rounded-lg px-3 py-2.5 text-sm" />
+						class="w-full bg-gb-bg border border-gb-border rounded-lg px-3 text-sm"
+						style="min-height:44px" />
 					<button onclick={sendMagicLink}
 						disabled={loginLoading || !loginEmail.trim()}
-						class="w-full bg-gb-green text-gb-bg font-medium text-sm py-2.5 rounded-lg hover:bg-gb-green/80 transition-colors disabled:opacity-50">
+						class="w-full bg-gb-green text-gb-bg font-medium text-sm rounded-lg hover:bg-gb-green/80 transition-colors disabled:opacity-50"
+						style="min-height:44px">
 						{loginLoading ? '...' : tr('auth.send_link')}
 					</button>
 				</div>

@@ -50,10 +50,12 @@
 		<p class="block text-sm text-gb-text-muted mb-2">{tr('dli.phase')}</p>
 		<div class="grid grid-cols-2 gap-2">
 			{#each phases as p}
+				<!-- v1.3.81: 44px Touch-Target (WCAG-AA Sweep) -->
 				<button
 					onclick={() => { phase = p.key; hours = p.hours; }}
-					class="px-3 py-2 rounded-lg text-sm transition-colors
+					class="px-3 rounded-lg text-sm transition-colors
 						{phase === p.key ? 'bg-gb-green text-gb-bg font-semibold' : 'bg-gb-surface-2 text-gb-text-muted hover:text-gb-text'}"
+					style="min-height:44px"
 				>
 					{p.label}
 				</button>

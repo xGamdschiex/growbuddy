@@ -218,9 +218,10 @@
 			<h1 class="text-2xl font-bold mt-1">🌱 Community Feed</h1>
 			<p class="text-sm text-gb-text-muted mt-1">Public Check-ins der Community.</p>
 		</div>
+		<!-- v1.3.81: 36→44px Touch-Target -->
 		<button onclick={load} disabled={loading}
-			class="bg-gb-surface border border-gb-border rounded-lg px-3 py-2 text-xs disabled:opacity-50"
-			style="min-height:36px">
+			class="bg-gb-surface border border-gb-border rounded-lg px-3 text-xs disabled:opacity-50"
+			style="min-height:44px">
 			{#if loading}
 				<span class="inline-flex items-center gap-1.5">
 					<span class="w-3 h-3 border-2 border-gb-text-muted border-t-transparent rounded-full animate-spin"></span>
@@ -232,17 +233,17 @@
 		</button>
 	</div>
 
-	<!-- Filter-Tabs -->
+	<!-- Filter-Tabs (v1.3.81: 36→44px Touch-Target) -->
 	{#if auth.user}
 		<div class="flex bg-gb-surface rounded-lg p-1 gap-1">
 			<button onclick={() => filterMode = 'all'}
-				class="flex-1 py-2 rounded-md text-xs font-medium transition-colors {filterMode === 'all' ? 'bg-gb-bg text-gb-text' : 'text-gb-text-muted'}"
-				style="min-height:36px">
+				class="flex-1 rounded-md text-xs font-medium transition-colors {filterMode === 'all' ? 'bg-gb-bg text-gb-text' : 'text-gb-text-muted'}"
+				style="min-height:44px">
 				Alle
 			</button>
 			<button onclick={() => filterMode = 'following'}
-				class="flex-1 py-2 rounded-md text-xs font-medium transition-colors {filterMode === 'following' ? 'bg-gb-bg text-gb-text' : 'text-gb-text-muted'}"
-				style="min-height:36px">
+				class="flex-1 rounded-md text-xs font-medium transition-colors {filterMode === 'following' ? 'bg-gb-bg text-gb-text' : 'text-gb-text-muted'}"
+				style="min-height:44px">
 				Folge ich ({followingIds.size})
 			</button>
 		</div>
@@ -325,18 +326,20 @@
 						</div>
 					{/if}
 
+					<!-- v1.3.81: Like + Report 32→44px Touch-Target (häufige Interaktionen) -->
 					<footer class="flex items-center gap-2 pt-2 border-t border-gb-border/50">
 						<button onclick={() => handleLike(item.id)} disabled={likingNow.has(item.id)}
-							class="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs transition-colors disabled:opacity-50 {myLikes.has(item.id) ? 'text-gb-danger bg-gb-danger/10' : 'text-gb-text-muted hover:text-gb-text hover:bg-gb-bg'}"
-							style="min-height:32px">
+							class="flex items-center gap-1.5 px-3 rounded-lg text-xs transition-colors disabled:opacity-50 {myLikes.has(item.id) ? 'text-gb-danger bg-gb-danger/10' : 'text-gb-text-muted hover:text-gb-text hover:bg-gb-bg'}"
+							style="min-height:44px;min-width:44px">
 							<span>{myLikes.has(item.id) ? '❤️' : '🤍'}</span>
 							<span class="font-medium">{likeCounts[item.id] ?? 0}</span>
 						</button>
 						{#if auth.user && item.user_id !== auth.user.id}
 							<button onclick={() => openReport(item)}
-								class="ml-auto px-2 py-1 rounded-lg text-xs text-gb-text-muted hover:text-gb-danger hover:bg-gb-danger/10 transition-colors"
-								style="min-height:32px"
-								title="Melden">
+								class="ml-auto px-3 rounded-lg text-xs text-gb-text-muted hover:text-gb-danger hover:bg-gb-danger/10 transition-colors"
+								style="min-height:44px;min-width:44px"
+								title="Melden"
+								aria-label="Melden">
 								⚐
 							</button>
 						{/if}

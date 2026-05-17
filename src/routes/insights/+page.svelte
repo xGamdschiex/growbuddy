@@ -219,8 +219,9 @@
 					<p class="text-xs text-gb-text-muted mt-1 leading-relaxed">
 						Basierend auf deinen Grow-Daten: erwarteter Yield, optimale Dauer, Schwächen pro Strain.
 					</p>
-					<a href="/pro" class="inline-block mt-3 bg-gb-accent text-white font-semibold text-xs px-4 py-2 rounded-lg"
-						style="min-height:36px; display:inline-flex; align-items:center;">
+					<!-- v1.3.81: 36→44px Touch-Target -->
+					<a href="/pro" class="inline-block mt-3 bg-gb-accent text-white font-semibold text-xs px-4 rounded-lg"
+						style="min-height:44px; display:inline-flex; align-items:center;">
 						Pro freischalten
 					</a>
 				</div>
