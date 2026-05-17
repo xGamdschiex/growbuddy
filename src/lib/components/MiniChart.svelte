@@ -15,6 +15,14 @@
 		max: number;
 	}
 
+	/** v1.4.4: Phase-Bänder als Hintergrund-Tönung (dezent, basierend auf Tag-Range) */
+	interface PhaseBand {
+		startDay: number;
+		endDay: number;
+		label: string;
+		color?: string;  // optional, default subtle phase color
+	}
+
 	interface Props {
 		data: number[];
 		days?: number[]; // Tag seit Grow-Start je Datenpunkt (gleicher Index)
@@ -29,6 +37,8 @@
 		phaseTargets?: PhaseTarget[]; // Segmentierte Targets je Phase
 		phaseMarkers?: PhaseMarker[];
 		showMinMax?: boolean;
+		/** v1.4.4: Hintergrund-Phase-Bänder. Tag-basiert (nicht Index). */
+		phaseBands?: PhaseBand[];
 	}
 
 	let {
@@ -45,6 +55,7 @@
 		phaseTargets,
 		phaseMarkers = [],
 		showMinMax = false,
+		phaseBands,
 	}: Props = $props();
 
 	const PADDING = 12;
@@ -143,6 +154,46 @@
 		activeIndex = null;
 	}
 
+	/** Mappt einen Day-Wert auf X-Pixel basierend auf data's day-Range (nicht Index). */
+	function xMapFromDay(day: number): number {
+		if (!days || days.length === 0) return PADDING;
+		const minDay = days[0];
+		const maxDay = days[days.length - 1];
+		const rangeDays = Math.max(1, maxDay - minDay);
+		const w = width - PADDING * 2;
+		return PADDING + ((day - minDay) / rangeDays) * w;
+	}
+
+	/** Phase-Background-Rectangles (dezent getönt) — gerendert vor den Daten. */
+	let phaseBandRects = $derived.by(() => {
+		if (!phaseBands || phaseBands.length === 0 || !days || days.length < 2) return [];
+		const minDay = days[0];
+		const maxDay = days[days.length - 1];
+		const phaseColors: Record<string, string> = {
+			Seedling: 'rgba(132, 204, 22, 0.06)',  // gelb-grün
+			Veg: 'rgba(34, 197, 94, 0.07)',         // grün
+			Bloom: 'rgba(168, 85, 247, 0.07)',      // lila
+			Flush: 'rgba(14, 165, 233, 0.07)',      // blau
+			Dry: 'rgba(245, 158, 11, 0.06)',        // orange
+			Cure: 'rgba(239, 68, 68, 0.06)',        // rot
+			Clone: 'rgba(132, 204, 22, 0.05)',
+		};
+		return phaseBands
+			.filter(b => b.endDay >= minDay && b.startDay <= maxDay)
+			.map(b => {
+				const sx = xMapFromDay(Math.max(b.startDay, minDay));
+				const ex = xMapFromDay(Math.min(b.endDay, maxDay));
+				return {
+					x: sx,
+					width: Math.max(0, ex - sx),
+					fill: b.color ?? phaseColors[b.label] ?? 'rgba(255,255,255,0.04)',
+					label: b.label,
+					labelX: sx + 4,
+				};
+			})
+			.filter(r => r.width > 0);
+	});
+
 	let xLabels = $derived.by(() => {
 		if (pts.length < 2) return [];
 		const first = pts[0];
@@ -179,6 +230,14 @@
 			onpointerleave={onPointerLeave}
 			onpointercancel={onPointerLeave}
 			role="img" aria-label={label}>
+			<!-- v1.4.4: Phase-Bänder als Background (vor allem anderen) -->
+			{#each phaseBandRects as band}
+				<rect x={band.x} y={PADDING} width={band.width} height={height - PADDING - PADDING_BOTTOM}
+					fill={band.fill} />
+				<text x={band.labelX} y={PADDING + 8} font-size="8" fill="currentColor"
+					class="text-gb-text-muted" opacity="0.5">{band.label}</text>
+			{/each}
+
 			{#if targetArea}
 				<rect x="0" y={targetArea.y} width={width} height={targetArea.height}
 					fill={color} opacity="0.1" />

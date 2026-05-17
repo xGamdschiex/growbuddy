@@ -23,15 +23,25 @@
 		phaseTargets?: Array<{ atIndex: number; min: number; max: number }>;
 	}
 
+	/** v1.4.4: Phase-Bänder als Hintergrund-Tönung (Tag-basiert). */
+	export interface PhaseBand {
+		startDay: number;
+		endDay: number;
+		label: string;
+		color?: string;
+	}
+
 	interface Props {
 		series: ChartSeries[];
 		/** Welche Series-Keys aktuell sichtbar sind. */
 		enabledKeys: string[];
 		height?: number;
 		width?: number;
+		/** v1.4.4: Phase-Bänder als Hintergrund-Tönung. */
+		phaseBands?: PhaseBand[];
 	}
 
-	let { series, enabledKeys, height = 200, width = 320 }: Props = $props();
+	let { series, enabledKeys, height = 200, width = 320, phaseBands }: Props = $props();
 
 	const PADDING = 12;
 	const PADDING_BOTTOM = 22;
@@ -168,6 +178,29 @@
 			role="img"
 			aria-label="Multi-Series-Verlauf"
 		>
+			<!-- v1.4.4: Phase-Background-Bänder (dezent) -->
+			{#if phaseBands && phaseBands.length > 0}
+				{@const phaseColors = {
+					Seedling: 'rgba(132, 204, 22, 0.06)',
+					Veg: 'rgba(34, 197, 94, 0.07)',
+					Bloom: 'rgba(168, 85, 247, 0.07)',
+					Flush: 'rgba(14, 165, 233, 0.07)',
+					Dry: 'rgba(245, 158, 11, 0.06)',
+					Cure: 'rgba(239, 68, 68, 0.06)',
+					Clone: 'rgba(132, 204, 22, 0.05)',
+				} as Record<string, string>}
+				{#each phaseBands.filter(b => b.endDay >= xRange.min && b.startDay <= xRange.max) as band}
+					{@const sx = xMap(Math.max(band.startDay, xRange.min))}
+					{@const ex = xMap(Math.min(band.endDay, xRange.max))}
+					{#if ex > sx}
+						<rect x={sx} y={PADDING} width={ex - sx} height={height - PADDING - PADDING_BOTTOM}
+							fill={band.color ?? phaseColors[band.label] ?? 'rgba(255,255,255,0.04)'} />
+						<text x={sx + 4} y={PADDING + 9} font-size="9" fill="currentColor"
+							class="text-gb-text-muted" opacity="0.5">{band.label}</text>
+					{/if}
+				{/each}
+			{/if}
+
 			<!-- Grid (horizontal Lines bei 25/50/75%) -->
 			{#each [0.25, 0.5, 0.75] as r}
 				<line x1={PADDING} y1={PADDING + (height - PADDING - PADDING_BOTTOM) * r}

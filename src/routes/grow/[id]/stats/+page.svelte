@@ -9,7 +9,7 @@
 	import { growStore } from '$lib/stores/grow';
 	import { isPro } from '$lib/stores/pro';
 	import type { CheckIn } from '$lib/stores/grow';
-	import { phaseDaysSummary } from '$lib/utils/phase';
+	import { phaseDaysSummary, phaseBoundaries, totalGrowDays } from '$lib/utils/phase';
 	import {
 		metricStats,
 		metricPerPhase,
@@ -233,9 +233,211 @@
 			: 0;
 		return calcUsageForecast(nutrientUsage, pos.phase, pos.daysIn, lastDay);
 	});
+
+	// v1.4.4: Header-Übersicht
+	let currentPos = $derived(grow ? currentPhasePosition(grow, growState?.checkins ?? []) : null);
+	let growTotalDays = $derived(grow ? totalGrowDays(grow, growState?.checkins ?? []) : 0);
+
+	// v1.4.4: Phase-Bänder für Charts — Tag-basiert
+	let phaseBandsForCharts = $derived.by(() => {
+		if (!grow) return [];
+		const bounds = phaseBoundaries(grow, growState?.checkins ?? []);
+		if (bounds.length === 0) return [];
+		const startMs = new Date(grow.started_at).getTime();
+		const todayMs = Date.now();
+		const day_ms = 86400000;
+		return bounds.map((b, i) => {
+			const startDay = Math.max(1, Math.floor((b.start_ms - startMs) / day_ms) + 1);
+			const nextStart = i + 1 < bounds.length ? bounds[i + 1].start_ms : todayMs;
+			const endDay = Math.max(startDay, Math.floor((nextStart - startMs) / day_ms) + 1);
+			return { startDay, endDay, label: b.phase };
+		});
+	});
+
+	// v1.4.4: Chart-Zeit-Navigation — Range + Offset
+	type RangeMode = 'all' | '14d' | '30d' | 'phase';
+	let chartRange = $state<RangeMode>('all');
+	let chartOffset = $state(0);  // Tage nach links (älter)
+
+	/** Max-Day in irgendeiner Series (= rechte Grenze unverschoben) */
+	let maxDayOverall = $derived.by(() => {
+		let m = 0;
+		for (const s of [tempSeries, rhSeries, vpdSeries, ecSeries, phSeries, waterSeries, nutrientSeries]) {
+			for (const d of s.days) if (d > m) m = d;
+		}
+		return Math.max(m, growTotalDays);
+	});
+
+	/** Sichtbares Tag-Fenster basierend auf Range + Offset */
+	let chartWindow = $derived.by(() => {
+		if (chartRange === 'all' || maxDayOverall < 2) {
+			return { fromDay: 1, toDay: Math.max(maxDayOverall, 1) };
+		}
+		if (chartRange === 'phase') {
+			const currentBand = phaseBandsForCharts[phaseBandsForCharts.length - 1];
+			if (!currentBand) return { fromDay: 1, toDay: maxDayOverall };
+			// Offset bewegt sich durch die Phase-Bänder zurück
+			const idx = Math.max(0, phaseBandsForCharts.length - 1 - chartOffset);
+			const band = phaseBandsForCharts[idx];
+			return { fromDay: band.startDay, toDay: band.endDay };
+		}
+		const win = chartRange === '14d' ? 14 : 30;
+		const toDay = Math.max(win, maxDayOverall - chartOffset);
+		const fromDay = Math.max(1, toDay - win + 1);
+		return { fromDay, toDay };
+	});
+
+	/** Label für die aktuelle Window-Range. */
+	let chartWindowLabel = $derived.by(() => {
+		const { fromDay, toDay } = chartWindow;
+		if (chartRange === 'all') return `Tag 1 – ${toDay}`;
+		if (chartRange === 'phase') {
+			const idx = Math.max(0, phaseBandsForCharts.length - 1 - chartOffset);
+			const band = phaseBandsForCharts[idx];
+			return band ? `${band.label} · Tag ${fromDay}–${toDay}` : `Tag ${fromDay}–${toDay}`;
+		}
+		return `Tag ${fromDay}–${toDay}`;
+	});
+
+	/** Slice einer Series aufs Fenster. */
+	function sliceSeries(s: { values: number[]; days: number[] }, win: { fromDay: number; toDay: number }) {
+		const out: { values: number[]; days: number[] } = { values: [], days: [] };
+		for (let i = 0; i < s.days.length; i++) {
+			if (s.days[i] >= win.fromDay && s.days[i] <= win.toDay) {
+				out.values.push(s.values[i]);
+				out.days.push(s.days[i]);
+			}
+		}
+		return out;
+	}
+
+	/** Slicte Series für MultiSeriesChart basierend auf Window. */
+	let viewSeries = $derived.by<ChartSeries[]>(() => {
+		const win = chartWindow;
+		return allSeries.map((s) => {
+			const sliced = sliceSeries({ values: s.values, days: s.days }, win);
+			return {
+				...s,
+				values: sliced.values,
+				days: sliced.days,
+				// phaseTargets-Mapping wäre komplex → bei Slicing weglassen.
+				// (Wird nur im 'all'-Mode geliefert — phaseBands ersetzen das visuell)
+				phaseTargets: chartRange === 'all' ? s.phaseTargets : undefined,
+			};
+		});
+	});
+
+	function setRange(r: RangeMode) {
+		chartRange = r;
+		chartOffset = 0;
+	}
+	function panOlder() {
+		if (chartRange === 'phase') {
+			chartOffset = Math.min(phaseBandsForCharts.length - 1, chartOffset + 1);
+			return;
+		}
+		const win = chartRange === '14d' ? 14 : chartRange === '30d' ? 30 : 0;
+		if (win > 0) chartOffset = Math.min(maxDayOverall - win, chartOffset + Math.floor(win / 2));
+	}
+	function panNewer() {
+		if (chartRange === 'phase') {
+			chartOffset = Math.max(0, chartOffset - 1);
+			return;
+		}
+		const win = chartRange === '14d' ? 14 : chartRange === '30d' ? 30 : 0;
+		if (win > 0) chartOffset = Math.max(0, chartOffset - Math.floor(win / 2));
+	}
+	let canPanOlder = $derived.by(() => {
+		if (chartRange === 'all') return false;
+		if (chartRange === 'phase') return chartOffset < phaseBandsForCharts.length - 1;
+		const win = chartRange === '14d' ? 14 : 30;
+		return maxDayOverall - chartOffset - win >= 1;
+	});
+	let canPanNewer = $derived(chartRange !== 'all' && chartOffset > 0);
+
+	// v1.4.4: Pro-Phase Target-Status-Helper
+	function targetStatus(phase: string, key: 'temp' | 'rh' | 'vpd' | 'ec' | 'ph', value: number | null): 'optimal' | 'warn' | 'crit' | null {
+		if (value === null) return null;
+		const t = targetFor(key, phase);
+		if (!t) return null;
+		if (value >= t.min && value <= t.max) return 'optimal';
+		// Warn-Zone: 15% außerhalb
+		const tolerance = (t.max - t.min) * 0.15;
+		if (value >= t.min - tolerance && value <= t.max + tolerance) return 'warn';
+		return 'crit';
+	}
+	function statusBg(status: 'optimal' | 'warn' | 'crit' | null): string {
+		if (status === 'optimal') return 'text-gb-green';
+		if (status === 'warn') return 'text-gb-warning';
+		if (status === 'crit') return 'text-gb-danger';
+		return 'text-gb-text-muted';
+	}
+
+	// v1.4.4: Foto-Timeline — chronologisch alle Check-ins mit Fotos
+	let photoCheckins = $derived(
+		chronCheckins.filter((c: CheckIn) =>
+			(c.photos_data && c.photos_data.length > 0) ||
+			(c.photo_urls && c.photo_urls.length > 0) ||
+			c.photo_data || c.photo_url,
+		)
+	);
+	function firstPhotoOf(c: CheckIn): string | null {
+		if (c.photos_data?.[0]) return c.photos_data[0];
+		if (c.photo_urls?.[0]) return c.photo_urls[0];
+		return c.photo_data ?? c.photo_url ?? null;
+	}
+
+	// v1.4.4: Trainings-Events — chronologisch
+	let trainingEvents = $derived(
+		chronCheckins
+			.filter((c: CheckIn) => c.training && c.training.trim())
+			.map((c: CheckIn) => ({ day: dayOf(c), labels: c.training!.split(',').map(s => s.trim()).filter(Boolean), phase: c.phase, week: c.week }))
+	);
+
+	// v1.4.4: Anomalien-Detection — Werte deutlich außerhalb Targets
+	let anomalies = $derived.by(() => {
+		const out: { day: number; phase: string; metric: string; value: string; severity: 'warn' | 'crit' }[] = [];
+		for (const c of chronCheckins) {
+			const d = dayOf(c);
+			const checks: Array<{ key: 'temp' | 'rh' | 'vpd' | 'ec' | 'ph'; val: number | null; unit: string }> = [
+				{ key: 'temp', val: c.temp, unit: '°C' },
+				{ key: 'rh', val: c.rh, unit: '%' },
+				{ key: 'vpd', val: c.vpd, unit: ' kPa' },
+				{ key: 'ec', val: c.ec_measured, unit: '' },
+				{ key: 'ph', val: c.ph_measured, unit: '' },
+			];
+			for (const ch of checks) {
+				const st = targetStatus(c.phase, ch.key, ch.val);
+				if (st === 'crit') {
+					out.push({ day: d, phase: c.phase, metric: ch.key.toUpperCase(), value: `${ch.val!.toFixed(ch.key === 'temp' || ch.key === 'rh' ? 0 : 2)}${ch.unit}`, severity: 'crit' });
+				}
+			}
+		}
+		// Top 5 nach Tag absteigend
+		return out.sort((a, b) => b.day - a.day).slice(0, 5);
+	});
+
+	// v1.4.4: Best-Day — Check-in mit meisten Werten im optimal-Bereich
+	let bestDay = $derived.by(() => {
+		let best: { day: number; ok: number; total: number; phase: string } | null = null;
+		for (const c of chronCheckins) {
+			let ok = 0, total = 0;
+			for (const ch of [{ k: 'temp' as const, v: c.temp }, { k: 'rh' as const, v: c.rh }, { k: 'vpd' as const, v: c.vpd }, { k: 'ec' as const, v: c.ec_measured }, { k: 'ph' as const, v: c.ph_measured }]) {
+				if (ch.v === null) continue;
+				const st = targetStatus(c.phase, ch.k, ch.v);
+				if (st === null) continue;
+				total++;
+				if (st === 'optimal') ok++;
+			}
+			if (total >= 3 && (best === null || ok > best.ok)) {
+				best = { day: dayOf(c), ok, total, phase: c.phase };
+			}
+		}
+		return best;
+	});
 </script>
 
-<svelte:head><title>Statistik · {grow?.name ?? 'Grow'}</title></svelte:head>
+<svelte:head><title>Analyse · {grow?.name ?? 'Grow'}</title></svelte:head>
 
 <div class="px-4 pt-6 max-w-lg mx-auto pb-24 space-y-5">
 	{#if !grow}
@@ -246,7 +448,7 @@
 	{:else}
 		<div>
 			<a href="/grow/{grow.id}" class="text-gb-text-muted text-sm hover:text-gb-text">&larr; {grow.name}</a>
-			<h1 class="text-2xl font-bold mt-1">📊 Statistik</h1>
+			<h1 class="text-2xl font-bold mt-1">📈 Analyse</h1>
 			<p class="text-xs text-gb-text-muted mt-1">{chronCheckins.length} Check-in{chronCheckins.length !== 1 ? 's' : ''} ausgewertet</p>
 		</div>
 
@@ -256,10 +458,44 @@
 				<p class="text-sm text-gb-text-muted">Noch keine Daten — leg ein paar Check-ins an, dann erscheint hier deine Auswertung.</p>
 			</div>
 		{:else}
-			<!-- Health-Card (Komponente, geteilt mit grow/[id]) -->
-			{#if consistency}
-				<HealthCard {consistency} {vpdStress} />
-			{/if}
+			<!-- v1.4.4: Übersichts-Header — Tag/Phase/Score/Yield kompakt -->
+			<div class="bg-gradient-to-br from-gb-surface to-gb-surface-2 rounded-xl p-4 space-y-3 border border-gb-border/50">
+				<div class="flex items-baseline justify-between gap-3">
+					<div class="min-w-0 flex-1">
+						<p class="text-[10px] text-gb-text-muted uppercase tracking-wide">Aktuell</p>
+						<p class="text-lg font-bold truncate">
+							{currentPos?.phase ?? '—'}
+							<span class="text-sm font-normal text-gb-text-muted">W{currentPos?.week}T{currentPos?.day}</span>
+						</p>
+					</div>
+					<div class="text-right shrink-0">
+						<p class="text-[10px] text-gb-text-muted uppercase tracking-wide">Grow-Tag</p>
+						<p class="text-lg font-bold tabular-nums">{growTotalDays}</p>
+					</div>
+				</div>
+				<div class="grid grid-cols-3 gap-2 pt-2 border-t border-gb-border/50">
+					<div>
+						<p class="text-[10px] text-gb-text-muted uppercase tracking-wide">Konsistenz</p>
+						<p class="text-sm font-bold tabular-nums">{consistency?.percent ?? '—'}<span class="text-[10px] font-normal text-gb-text-muted">%</span></p>
+					</div>
+					<div>
+						<p class="text-[10px] text-gb-text-muted uppercase tracking-wide">VPD-OK</p>
+						<p class="text-sm font-bold tabular-nums">{vpdStress.okPercent ?? '—'}<span class="text-[10px] font-normal text-gb-text-muted">%</span></p>
+					</div>
+					<div>
+						<p class="text-[10px] text-gb-text-muted uppercase tracking-wide">{grow.status === 'harvested' ? 'Yield' : 'Score'}</p>
+						<p class="text-sm font-bold tabular-nums">
+							{#if grow.status === 'harvested' && grow.yield_g}
+								{grow.yield_g.toFixed(0)}<span class="text-[10px] font-normal text-gb-text-muted">g</span>
+							{:else if grow.grow_score !== null}
+								{grow.grow_score}<span class="text-[10px] font-normal text-gb-text-muted">/100</span>
+							{:else}
+								—
+							{/if}
+						</p>
+					</div>
+				</div>
+			</div>
 
 			<!-- Klima + Wasser-Werte als Grid -->
 			<div class="space-y-2">
@@ -460,7 +696,7 @@
 				{/if}
 			</div>
 
-			<!-- v1.4.2: Pro Phase — Ø Werte + Tage zusammengeführt -->
+			<!-- v1.4.4: Pro Phase — Tabelle mit Target-Coloring -->
 			{#if allPhases.length >= 1 && (allPhases.length >= 2 || phaseDays.length > 0)}
 				<div class="space-y-2">
 					<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">Pro Phase</h2>
@@ -480,28 +716,63 @@
 							<tbody>
 								{#each allPhases as phase}
 									{@const days = phaseDays.find(p => p.phase === phase)?.days}
+									{@const tempAvg = tempPerPhase[phase]?.avg ?? null}
+									{@const rhAvg = rhPerPhase[phase]?.avg ?? null}
+									{@const vpdAvg = vpdPerPhase[phase]?.avg ?? null}
+									{@const ecAvg = ecPerPhase[phase]?.avg ?? null}
+									{@const phAvg = phPerPhase[phase]?.avg ?? null}
 									<tr class="border-t border-gb-border/50">
 										<td class="py-1.5 font-medium">{phase}</td>
 										<td class="text-right text-gb-text-muted tabular-nums">{days !== undefined ? `${days}d` : '—'}</td>
-										<td class="text-right text-gb-text-muted tabular-nums">{tempPerPhase[phase]?.avg !== null && tempPerPhase[phase] !== undefined ? `${tempPerPhase[phase].avg!.toFixed(1)}°` : '—'}</td>
-										<td class="text-right text-gb-text-muted tabular-nums">{rhPerPhase[phase]?.avg !== null && rhPerPhase[phase] !== undefined ? `${rhPerPhase[phase].avg!.toFixed(0)}%` : '—'}</td>
-										<td class="text-right text-gb-text-muted tabular-nums">{vpdPerPhase[phase]?.avg !== null && vpdPerPhase[phase] !== undefined ? vpdPerPhase[phase].avg!.toFixed(2) : '—'}</td>
-										<td class="text-right text-gb-text-muted tabular-nums">{ecPerPhase[phase]?.avg !== null && ecPerPhase[phase] !== undefined ? ecPerPhase[phase].avg!.toFixed(2) : '—'}</td>
-										<td class="text-right text-gb-text-muted tabular-nums">{phPerPhase[phase]?.avg !== null && phPerPhase[phase] !== undefined ? phPerPhase[phase].avg!.toFixed(1) : '—'}</td>
+										<td class="text-right tabular-nums font-medium {statusBg(targetStatus(phase, 'temp', tempAvg))}">{tempAvg !== null ? `${tempAvg.toFixed(1)}°` : '—'}</td>
+										<td class="text-right tabular-nums font-medium {statusBg(targetStatus(phase, 'rh', rhAvg))}">{rhAvg !== null ? `${rhAvg.toFixed(0)}%` : '—'}</td>
+										<td class="text-right tabular-nums font-medium {statusBg(targetStatus(phase, 'vpd', vpdAvg))}">{vpdAvg !== null ? vpdAvg.toFixed(2) : '—'}</td>
+										<td class="text-right tabular-nums font-medium {statusBg(targetStatus(phase, 'ec', ecAvg))}">{ecAvg !== null ? ecAvg.toFixed(2) : '—'}</td>
+										<td class="text-right tabular-nums font-medium {statusBg(targetStatus(phase, 'ph', phAvg))}">{phAvg !== null ? phAvg.toFixed(1) : '—'}</td>
 									</tr>
 								{/each}
 							</tbody>
 						</table>
+						<div class="flex items-center gap-3 mt-2 pt-2 border-t border-gb-border/50 text-[10px] text-gb-text-muted">
+							<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-gb-green"></span>optimal</span>
+							<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-gb-warning"></span>grenzwertig</span>
+							<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-gb-danger"></span>kritisch</span>
+						</div>
 					</div>
 				</div>
 			{/if}
 
-			<!-- Multi-Series Combined-Chart (v1.3.58): alle 7 Metriken überlagert, Pills zum Toggle -->
+			<!-- v1.4.4: Verlauf — mit Range-Toolbar (14d/30d/Phase/Gesamt + Pan) + Phase-Bänder -->
 			{#if plottableSeries.length >= 2}
 				<div class="space-y-2">
-					<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">Alle Werte überlagert</h2>
+					<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">Verlauf</h2>
+
+					<!-- Range-Toolbar -->
+					<div class="bg-gb-surface rounded-xl p-2 space-y-2">
+						<div class="flex items-center gap-1">
+							<div class="flex-1 grid grid-cols-4 gap-1">
+								{#each [{ k: '14d' as RangeMode, l: '14d' }, { k: '30d' as RangeMode, l: '30d' }, { k: 'phase' as RangeMode, l: 'Phase' }, { k: 'all' as RangeMode, l: 'Gesamt' }] as opt}
+									<button type="button" onclick={() => setRange(opt.k)}
+										class="text-[11px] font-medium rounded-lg transition-colors
+											{chartRange === opt.k ? 'bg-gb-green text-gb-bg' : 'text-gb-text-muted hover:text-gb-text'}"
+										style="min-height:32px">
+										{opt.l}
+									</button>
+								{/each}
+							</div>
+							<div class="flex gap-0.5 ml-1">
+								<button type="button" onclick={panOlder} disabled={!canPanOlder} aria-label="Älter"
+									class="w-9 h-8 flex items-center justify-center rounded-lg text-gb-text-muted disabled:opacity-30 hover:text-gb-text hover:bg-gb-bg/50">←</button>
+								<button type="button" onclick={panNewer} disabled={!canPanNewer} aria-label="Neuer"
+									class="w-9 h-8 flex items-center justify-center rounded-lg text-gb-text-muted disabled:opacity-30 hover:text-gb-text hover:bg-gb-bg/50">→</button>
+							</div>
+						</div>
+						<p class="text-[10px] text-gb-text-muted text-center">{chartWindowLabel}</p>
+					</div>
+
+					<!-- Metrik-Pills -->
 					<div class="bg-gb-surface rounded-xl p-3">
-						<div class="flex flex-wrap gap-1.5 mb-3">
+						<div class="flex flex-wrap gap-1.5">
 							{#each plottableSeries as s}
 								{@const active = enabledKeys.includes(s.key)}
 								<button type="button" onclick={() => toggleKey(s.key)}
@@ -513,57 +784,95 @@
 							{/each}
 						</div>
 					</div>
-					<MultiSeriesChart series={allSeries} {enabledKeys} />
+
+					<MultiSeriesChart series={viewSeries} {enabledKeys} phaseBands={phaseBandsForCharts} />
 					<p class="text-[10px] text-gb-text-muted px-2">
-						Werte sind pro Metrik einzeln skaliert (jede Linie nutzt ihren eigenen Min/Max-Range).
-						So bleiben Verläufe vergleichbar, auch bei sehr unterschiedlichen Größen (Temp vs. Wasser).
+						Tippe in den Chart für Werte am Tag. Werte sind pro Metrik einzeln skaliert (Y-Achse pro Linie). Phasen sind als getönte Bänder im Hintergrund.
 					</p>
 				</div>
 			{/if}
 
-			<!-- Verlaufsgrafiken (v1.3.57: Temp/RH/Wasser/Dünger — VPD/EC/pH sind auf Übersicht) -->
-			{#if tempSeries.values.length >= 2 || rhSeries.values.length >= 2 || waterSeries.values.length >= 2 || nutrientSeries.values.length >= 2}
+			<!-- v1.4.4: Pflanzen-Pflege — Foto-Timeline + Trainings-Events -->
+			{#if photoCheckins.length > 0 || trainingEvents.length > 0}
 				<div class="space-y-2">
-					<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide flex items-center gap-2">
-						Verlaufsgrafiken
-						{#if !userIsPro}
-							<span class="text-[10px] bg-gb-accent/20 text-gb-accent px-2 py-0.5 rounded-full font-normal">Pro</span>
-						{/if}
-					</h2>
-					{#if userIsPro}
-						{#if tempSeries.values.length >= 2}
-							<MiniChart data={tempSeries.values} days={tempSeries.days} phaseMarkers={tempMarkers}
-								phaseTargets={tempPhaseTargets} showMinMax
-								color={CHART_COLORS.temp} label="Temperatur" unit="°C" />
-						{/if}
-						{#if rhSeries.values.length >= 2}
-							<MiniChart data={rhSeries.values} days={rhSeries.days} phaseMarkers={rhMarkers}
-								phaseTargets={rhPhaseTargets} showMinMax
-								color={CHART_COLORS.rh} label="Luftfeuchte" unit="%" />
-						{/if}
-						{#if waterSeries.values.length >= 2}
-							<MiniChart data={waterSeries.values} days={waterSeries.days} phaseMarkers={waterMarkers}
-								showMinMax color={CHART_COLORS.water} label="Wasser kumulativ" unit=" L" />
-						{/if}
-						{#if nutrientSeries.values.length >= 2}
-							<MiniChart data={nutrientSeries.values} days={nutrientSeries.days} phaseMarkers={nutrientMarkers}
-								showMinMax color={CHART_COLORS.nutrient} label="Dünger" unit=" mL" />
-						{/if}
-					{:else}
-						<div class="bg-gradient-to-br from-gb-accent/15 to-gb-accent/5 border border-gb-accent/30 rounded-xl p-4">
-							<div class="flex items-start gap-3">
-								<div class="text-2xl">📊</div>
-								<div class="flex-1">
-									<p class="font-semibold text-sm">4 Charts mit Pro</p>
-									<p class="text-xs text-gb-text-muted mt-1 leading-relaxed">
-										Temperatur, Luftfeuchte, Wasser-Verbrauch und Dünger über die Zeit — alle mit Phasen-Targets, Tap-Tooltips und Min/Max-Markern.
-									</p>
-									<a href="/pro" class="inline-block mt-3 bg-gb-accent text-white font-semibold text-xs px-4 py-2 rounded-lg"
-										style="min-height:36px; display:inline-flex; align-items:center;">
-										Pro freischalten
-									</a>
-								</div>
+					<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">Pflanzen-Pflege</h2>
+
+					{#if photoCheckins.length > 0}
+						<div class="bg-gb-surface rounded-xl p-3 space-y-2">
+							<div class="flex items-baseline justify-between gap-2">
+								<p class="text-[10px] text-gb-text-muted uppercase tracking-wide">📷 Foto-Verlauf</p>
+								<a href="/grow/{grow.id}" class="text-[10px] text-gb-text-muted hover:text-gb-text">{photoCheckins.length} Fotos · alle ansehen →</a>
 							</div>
+							<div class="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+								{#each photoCheckins as ci}
+									{@const src = firstPhotoOf(ci)}
+									{#if src}
+										<div class="shrink-0">
+											<div class="w-20 h-20 rounded-lg overflow-hidden bg-gb-bg ring-1 ring-gb-border/40">
+												<img {src} alt="Tag {dayOf(ci)}" loading="lazy" class="w-full h-full object-cover" />
+											</div>
+											<p class="text-[10px] text-gb-text-muted text-center mt-1 tabular-nums">T{dayOf(ci)} · {ci.phase}</p>
+										</div>
+									{/if}
+								{/each}
+							</div>
+						</div>
+					{/if}
+
+					{#if trainingEvents.length > 0}
+						<div class="bg-gb-surface rounded-xl p-3 space-y-2">
+							<p class="text-[10px] text-gb-text-muted uppercase tracking-wide">✂️ Trainings-Events</p>
+							<div class="space-y-1.5">
+								{#each trainingEvents as ev}
+									<div class="flex items-baseline gap-2">
+										<span class="text-[10px] text-gb-text-muted tabular-nums w-10 shrink-0">T{ev.day}</span>
+										<div class="flex flex-wrap gap-1 flex-1">
+											{#each ev.labels as label}
+												<span class="text-[11px] bg-gb-accent/15 text-gb-accent-light px-2 py-0.5 rounded-full font-medium">{label}</span>
+											{/each}
+										</div>
+										<span class="text-[10px] text-gb-text-muted">{ev.phase} W{ev.week}</span>
+									</div>
+								{/each}
+							</div>
+						</div>
+					{/if}
+				</div>
+			{/if}
+
+			<!-- v1.4.4: Highlights — Best-Day + Anomalien -->
+			{#if bestDay || anomalies.length > 0}
+				<div class="space-y-2">
+					<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">Highlights</h2>
+
+					{#if bestDay}
+						<div class="bg-gradient-to-br from-gb-green/10 to-gb-green/5 border border-gb-green/20 rounded-xl p-3">
+							<div class="flex items-baseline justify-between gap-2">
+								<p class="text-sm font-semibold text-gb-green">🏆 Bester Tag</p>
+								<span class="text-[10px] text-gb-text-muted tabular-nums">Tag {bestDay.day} · {bestDay.phase}</span>
+							</div>
+							<p class="text-[11px] text-gb-text-muted mt-1">
+								{bestDay.ok} von {bestDay.total} Messwerten im optimalen Bereich der Phase-Targets.
+							</p>
+						</div>
+					{/if}
+
+					{#if anomalies.length > 0}
+						<div class="bg-gb-surface rounded-xl p-3 space-y-2">
+							<p class="text-[10px] text-gb-text-muted uppercase tracking-wide">⚠️ Anomalien (Top 5)</p>
+							<div class="space-y-1">
+								{#each anomalies as a}
+									<div class="flex items-baseline gap-2 text-xs">
+										<span class="text-gb-text-muted tabular-nums w-10 shrink-0">T{a.day}</span>
+										<span class="text-gb-text-muted w-12 shrink-0">{a.phase}</span>
+										<span class="font-medium flex-1">{a.metric}</span>
+										<span class="text-gb-danger font-semibold tabular-nums">{a.value}</span>
+									</div>
+								{/each}
+							</div>
+							<p class="text-[10px] text-gb-text-muted leading-relaxed opacity-80 pt-1 border-t border-gb-border/40">
+								Werte deutlich außerhalb des Soll-Bereichs für die jeweilige Phase. Zur Detail-Ansicht im Verlauf-Chart Range auf „Gesamt" → entsprechenden Tag tippen.
+							</p>
 						</div>
 					{/if}
 				</div>
