@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { calcNutrientUsage, productSeries, productSeriesCumulative } from './nutrient-usage';
+import { calcNutrientUsage, productSeries, productSeriesCumulative, calcUsageForecast } from './nutrient-usage';
 import type { CheckIn, Grow } from '$lib/stores/grow';
 
 const baseGrow: Grow = {
@@ -272,5 +272,79 @@ describe('productSeries / productSeriesCumulative', () => {
 		const series = productSeries(r.history, 'fade');
 		expect(series.days).toEqual([]);
 		expect(series.values).toEqual([]);
+	});
+
+	it('avg_per_application = total / n_checkins', () => {
+		const r = calcNutrientUsage(baseGrow, checkins);
+		const grow = r.byProduct.find(p => p.key === 'grow')!;
+		expect(grow.avg_per_application).toBeCloseTo(grow.total / grow.n_checkins, 1);
+	});
+});
+
+describe('calcUsageForecast', () => {
+	it('null wenn keine History', () => {
+		const r = calcNutrientUsage(baseGrow, []);
+		expect(calcUsageForecast(r, 'Veg', 1, 1)).toBeNull();
+	});
+
+	it('null wenn unbekannte Phase', () => {
+		const checkins: CheckIn[] = [
+			ci({ day: 1, phase: 'Veg', week: 1, watered: true, nutrients_given: true, water_ml: 5000 }),
+		];
+		const r = calcNutrientUsage(baseGrow, checkins);
+		expect(calcUsageForecast(r, 'NotAPhase', 1, 1)).toBeNull();
+	});
+
+	it('schätzt verbleibenden Verbrauch in Bloom mit Athena (Schema 9W = 63d)', () => {
+		// 4× Veg-Wassergaben in 14d + 2× Bloom-Wassergaben in 7d
+		const checkins: CheckIn[] = [
+			ci({ day: 1, phase: 'Veg', week: 1, watered: true, nutrients_given: true, water_ml: 5000 }),
+			ci({ day: 4, phase: 'Veg', week: 1, watered: true, nutrients_given: true, water_ml: 5000 }),
+			ci({ day: 8, phase: 'Veg', week: 2, watered: true, nutrients_given: true, water_ml: 5000 }),
+			ci({ day: 11, phase: 'Veg', week: 2, watered: true, nutrients_given: true, water_ml: 5000 }),
+			ci({ day: 30, phase: 'Bloom', week: 1, watered: true, nutrients_given: true, water_ml: 10000 }),
+			ci({ day: 34, phase: 'Bloom', week: 1, watered: true, nutrients_given: true, water_ml: 10000 }),
+		];
+		const r = calcNutrientUsage(baseGrow, checkins);
+		// User ist in Bloom Tag 7 von 63 → 56 Tage in Bloom + 0 Folge-Phasen = 56 Tage remaining
+		const fc = calcUsageForecast(r, 'Bloom', 7, 34);
+		expect(fc).not.toBeNull();
+		expect(fc!.current_phase).toBe('Bloom');
+		expect(fc!.schema_days_total).toBe(63);
+		expect(fc!.remaining_days_total).toBe(56);
+		// Wasser: 4× 5L (Veg) + 2× 10L (Bloom) = 40L. avg = 40L/34d ≈ 1.18 L/d
+		expect(fc!.avg_water_per_day_l).toBeCloseTo(40 / 34, 1);
+		expect(fc!.water_remaining_est_l).toBeCloseTo((40 / 34) * 56, 0);
+		// Pro Bloom: 16.24 + 16.24 + 8.12 + 8.12 + 20.3 + 20.3 = ... war nur in Bloom W1.
+		// Actually Veg Schema hat bloom=0, Bloom W1 schema bloom=20.3 g/10L. Bei 10L: 20.3g pro Anwendung
+		// = 40.6g für 2 Anwendungen
+		const bloom = fc!.products.find(p => p.key === 'bloom');
+		expect(bloom).toBeDefined();
+		expect(bloom!.used).toBeCloseTo(40.6, 1);
+		expect(bloom!.remaining_est).toBeGreaterThan(0);
+	});
+
+	it('remaining_days_total = 0 wenn Phase = letzte und über Schema', () => {
+		const checkins: CheckIn[] = [
+			ci({ day: 1, phase: 'Bloom', week: 1, watered: true, nutrients_given: true, water_ml: 10000 }),
+		];
+		const r = calcNutrientUsage(baseGrow, checkins);
+		// Athena Bloom: schema_wochen=9. User auf Tag 70 → über Schema, days_left=0
+		const fc = calcUsageForecast(r, 'Bloom', 70, 1);
+		expect(fc!.remaining_days_total).toBe(0);
+		// Alle Forecast-Werte = 0
+		expect(fc!.water_remaining_est_l).toBe(0);
+		expect(fc!.products.every(p => p.remaining_est === 0)).toBe(true);
+	});
+
+	it('addiert Folge-Phasen wenn current_phase nicht die letzte ist', () => {
+		const checkins: CheckIn[] = [
+			ci({ day: 1, phase: 'Veg', week: 1, watered: true, nutrients_given: true, water_ml: 5000 }),
+		];
+		const r = calcNutrientUsage(baseGrow, checkins);
+		// User in Veg Tag 1 von 28 (4W). Athena: Veg=4W=28d, Bloom=9W=63d.
+		// remaining = (28-1) + 63 = 90
+		const fc = calcUsageForecast(r, 'Veg', 1, 1);
+		expect(fc!.remaining_days_total).toBe(90);
 	});
 });

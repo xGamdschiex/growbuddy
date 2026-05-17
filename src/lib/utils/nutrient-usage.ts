@@ -36,6 +36,8 @@ export interface ProductUsage {
 	einheit: 'g' | 'mL';
 	/** Summe über alle Check-ins (in einheit) */
 	total: number;
+	/** Ø pro Anwendung (= total / n_checkins) */
+	avg_per_application: number;
 	/** Anzahl Check-ins die dieses Produkt enthielten (Dosierung > 0) */
 	n_checkins: number;
 	/** Welche Produkt-Kategorie ('base' | 'supplement' | ...) — für UI-Gruppierung */
@@ -225,6 +227,7 @@ export function calcNutrientUsage(grow: Grow, allCheckins: CheckIn[]): NutrientU
 			name: v.name,
 			einheit: v.einheit,
 			total: Math.round(v.total * 100) / 100,
+			avg_per_application: v.n > 0 ? Math.round((v.total / v.n) * 100) / 100 : 0,
 			n_checkins: v.n,
 			kategorie: v.kategorie,
 		}))
@@ -243,6 +246,7 @@ export function calcNutrientUsage(grow: Grow, allCheckins: CheckIn[]): NutrientU
 					name: v.name,
 					einheit: v.einheit,
 					total: Math.round(v.total * 100) / 100,
+					avg_per_application: v.n > 0 ? Math.round((v.total / v.n) * 100) / 100 : 0,
 					n_checkins: v.n,
 					kategorie: v.kategorie,
 				}))
@@ -304,4 +308,103 @@ export function productSeriesCumulative(
 		}
 	}
 	return { days, values };
+}
+
+// ─── FORECAST ────────────────────────────────────────────────────────────
+
+export interface ProductForecast {
+	key: string;
+	name: string;
+	einheit: 'g' | 'mL';
+	/** Bisher verbraucht (Σ aller Phasen) */
+	used: number;
+	/** Voraussichtlich bis Schema-Ende noch nötig */
+	remaining_est: number;
+	/** Voraussichtlicher Total = used + remaining_est */
+	total_est: number;
+	kategorie: FeedProduct['kategorie'];
+}
+
+export interface UsageForecast {
+	/** Aktuelle Phase laut Schema (z.B. 'Bloom') */
+	current_phase: string;
+	/** Tag in aktueller Phase (1-basiert) */
+	current_day_in_phase: number;
+	/** Schema-Tage gesamt für aktuelle Phase */
+	schema_days_total: number;
+	/** Restdauer aktuelle Phase + alle Folge-Phasen (Schema-Tage) */
+	remaining_days_total: number;
+	/** Forecast pro Produkt */
+	products: ProductForecast[];
+	/** Gesamt-Wasser-Voraussage (L) */
+	water_remaining_est_l: number;
+	/** Aktueller Ø-Verbrauch pro Tag (für Transparenz) */
+	avg_water_per_day_l: number;
+}
+
+/**
+ * Schätzt verbleibenden Düngerverbrauch bis Schema-Ende.
+ *
+ * Vereinfachte Heuristik: extrapoliert den DURCHSCHNITTLICHEN Tages-Verbrauch
+ * der letzten Wochen über die noch verbleibenden Schema-Tage hinweg.
+ *
+ * Nicht-perfekt aber sehr nützlich:
+ *  - Athena Schema variiert zwischen Phasen + Wochen — wir mitteln drüber
+ *  - Trifft Größenordnung für Nachbestell-Entscheidungen
+ *  - User sieht den Ø-Wert + kann selbst grob korrigieren
+ *
+ * Voraussetzung: ≥1 Düng-Check-in mit water_ml. Sonst Forecast = null.
+ */
+export function calcUsageForecast(
+	usage: NutrientUsageResult,
+	currentPhase: string,
+	currentDayInPhase: number,
+	totalDaysCovered: number,  // Tage seit Grow-Start an denen schon gedüngt wurde (etwa = letzter Düng-Tag)
+): UsageForecast | null {
+	if (!usage.feedline || usage.history.length === 0 || totalDaysCovered <= 0) return null;
+
+	const line = usage.feedline;
+	const phaseConfig = line.phasen.find((p) => p.name === currentPhase);
+	if (!phaseConfig) return null;
+
+	const schema_days_total = phaseConfig.schema_wochen * 7;
+	// Tage übrig in aktueller Phase laut Schema (kann negativ sein wenn User über Schema hinaus geht)
+	const days_left_in_current_phase = Math.max(0, schema_days_total - currentDayInPhase);
+
+	// Restdauer aktuelle + Folge-Phasen
+	const phaseOrder = line.phasen;
+	const currentIdx = phaseOrder.findIndex((p) => p.name === currentPhase);
+	let remaining_days_total = days_left_in_current_phase;
+	if (currentIdx >= 0) {
+		for (let i = currentIdx + 1; i < phaseOrder.length; i++) {
+			remaining_days_total += phaseOrder[i].schema_wochen * 7;
+		}
+	}
+
+	// Ø-Verbrauch pro Tag: aus History den Daily-Average bilden
+	const avg_water_per_day_l = usage.total_water_l / totalDaysCovered;
+
+	const products: ProductForecast[] = usage.byProduct.map((p) => {
+		const avg_per_day = p.total / totalDaysCovered;
+		const remaining_est = avg_per_day * remaining_days_total;
+		return {
+			key: p.key,
+			name: p.name,
+			einheit: p.einheit,
+			used: p.total,
+			remaining_est: Math.round(remaining_est * 10) / 10,
+			total_est: Math.round((p.total + remaining_est) * 10) / 10,
+			kategorie: p.kategorie,
+		};
+	});
+
+	return {
+		current_phase: currentPhase,
+		current_day_in_phase: currentDayInPhase,
+		schema_days_total,
+		remaining_days_total,
+		products,
+		water_remaining_est_l: Math.round(avg_water_per_day_l * remaining_days_total * 10) / 10,
+		avg_water_per_day_l: Math.round(avg_water_per_day_l * 100) / 100,
+	};
 }

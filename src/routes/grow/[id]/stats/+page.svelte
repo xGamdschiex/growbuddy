@@ -22,7 +22,8 @@
 	import HealthCard from '$lib/components/HealthCard.svelte';
 	import { phaseTargetSegments, targetFor } from '$lib/utils/phase-targets';
 	import { CHART_COLORS } from '$lib/utils/chart-colors';
-	import { calcNutrientUsage, productSeriesCumulative } from '$lib/utils/nutrient-usage';
+	import { calcNutrientUsage, productSeries, productSeriesCumulative, calcUsageForecast, type ProductUsage } from '$lib/utils/nutrient-usage';
+	import { currentPhasePosition } from '$lib/utils/phase';
 	import { onMount } from 'svelte';
 
 	let growId = $derived($page.params.id);
@@ -165,20 +166,53 @@
 
 	// v1.4.1: Düngerverbrauch — hochgerechnet aus Wassergaben + Feedline-Schema
 	let nutrientUsage = $derived(grow ? calcNutrientUsage(grow, growState?.checkins ?? []) : null);
-	let nutrientMaxTotal = $derived(nutrientUsage ? Math.max(0, ...nutrientUsage.byProduct.map(p => p.total)) : 0);
+
+	// v1.4.3: Phase-Tab-Switch (Gesamt / Veg / Bloom / ...)
+	let selectedTab = $state<string>('total');  // 'total' | phase-name
+	let availableTabs = $derived.by(() => {
+		const phases = nutrientUsage?.byPhase.map(p => p.phase) ?? [];
+		return [{ key: 'total', label: 'Gesamt' }, ...phases.map(p => ({ key: p, label: p }))];
+	});
+
+	/** Sichtbare Daten je nach Tab: { products, water_l, n_checkins } */
+	let viewData = $derived.by(() => {
+		if (!nutrientUsage) return { products: [] as ProductUsage[], water_l: 0, n_checkins: 0 };
+		if (selectedTab === 'total') {
+			return {
+				products: nutrientUsage.byProduct,
+				water_l: nutrientUsage.total_water_l,
+				n_checkins: nutrientUsage.n_fertigated_checkins,
+			};
+		}
+		const phase = nutrientUsage.byPhase.find(p => p.phase === selectedTab);
+		return {
+			products: phase?.products ?? [],
+			water_l: phase?.water_l ?? 0,
+			n_checkins: phase?.n_checkins ?? 0,
+		};
+	});
+
+	let nutrientMaxTotal = $derived(Math.max(0, ...viewData.products.map(p => p.total)));
 	let selectedProductKey = $state<string | null>(null);
-	// Default: erstes Produkt (= meistgenutztes)
+	// Default + Auto-Reset wenn Tab gewechselt und gewähltes Produkt nicht mehr in der Liste
 	$effect(() => {
-		if (nutrientUsage && nutrientUsage.byProduct.length > 0 && selectedProductKey === null) {
-			selectedProductKey = nutrientUsage.byProduct[0].key;
+		const keys = viewData.products.map(p => p.key);
+		if (keys.length === 0) { selectedProductKey = null; return; }
+		if (selectedProductKey === null || !keys.includes(selectedProductKey)) {
+			selectedProductKey = keys[0];
 		}
 	});
+
+	// v1.4.3: Chart-Mode Toggle (kumulativ vs. pro Anwendung)
+	let chartMode = $state<'cumulative' | 'per_application'>('cumulative');
 	let selectedProductSeries = $derived.by(() => {
 		if (!nutrientUsage || !selectedProductKey) return { days: [], values: [] };
-		return productSeriesCumulative(nutrientUsage.history, selectedProductKey);
+		return chartMode === 'cumulative'
+			? productSeriesCumulative(nutrientUsage.history, selectedProductKey)
+			: productSeries(nutrientUsage.history, selectedProductKey);
 	});
 	let selectedProduct = $derived(
-		nutrientUsage?.byProduct.find(p => p.key === selectedProductKey) ?? null
+		viewData.products.find(p => p.key === selectedProductKey) ?? null
 	);
 	// Kategorie-Farben (visuelle Trennung base vs. supplement vs. ...)
 	function categoryColor(kat: string): string {
@@ -188,6 +222,17 @@
 		if (kat === 'stimulator') return CHART_COLORS.ec;
 		return CHART_COLORS.rh;
 	}
+
+	// v1.4.3: Forecast — voraussichtlicher Restverbrauch bis Schema-Ende
+	let usageForecast = $derived.by(() => {
+		if (!nutrientUsage || !grow) return null;
+		const pos = currentPhasePosition(grow, growState?.checkins ?? []);
+		// totalDaysCovered = letzter Düng-Tag (Tag X seit Start). Wenn history leer: 0.
+		const lastDay = nutrientUsage.history.length > 0
+			? nutrientUsage.history[nutrientUsage.history.length - 1].day
+			: 0;
+		return calcUsageForecast(nutrientUsage, pos.phase, pos.daysIn, lastDay);
+	});
 </script>
 
 <svelte:head><title>Statistik · {grow?.name ?? 'Grow'}</title></svelte:head>
@@ -258,7 +303,7 @@
 				</div>
 			</div>
 
-			<!-- v1.4.2: Wasser & Dünger — ein Block (war: 'Verbrauch' + 'Düngerverbrauch' separat) -->
+			<!-- v1.4.3: Wasser & Dünger — Tab-Switch zwischen Gesamt / Veg / Bloom / ... -->
 			<div class="space-y-2">
 				<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide flex items-center justify-between gap-2">
 					<span>Wasser &amp; Dünger</span>
@@ -267,34 +312,47 @@
 					{/if}
 				</h2>
 
-				<!-- Top-Tiles: Wasser-Total + Düng-Count -->
-				<div class="grid grid-cols-2 gap-2">
-					<div class="bg-gb-surface rounded-xl p-3">
-						<p class="text-[10px] text-gb-text-muted uppercase tracking-wide">💧 Wasser</p>
-						<p class="text-xl font-bold text-gb-info mt-0.5">{(totalWaterMl / 1000).toFixed(1)}<span class="text-xs font-normal text-gb-text-muted ml-1">L</span></p>
-					</div>
-					<div class="bg-gb-surface rounded-xl p-3">
-						<p class="text-[10px] text-gb-text-muted uppercase tracking-wide">🧪 Düng-Check-ins</p>
-						<p class="text-xl font-bold mt-0.5">{nutrientUsage?.n_fertigated_checkins ?? nutrientCheckins}<span class="text-xs font-normal text-gb-text-muted ml-1">×</span></p>
-					</div>
-				</div>
+				{#if nutrientUsage?.feedline && nutrientUsage.byProduct.length > 0}
+					<!-- Segmented Tab-Switch (nur wenn ≥1 Phase, sonst hat nur 'Gesamt' Sinn) -->
+					{#if availableTabs.length > 1}
+						<div class="bg-gb-surface rounded-xl p-1 flex gap-1 overflow-x-auto">
+							{#each availableTabs as tab}
+								<button type="button" onclick={() => selectedTab = tab.key}
+									class="flex-1 text-xs font-medium px-3 rounded-lg transition-colors whitespace-nowrap
+										{selectedTab === tab.key ? 'bg-gb-green text-gb-bg' : 'text-gb-text-muted hover:text-gb-text'}"
+									style="min-height:36px">
+									{tab.label}
+								</button>
+							{/each}
+						</div>
+					{/if}
 
-				<!-- Düngerverbrauch (wenn Feedline gesetzt) -->
-				{#if nutrientUsage?.feedline}
-					{#if nutrientUsage.byProduct.length === 0}
-						<div class="bg-gb-surface rounded-xl p-4 space-y-2">
-							<p class="text-sm text-gb-text-muted">Noch keine Düngung berechnet.</p>
-							<p class="text-[11px] text-gb-text-muted leading-relaxed">
-								Beim Check-in 💧 <span class="text-gb-text">Gegossen</span> +
-								🧪 <span class="text-gb-text">Gedüngt</span> aktivieren und <span class="text-gb-text">Wassermenge (mL)</span> eintragen.
-								Wir rechnen aus dem Düngerschema hoch.
-							</p>
+					<!-- Reaktive Tiles (Wasser + Düng-Check-ins pro Tab) -->
+					<div class="grid grid-cols-2 gap-2">
+						<div class="bg-gb-surface rounded-xl p-3">
+							<p class="text-[10px] text-gb-text-muted uppercase tracking-wide">💧 Wasser</p>
+							<p class="text-xl font-bold text-gb-info mt-0.5 tabular-nums">{viewData.water_l.toFixed(1)}<span class="text-xs font-normal text-gb-text-muted ml-1">L</span></p>
+							{#if viewData.n_checkins > 0}
+								<p class="text-[10px] text-gb-text-muted mt-0.5">Ø {(viewData.water_l / viewData.n_checkins).toFixed(1)} L/Gießung</p>
+							{/if}
+						</div>
+						<div class="bg-gb-surface rounded-xl p-3">
+							<p class="text-[10px] text-gb-text-muted uppercase tracking-wide">🧪 Düng-Check-ins</p>
+							<p class="text-xl font-bold mt-0.5 tabular-nums">{viewData.n_checkins}<span class="text-xs font-normal text-gb-text-muted ml-1">×</span></p>
+							{#if selectedTab !== 'total' && nutrientUsage.n_fertigated_checkins > 0}
+								<p class="text-[10px] text-gb-text-muted mt-0.5">von {nutrientUsage.n_fertigated_checkins} gesamt</p>
+							{/if}
+						</div>
+					</div>
+
+					<!-- Produkt-Liste für gewählten Tab (sortiert nach Total) -->
+					{#if viewData.products.length === 0}
+						<div class="bg-gb-surface rounded-xl p-4 text-center text-sm text-gb-text-muted">
+							In Phase „{selectedTab}" wurden noch keine Produkte angewendet.
 						</div>
 					{:else}
-						<!-- Total über alle Phasen, kompakte Bars -->
 						<div class="bg-gb-surface rounded-xl p-3 space-y-2.5">
-							<p class="text-[10px] text-gb-text-muted uppercase tracking-wide">Gesamt</p>
-							{#each nutrientUsage.byProduct as p}
+							{#each viewData.products as p}
 								{@const widthPct = nutrientMaxTotal > 0 ? (p.total / nutrientMaxTotal) * 100 : 0}
 								{@const isSelected = selectedProductKey === p.key}
 								{@const color = categoryColor(p.kategorie)}
@@ -310,72 +368,95 @@
 										<div class="flex-1 h-1.5 bg-gb-bg rounded-full overflow-hidden">
 											<div class="h-full transition-all" style="width: {widthPct}%; background: {color}; opacity: {isSelected ? 1 : 0.55};"></div>
 										</div>
-										<span class="text-[10px] text-gb-text-muted whitespace-nowrap tabular-nums">{p.n_checkins}×</span>
+										<span class="text-[10px] text-gb-text-muted whitespace-nowrap tabular-nums">{p.n_checkins}× · Ø {p.avg_per_application.toFixed(p.einheit === 'g' ? 1 : 0)}{p.einheit}</span>
 									</div>
 								</button>
 							{/each}
 						</div>
+					{/if}
 
-						<!-- v1.4.2: Aufschlüsselung pro Phase (Veg vs Bloom vs ...) — nur wenn mehrere Phasen -->
-						{#if nutrientUsage.byPhase.length >= 2}
-							{#each nutrientUsage.byPhase as ph}
-								{@const phMax = Math.max(0, ...ph.products.map(pp => pp.total))}
-								<details class="bg-gb-surface rounded-xl overflow-hidden">
-									<summary class="flex items-center justify-between px-3 py-2.5 cursor-pointer select-none" style="min-height:44px">
-										<div class="flex items-baseline gap-2 min-w-0">
-											<span class="text-sm font-semibold">{ph.phase}</span>
-											<span class="text-[11px] text-gb-text-muted">{ph.n_checkins}× · {ph.water_l.toFixed(1)} L</span>
-										</div>
-										<span class="text-gb-text-muted text-xs phase-chev">▸</span>
-									</summary>
-									<div class="px-3 pb-3 space-y-1.5">
-										{#each ph.products as pp}
-											{@const wPct = phMax > 0 ? (pp.total / phMax) * 100 : 0}
-											{@const c = categoryColor(pp.kategorie)}
-											<div class="space-y-0.5">
-												<div class="flex items-baseline justify-between gap-2">
-													<span class="text-xs text-gb-text-muted truncate">{pp.name}</span>
-													<span class="text-xs font-semibold tabular-nums">{pp.total.toFixed(pp.einheit === 'g' ? 1 : 0)} {pp.einheit}</span>
-												</div>
-												<div class="h-1 bg-gb-bg rounded-full overflow-hidden">
-													<div class="h-full" style="width: {wPct}%; background: {c}; opacity: 0.7;"></div>
-												</div>
-											</div>
-										{/each}
-									</div>
-								</details>
-							{/each}
-						{/if}
-
-						<!-- Hinweise -->
-						<div class="text-[11px] text-gb-text-muted leading-relaxed px-1 space-y-1">
-							{#if nutrientUsage.n_skipped_checkins > 0}
-								<p><span class="text-gb-warning">{nutrientUsage.n_skipped_checkins} Check-in{nutrientUsage.n_skipped_checkins !== 1 ? 's' : ''} übersprungen</span> (Phase/Woche nicht im Schema).</p>
-							{/if}
-							<p class="opacity-80">EC-Skalierung: <code>ec_measured / ec_ziel</code> (clamped 0.3–1.2×). Ohne EC → 100 %.</p>
-						</div>
-
-						<!-- Verlauf-Chart für gewähltes Produkt (kumuliert) -->
-						{#if selectedProduct && selectedProductSeries.values.length >= 2}
+					<!-- Chart mit Mode-Toggle (kumulativ / pro Anwendung) -->
+					{#if selectedProduct && selectedProductSeries.values.length >= 2}
+						<div class="space-y-2">
+							<div class="flex items-center justify-between gap-2 px-1">
+								<span class="text-[11px] text-gb-text-muted">{selectedProduct.name} · Verlauf (gesamter Grow)</span>
+								<div class="bg-gb-surface rounded-lg p-0.5 flex gap-0.5">
+									<button type="button" onclick={() => chartMode = 'cumulative'}
+										class="text-[10px] px-2 py-1 rounded-md font-medium {chartMode === 'cumulative' ? 'bg-gb-bg text-gb-text' : 'text-gb-text-muted'}"
+										style="min-height:28px">kumulativ</button>
+									<button type="button" onclick={() => chartMode = 'per_application'}
+										class="text-[10px] px-2 py-1 rounded-md font-medium {chartMode === 'per_application' ? 'bg-gb-bg text-gb-text' : 'text-gb-text-muted'}"
+										style="min-height:28px">pro Gabe</button>
+								</div>
+							</div>
 							<MiniChart
 								data={selectedProductSeries.values}
 								days={selectedProductSeries.days}
 								color={categoryColor(selectedProduct.kategorie)}
-								label="{selectedProduct.name} kumulativ"
+								label={chartMode === 'cumulative' ? 'kumulativ' : 'pro Gabe'}
 								unit=" {selectedProduct.einheit}"
 								showMinMax
 							/>
-						{/if}
-					{/if}
-				{:else if totalNutrientMl > 0}
-					<!-- Fallback: keine Feedline gesetzt, aber User loggt nutrient_ml manuell -->
-					<div class="bg-gb-surface rounded-xl p-3 space-y-1">
-						<div class="flex items-baseline justify-between">
-							<p class="text-xs text-gb-text-muted">🧪 Nährstoff (mL, manuell)</p>
-							<p class="text-lg font-bold">{totalNutrientMl.toFixed(0)} <span class="text-xs font-normal text-gb-text-muted">mL</span></p>
 						</div>
-						<p class="text-[11px] text-gb-text-muted">Ohne Düngerlinie können wir nicht pro Produkt aufschlüsseln. Weise dem Grow eine Linie zu für Pro-Produkt-Stats.</p>
+					{/if}
+
+					<!-- Forecast-Block: voraussichtlich noch nötig (nur wenn remaining > 0) -->
+					{#if usageForecast && usageForecast.remaining_days_total > 0 && usageForecast.products.length > 0}
+						<div class="bg-gradient-to-br from-gb-info/10 to-gb-info/5 border border-gb-info/20 rounded-xl p-3 space-y-2">
+							<div class="flex items-baseline justify-between gap-2">
+								<p class="text-sm font-semibold text-gb-info">🔮 Voraussichtlich noch nötig</p>
+								<span class="text-[10px] text-gb-text-muted whitespace-nowrap">~{usageForecast.remaining_days_total}d Schema</span>
+							</div>
+							<div class="space-y-1">
+								<div class="flex items-baseline justify-between text-xs">
+									<span class="text-gb-text-muted">💧 Wasser</span>
+									<span class="font-semibold tabular-nums">~{usageForecast.water_remaining_est_l.toFixed(0)} L</span>
+								</div>
+								{#each usageForecast.products as f}
+									{#if f.remaining_est >= 0.5}
+										<div class="flex items-baseline justify-between text-xs">
+											<span class="text-gb-text-muted truncate">{f.name}</span>
+											<span class="font-semibold tabular-nums">~{f.remaining_est.toFixed(f.einheit === 'g' ? 1 : 0)} {f.einheit}</span>
+										</div>
+									{/if}
+								{/each}
+							</div>
+							<p class="text-[10px] text-gb-text-muted leading-relaxed opacity-80">
+								Basis: Ø {usageForecast.avg_water_per_day_l.toFixed(2)} L/Tag der bisherigen Daten,
+								extrapoliert über verbleibende Schema-Tage. Nachbestellen-Richtwert, nicht exakte Prognose.
+							</p>
+						</div>
+					{/if}
+
+					<!-- Hinweise (kurz, freundlich) -->
+					<div class="text-[11px] text-gb-text-muted leading-relaxed px-1 space-y-1">
+						{#if nutrientUsage.n_skipped_checkins > 0}
+							<p><span class="text-gb-warning">{nutrientUsage.n_skipped_checkins} Check-in{nutrientUsage.n_skipped_checkins !== 1 ? 's' : ''} übersprungen</span> — Phase/Woche nicht im Schema definiert.</p>
+						{/if}
+						<p class="opacity-80">Wenn du beim Check-in EC misst, passen wir die Mengen entsprechend an (schwächer dosiert = weniger Verbrauch).</p>
 					</div>
+
+				{:else if nutrientUsage?.feedline}
+					<!-- Feedline gesetzt aber noch keine Düngung -->
+					<div class="bg-gb-surface rounded-xl p-4 space-y-2">
+						<p class="text-sm text-gb-text-muted">Noch keine Düngung berechnet.</p>
+						<p class="text-[11px] text-gb-text-muted leading-relaxed">
+							Beim Check-in 💧 <span class="text-gb-text">Gegossen</span> + 🧪 <span class="text-gb-text">Gedüngt</span> aktivieren und <span class="text-gb-text">Wassermenge (mL)</span> eintragen.
+						</p>
+					</div>
+				{:else if totalWaterMl > 0 || totalNutrientMl > 0}
+					<!-- Fallback: keine Feedline, aber User loggt water/nutrient_ml manuell -->
+					<div class="grid grid-cols-2 gap-2">
+						<div class="bg-gb-surface rounded-xl p-3">
+							<p class="text-[10px] text-gb-text-muted uppercase tracking-wide">💧 Wasser</p>
+							<p class="text-xl font-bold text-gb-info mt-0.5">{(totalWaterMl / 1000).toFixed(1)}<span class="text-xs font-normal text-gb-text-muted ml-1">L</span></p>
+						</div>
+						<div class="bg-gb-surface rounded-xl p-3">
+							<p class="text-[10px] text-gb-text-muted uppercase tracking-wide">🧪 Nährstoff</p>
+							<p class="text-xl font-bold mt-0.5">{totalNutrientMl.toFixed(0)}<span class="text-xs font-normal text-gb-text-muted ml-1">mL</span></p>
+						</div>
+					</div>
+					<p class="text-[11px] text-gb-text-muted px-1">Ohne Düngerlinie können wir nicht pro Produkt aufschlüsseln — weise dem Grow eine Linie zu.</p>
 				{/if}
 			</div>
 
@@ -491,10 +572,5 @@
 	{/if}
 </div>
 
-<style>
-	/* v1.4.2: details/summary Polish — Default-Marker weg, Chevron rotiert beim Aufklappen */
-	details > summary { list-style: none; }
-	details > summary::-webkit-details-marker { display: none; }
-	.phase-chev { transition: transform 0.2s ease; display: inline-block; }
-	details[open] .phase-chev { transform: rotate(90deg); }
-</style>
+<!-- v1.4.3: details-CSS entfernt (Phase-<details> wurden zu Tab-Switch). -->
+
