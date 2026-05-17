@@ -23,14 +23,7 @@
 		<p class="text-xs text-gb-text-muted mt-1">Stand: {STAND} · Version {VERSION}</p>
 	</div>
 
-	<!-- Beta-Disclaimer -->
-	<div class="bg-gb-warning/10 border border-gb-warning/30 rounded-xl p-3">
-		<p class="text-xs leading-relaxed">
-			<strong>Beta-Phase:</strong> Diese Erklärung gilt für die Beta-Version von GrowBuddy.
-			Vor offiziellem Release kann sich der Wortlaut ändern — der Inhalt (lokale Speicherung,
-			optionale Cloud, kein Tracking) bleibt aber gleich.
-		</p>
-	</div>
+	<!-- v1.4.0: Beta-Disclaimer-Box entfernt — Beta-Status steht zentral in /about, Privacy bleibt fachlich. -->
 
 	<section class="space-y-2">
 		<h2 class="text-lg font-bold">1. Verantwortlicher</h2>

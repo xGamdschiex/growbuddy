@@ -138,10 +138,14 @@
 		return 'Möglich';
 	}
 
-	function reset() {
+	// v1.4.0: Photo-Wechsel behält userNote — User soll Frage nicht neu tippen
+	function resetPhoto() {
 		photo = null;
 		diagnosis = null;
 		error = null;
+	}
+	function resetAll() {
+		resetPhoto();
 		userNote = '';
 	}
 </script>
@@ -228,11 +232,12 @@
 				<input type="file" accept="image/*" capture="environment" onchange={handlePhoto} class="hidden" />
 			</label>
 		{:else}
-			<!-- Photo Preview -->
+			<!-- Photo Preview (v1.4.0: 32→44px WCAG-AA, Note bleibt erhalten) -->
 			<div class="relative">
 				<img src={photo} alt="Pflanzenfoto" class="w-full rounded-xl max-h-72 object-cover" />
-				<button onclick={reset}
-					class="absolute top-2 right-2 bg-black/60 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm hover:bg-black/80">
+				<button onclick={resetPhoto} aria-label="Foto entfernen"
+					class="absolute top-2 right-2 bg-black/60 text-white rounded-full flex items-center justify-center text-sm hover:bg-black/80"
+					style="min-width:44px; min-height:44px;">
 					✕
 				</button>
 			</div>

@@ -37,35 +37,77 @@
 	let deleteConfirmText = $state('');
 	let deletingAccount = $state(false);
 
+	// v1.4.0: Custom-Confirm-Sheet statt nativer confirm() — dark-themed, konsistent zum Rest der App
+	type Confirm = {
+		title: string;
+		message: string;
+		confirmLabel: string;
+		danger?: boolean;
+		typeToConfirm?: string;  // wenn gesetzt: User muss diesen String tippen (z.B. "LÖSCHEN")
+		onConfirm: () => void | Promise<void>;
+	};
+	let pendingConfirm: Confirm | null = $state(null);
+	let confirmTypeText = $state('');
+	function closeConfirm() {
+		pendingConfirm = null;
+		confirmTypeText = '';
+	}
+	async function runConfirm() {
+		if (!pendingConfirm) return;
+		const fn = pendingConfirm.onConfirm;
+		closeConfirm();
+		await fn();
+	}
+
 	async function logout() {
 		await authStore.logout();
 		toastStore.info('Abgemeldet');
 	}
 
 	function resetXP() {
-		if (!confirm('Wirklich alle XP/Achievements zurücksetzen?')) return;
-		xpStore.reset();
-		streakStore.reset();
-		toastStore.success('XP zurückgesetzt');
+		pendingConfirm = {
+			title: 'XP & Achievements zurücksetzen?',
+			message: 'Alle gesammelten XP, Level und Streak-Milestones werden gelöscht. Deine Grows und Check-ins bleiben erhalten.',
+			confirmLabel: 'Zurücksetzen',
+			danger: true,
+			onConfirm: () => {
+				xpStore.reset();
+				streakStore.reset();
+				toastStore.success('XP zurückgesetzt');
+			},
+		};
 	}
 
 	function resetOnboarding() {
-		if (!confirm('Onboarding zurücksetzen? Du wirst zum Onboarding-Bildschirm geleitet.')) return;
-		onboardingStore.reset();
-		toastStore.success('Onboarding zurückgesetzt');
-		setTimeout(() => goto('/onboarding', { replaceState: true }), 300);
+		pendingConfirm = {
+			title: 'Onboarding erneut anzeigen?',
+			message: 'Du wirst zum Willkommens-Bildschirm geleitet. Deine Daten bleiben erhalten.',
+			confirmLabel: 'Anzeigen',
+			onConfirm: () => {
+				onboardingStore.reset();
+				toastStore.success('Onboarding zurückgesetzt');
+				setTimeout(() => goto('/onboarding', { replaceState: true }), 300);
+			},
+		};
 	}
 
 	function resetAll() {
-		if (!confirm('WIRKLICH alle Daten löschen? Das kann nicht rückgängig gemacht werden!')) return;
-		if (!confirm('Letzte Warnung — alle Grows, Check-ins und Fortschritt gehen verloren!')) return;
-		xpStore.reset();
-		streakStore.reset();
-		growStore.replaceState({ grows: [], checkins: [] });
-		localStorage.removeItem('growbuddy_reminders');
-		localStorage.removeItem('growbuddy_sync');
-		toastStore.success('Alles zurückgesetzt — App wird neu geladen');
-		setTimeout(() => window.location.reload(), 1500);
+		pendingConfirm = {
+			title: 'Wirklich alle Daten löschen?',
+			message: 'Alle Grows, Check-ins, Fotos und Fortschritt werden unwiderruflich gelöscht. Tippe LÖSCHEN zur Bestätigung.',
+			confirmLabel: 'Alles löschen',
+			danger: true,
+			typeToConfirm: 'LÖSCHEN',
+			onConfirm: () => {
+				xpStore.reset();
+				streakStore.reset();
+				growStore.replaceState({ grows: [], checkins: [] });
+				localStorage.removeItem('growbuddy_reminders');
+				localStorage.removeItem('growbuddy_sync');
+				toastStore.success('Alles zurückgesetzt — App wird neu geladen');
+				setTimeout(() => window.location.reload(), 1500);
+			},
+		};
 	}
 
 	async function deleteAccount() {
@@ -297,6 +339,46 @@
 			</div>
 		{/if}
 	</div>
+
+	<!-- v1.4.0: Generischer Confirm-Sheet (ersetzt natives confirm()) -->
+	{#if pendingConfirm}
+		<div class="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-4"
+			onclick={closeConfirm}
+			onkeydown={(e) => { if (e.key === 'Escape') closeConfirm(); }}
+			role="presentation">
+			<div class="bg-gb-surface w-full max-w-sm rounded-2xl p-5 space-y-4"
+				onclick={(e) => e.stopPropagation()}
+				onkeydown={(e) => e.stopPropagation()}
+				role="dialog" aria-modal="true" tabindex="-1">
+				<div>
+					<p class="font-semibold text-base">{pendingConfirm.title}</p>
+					<p class="text-sm text-gb-text-muted mt-2">{pendingConfirm.message}</p>
+				</div>
+				{#if pendingConfirm.typeToConfirm}
+					<div>
+						<label for="confirm-type" class="text-xs text-gb-text-muted">Tippe <span class="font-mono text-gb-danger">{pendingConfirm.typeToConfirm}</span></label>
+						<input id="confirm-type" type="text" bind:value={confirmTypeText}
+							class="w-full bg-gb-bg border border-gb-border rounded-lg px-3 mt-1 text-sm"
+							style="min-height:44px"
+							placeholder={pendingConfirm.typeToConfirm} autocapitalize="characters" />
+					</div>
+				{/if}
+				<div class="flex gap-3 pt-1">
+					<button onclick={closeConfirm}
+						class="flex-1 bg-gb-bg border border-gb-border text-gb-text font-medium rounded-xl"
+						style="min-height:48px">
+						Abbrechen
+					</button>
+					<button onclick={runConfirm}
+						disabled={!!pendingConfirm.typeToConfirm && confirmTypeText !== pendingConfirm.typeToConfirm}
+						class="flex-1 {pendingConfirm.danger ? 'bg-gb-danger text-white' : 'bg-gb-green text-gb-bg'} font-medium rounded-xl disabled:opacity-50"
+						style="min-height:48px">
+						{pendingConfirm.confirmLabel}
+					</button>
+				</div>
+			</div>
+		</div>
+	{/if}
 
 	{#if showDeleteAccount}
 		<div class="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-4"

@@ -3,11 +3,14 @@
 	import { xpStore } from '$lib/stores/xp';
 	import { t } from '$lib/i18n';
 	import { onMount } from 'svelte';
-	xpStore.awardToolUse('dli');
 
 	let tr: (k: string, opts?: Record<string, string | number>) => string = $state((k: string) => k);
 
-	onMount(() => t.subscribe(v => tr = v));
+	// v1.4.0: awardToolUse in onMount (siehe vpd)
+	onMount(() => {
+		xpStore.awardToolUse('dli');
+		return t.subscribe(v => tr = v);
+	});
 	let ppfd = $state(600);
 	let hours = $state(18);
 	let phase: string = $state('vegetative');

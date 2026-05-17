@@ -186,9 +186,8 @@
 			<span class="text-6xl block">{slides[step].icon}</span>
 			<h1 class="text-2xl font-bold leading-tight">{slides[step].title}</h1>
 			<p class="text-gb-text-muted leading-relaxed">{slides[step].subtitle}</p>
-			{#if step === 0}
-				<p class="text-[11px] text-gb-text-muted/70 italic">{tr('onboarding.beta_note')}</p>
-			{/if}
+			<!-- v1.4.0: beta_note entfernt — Beta-Pill oben reicht. -->
+
 
 			<!-- Dots -->
 			<div class="flex justify-center gap-2 pt-4">
@@ -297,6 +296,20 @@
 						{finishing ? 'Eingeloggt — bereite App vor…' : 'Warte auf Google-Login…'}
 					</p>
 					<p class="text-xs text-gb-text-muted">Du wirst gleich weitergeleitet.</p>
+				</div>
+			{:else if auth.user}
+				<!-- v1.4.0: User schon eingeloggt (z.B. nach Onboarding-Reset) → Shortcut statt OAuth-Wiederholung -->
+				<div class="bg-gb-green/10 border border-gb-green/30 rounded-xl p-5 text-center space-y-3">
+					<span class="text-3xl block">✓</span>
+					<div>
+						<p class="font-semibold text-sm">Schon eingeloggt</p>
+						<p class="text-xs text-gb-text-muted mt-1">{auth.user.email}</p>
+					</div>
+					<button onclick={finish}
+						class="w-full bg-gb-green text-gb-bg font-semibold py-3.5 rounded-xl text-sm hover:bg-gb-green/80 transition-colors"
+						style="min-height:48px">
+						Loslegen →
+					</button>
 				</div>
 			{:else}
 				<div class="space-y-3">

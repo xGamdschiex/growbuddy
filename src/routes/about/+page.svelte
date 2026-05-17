@@ -38,18 +38,7 @@
 		</div>
 	</div>
 
-	<!-- Beta-Disclaimer -->
-	<div class="bg-gb-warning/10 border border-gb-warning/30 rounded-xl p-4 space-y-2">
-		<p class="font-semibold text-sm flex items-center gap-2">
-			<span>⚠️</span>
-			Closed Beta
-		</p>
-		<p class="text-xs text-gb-text-muted leading-relaxed">
-			Du nutzt eine Vorab-Version. Daten werden lokal gespeichert + optional in die Cloud
-			synchronisiert. Backups werden empfohlen (Profil → Daten → Export). Bugs sind
-			erwartbar — bitte melden via Feedback-Kanal unten.
-		</p>
-	</div>
+	<!-- v1.4.0: Beta-Disclaimer-Card entfernt — Pill oben sagt es schon, Doppelung war Unfertig-Eindruck. -->
 
 	<!-- Tester-Feedback-Channel -->
 	<div class="bg-gb-surface rounded-xl p-4 space-y-3">

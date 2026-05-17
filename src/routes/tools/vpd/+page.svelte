@@ -3,11 +3,15 @@
 	import { xpStore } from '$lib/stores/xp';
 	import { t } from '$lib/i18n';
 	import { onMount } from 'svelte';
-	xpStore.awardToolUse('vpd');
 
 	let tr: (key: string, params?: Record<string, string | number>) => string = $state((k: string) => k);
 
-	onMount(() => t.subscribe(v => tr = v));
+	// v1.4.0: awardToolUse in onMount statt Modul-Eval — Modul-Eval feuert beim Bundle-Load,
+	// nicht beim tatsächlichen Page-View (SSR/Code-Split-Problem).
+	onMount(() => {
+		xpStore.awardToolUse('vpd');
+		return t.subscribe(v => tr = v);
+	});
 	let temp = $state(25);
 	let rh = $state(60);
 	let leafOffset = $state(-2);

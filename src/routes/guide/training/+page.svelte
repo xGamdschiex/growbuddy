@@ -2,11 +2,14 @@
 	import { xpStore } from '$lib/stores/xp';
 	import { t } from '$lib/i18n';
 	import { onMount } from 'svelte';
-	xpStore.awardToolUse('training');
 
 	let tr = $state<any>((k: string) => k);
 
-	onMount(() => t.subscribe(v => tr = v));
+	// v1.4.0: awardToolUse in onMount (siehe tools/vpd)
+	onMount(() => {
+		xpStore.awardToolUse('training');
+		return t.subscribe(v => tr = v);
+	});
 
 	interface Technique {
 		id: string;

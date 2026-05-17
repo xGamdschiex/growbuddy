@@ -4,11 +4,13 @@
 	import { t } from '$lib/i18n';
 	import { onMount } from 'svelte';
 
-	xpStore.awardToolUse('ipm');
-
 	let tr = $state<any>((k: string) => k);
 
-	onMount(() => t.subscribe(v => tr = v));
+	// v1.4.0: awardToolUse in onMount (siehe tools/vpd)
+	onMount(() => {
+		xpStore.awardToolUse('ipm');
+		return t.subscribe(v => tr = v);
+	});
 
 	function pestIcon(id: string): string {
 		if (id.includes('mite')) return '🕷️';

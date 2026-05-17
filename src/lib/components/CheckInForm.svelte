@@ -15,7 +15,7 @@
 	import { authStore } from '$lib/stores/auth';
 	import { syncStore } from '$lib/stores/sync';
 	import { xpStore } from '$lib/stores/xp';
-	import { streakMultiplier } from '$lib/stores/streak';
+	import { streakStore, currentStreak, streakMultiplier } from '$lib/stores/streak';
 	import { toastStore } from '$lib/stores/toast';
 	import { t } from '$lib/i18n';
 	import { compressBatch, MAX_PHOTOS } from '$lib/utils/photo';
@@ -250,6 +250,21 @@
 			growStore.addCheckIn({ grow_id: grow.id, ...patch });
 			const isFull = !!(validTemp && validRh && validEc && validPh);
 			xpStore.awardCheckIn(ciPhotos.length > 0, isFull, multiplierValue);
+
+			// v1.4.0: Streak-Milestones immer prüfen (vorher nur in DailyCheckin)
+			// → konsistent egal ob Check-in aus Dashboard oder Grow-Detail kommt
+			setTimeout(() => {
+				let streakState: any;
+				streakStore.subscribe((s) => (streakState = s))();
+				let currentS: any;
+				currentStreak.subscribe((s) => (currentS = s))();
+				const pending = streakStore.pendingMilestones(streakState, currentS.current);
+				for (const m of pending) {
+					streakStore.markMilestone(m);
+					xpStore.awardAchievement(`${m}-Tage-Streak`, m * 5);
+				}
+				streakStore.updateLongest(currentS.current);
+			}, 100);
 		}
 
 		hapticSuccess();
