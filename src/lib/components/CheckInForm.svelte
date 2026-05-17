@@ -363,14 +363,18 @@
 			<div class="ci-scale">
 				<span>0.0</span><span>0.5</span><span>1.0</span><span>1.5</span><span>2.0</span><span>2.5</span>
 			</div>
+			<!-- v1.3.79: Hint wenn VPD nicht berechnet werden kann — User weiß sonst nicht warum der Cursor fehlt -->
+			{#if ciVpd === null}
+				<p class="ci-vpd-hint">Temp + RH eingeben für VPD-Berechnung</p>
+			{/if}
 		</div>
 	</div>
 
-	<!-- Disclosure -->
+	<!-- Disclosure (v1.3.79: nur EIN State-Indikator — vorher +/- LINKS + Chevron RECHTS waren redundant) -->
 	<button type="button" class="ci-disc" onclick={() => {
 		ciMore = !ciMore;
 		if (typeof localStorage !== 'undefined') localStorage.setItem('growbuddy_ci_more', ciMore ? '1' : '0');
-	}}>
+	}} aria-expanded={ciMore}>
 		<div class="ci-disc-l">
 			<div class="ci-disc-ico">{ciMore ? '−' : '+'}</div>
 			<div>
@@ -378,7 +382,6 @@
 				<div class="ci-disc-sub">EC · pH · Gießen · Training · Notizen</div>
 			</div>
 		</div>
-		<div class="ci-chev">{ciMore ? '▾' : '▸'}</div>
 	</button>
 
 	<div class="ci-fold" style="max-height: {ciMore ? '2000px' : '0'}; opacity: {ciMore ? 1 : 0};">
@@ -472,9 +475,9 @@
 		</div>
 	</div>
 
-	<!-- Submit -->
+	<!-- Submit (v1.3.79: XP-Hint immer sichtbar bei neuen Check-ins, Bonus-Multiplier nur wenn aktiv) -->
 	<button type="button" class="ci-cta" onclick={submitCheckin}>
-		✓ {editingCi ? 'Änderungen speichern' : tr('checkin.save')}{#if !editingCi && multiplierValue > 1} · +{Math.round(10 * multiplierValue)} XP{/if}
+		✓ {editingCi ? 'Änderungen speichern' : tr('checkin.save')}{#if !editingCi} · +{Math.round(10 * multiplierValue)} XP{#if multiplierValue > 1} <span class="ci-cta-bonus">({multiplierValue}× Streak)</span>{/if}{/if}
 	</button>
 </div>
 
@@ -499,7 +502,8 @@
 	}
 	.ci-close {
 		background: none; border: none; color: var(--color-gb-text-muted);
-		font-size: 18px; cursor: pointer; padding: 4px 8px; min-height: 36px; min-width: 36px;
+		font-size: 18px; cursor: pointer; padding: 4px 8px;
+		min-height: 44px; min-width: 44px; /* v1.3.79: 36→44 für WCAG-AA-Touch-Target */
 	}
 	.ci-card {
 		background: var(--color-gb-surface);
@@ -534,10 +538,11 @@
 	.ci-sec-hint { font-size: 11px; color: var(--color-gb-text-dim); }
 
 	.ci-chip {
-		min-height: 36px;
-		padding: 8px 12px;
+		/* v1.3.79: 36→44 für WCAG-AA Touch-Target; padding angepasst damit visuelle Größe ähnlich bleibt */
+		min-height: 44px;
+		padding: 10px 14px;
 		border-radius: 999px;
-		font-size: 12px;
+		font-size: 13px;
 		font-weight: 500;
 		border: 1px solid var(--color-gb-border);
 		background: var(--color-gb-bg);
@@ -691,6 +696,14 @@
 		width: 3px; height: 12px;
 		border-radius: 2px;
 	}
+	/* v1.3.79: VPD-Hint wenn Temp/RH fehlen */
+	.ci-vpd-hint {
+		margin: 8px 0 0;
+		font-size: 11px;
+		color: var(--color-gb-text-dim);
+		text-align: center;
+		font-style: italic;
+	}
 	.ci-scale {
 		display: flex;
 		justify-content: space-between;
@@ -724,7 +737,14 @@
 	}
 	.ci-disc-title { font-size: 14px; font-weight: 500; }
 	.ci-disc-sub { font-size: 11px; color: var(--color-gb-text-muted); margin-top: 1px; }
-	.ci-chev { color: var(--color-gb-text-dim); font-size: 18px; }
+	/* v1.3.79: .ci-chev entfernt — Chevron war redundant zum +/- Icon links. */
+	/* v1.3.79: Streak-Bonus-Suffix im CTA — kleiner & dezenter als der XP-Hauptwert */
+	.ci-cta-bonus {
+		font-size: 11px;
+		font-weight: 500;
+		opacity: 0.75;
+		margin-left: 2px;
+	}
 
 	.ci-fold {
 		overflow: hidden;
@@ -746,12 +766,12 @@
 		gap: 2px;
 	}
 	.ci-seg button {
-		padding: 8px 12px;
+		padding: 10px 14px;
 		font-size: 12px; font-weight: 500;
 		color: var(--color-gb-text-muted);
 		background: none; border: none;
 		border-radius: 9px;
-		min-height: 36px; min-width: 44px;
+		min-height: 44px; min-width: 44px; /* v1.3.79: 36→44 für WCAG-AA */
 		cursor: pointer;
 		font-family: inherit;
 	}
