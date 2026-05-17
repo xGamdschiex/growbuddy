@@ -238,11 +238,12 @@
 			<h1 class="text-xl font-bold">{tr('calc.title')}</h1>
 			<p class="text-gb-text-muted text-sm">{tr('calc.subtitle')}</p>
 		</div>
-		<!-- Modus-Toggle: Einfach / Voll -->
+		<!-- Modus-Toggle: Einfach / Voll (v1.3.80: 24→44px Touch-Target — primärer State-Switcher) -->
 		<button
 			onclick={() => calcStore.toggleEinfach()}
-			class="text-xs px-3 py-1.5 rounded-full border shrink-0 ml-3
+			class="text-xs px-4 rounded-full border shrink-0 ml-3 flex items-center justify-center font-medium
 				{calcState.einfach_modus ? 'bg-gb-green/20 border-gb-green text-gb-green' : 'bg-gb-surface border-gb-border text-gb-text-muted'}"
+			style="min-height:44px"
 			aria-label="Modus wechseln"
 		>
 			{calcState.einfach_modus ? '⚡ ' + tr('calc.einfach_modus') : '⚙️ ' + tr('calc.voll_modus')}
@@ -325,6 +326,7 @@
 	{#if !calcState.einfach_modus || calcState.system !== 'topf'}
 	<div>
 		<span class="block text-xs text-gb-text-muted mb-1">{tr('calc.system_label')}</span>
+		<!-- v1.3.80: Pro-locked options bekommen 🔒-Prefix — sonst sieht User nur opacity-50 ohne Grund -->
 		<div class="grid grid-cols-4 gap-2">
 			{#each [
 				{ val: 'topf', label: '🪴 Topf', pro: false },
@@ -334,14 +336,22 @@
 			] as opt}
 				<button
 					onclick={() => {
-						if (opt.pro && !userIsPro) return;
+						if (opt.pro && !userIsPro) {
+							goto('/pro');
+							return;
+						}
 						updateState({ system: opt.val as any });
 					}}
-					disabled={opt.pro && !userIsPro}
-					class="px-2 py-2 rounded-lg text-xs font-medium border
+					class="px-2 py-2 rounded-lg text-xs font-medium border relative
 						{calcState.system === opt.val ? 'bg-gb-green/20 border-gb-green text-gb-green' : 'bg-gb-surface border-gb-border text-gb-text-muted'}
-						{opt.pro && !userIsPro ? 'opacity-50 cursor-not-allowed' : ''}"
-				>{opt.label}</button>
+						{opt.pro && !userIsPro ? 'opacity-60' : ''}"
+					aria-label={opt.pro && !userIsPro ? `${opt.label} (Pro-Feature)` : opt.label}
+				>
+					{#if opt.pro && !userIsPro}
+						<span class="absolute -top-1 -right-1 text-[10px] bg-gb-accent text-white rounded-full w-4 h-4 flex items-center justify-center" aria-hidden="true">🔒</span>
+					{/if}
+					{opt.label}
+				</button>
 			{/each}
 		</div>
 		{#if calcState.system !== 'topf'}
@@ -356,11 +366,13 @@
 	{/if}
 
 	<!-- ═════ VOLL-MODUS ═════ -->
+	<!-- v1.3.80: Custom Chevron-Marker statt Text-Hinweis; rotiert via CSS bei [open] -->
 	{#if !calcState.einfach_modus}
-		<details class="bg-gb-surface/50 rounded-xl border border-gb-border">
-			<summary class="px-4 py-3 text-sm font-medium cursor-pointer select-none flex items-center justify-between">
+		<details class="calc-advanced bg-gb-surface/50 rounded-xl border border-gb-border">
+			<summary class="px-4 py-3 text-sm font-medium cursor-pointer select-none flex items-center justify-between gap-2"
+				style="min-height:48px">
 				<span>⚙️ {tr('calc.advanced_options')}</span>
-				<span class="text-xs text-gb-text-muted">tippen zum Öffnen</span>
+				<span class="calc-chevron text-gb-text-muted text-base leading-none" aria-hidden="true">›</span>
 			</summary>
 			<div class="p-4 pt-0 space-y-5">
 
@@ -567,16 +579,18 @@
 			{/each}
 		</div>
 
-		<!-- Apply als Check-in -->
-		<button
-			onclick={openApply}
-			class="w-full bg-gb-green text-gb-bg font-semibold px-4 py-3.5 rounded-xl text-sm shadow-lg shadow-gb-green/20 active:scale-[0.98] transition-transform"
-		>
-			🧪 Nährlösung angemischt & gegeben
-		</button>
-		<p class="text-xs text-gb-text-muted text-center -mt-2">
-			Legt automatisch einen Check-in mit Wasser- & Düngermengen an.
-		</p>
+		<!-- Apply als Check-in (v1.3.80: Hint VOR dem Button als Beschreibung statt awkward -mt-2 darunter) -->
+		<div class="space-y-2 pt-1">
+			<p class="text-xs text-gb-text-muted text-center px-2">
+				Tippe um automatisch einen Check-in mit Wasser- &amp; Düngermengen für deinen aktiven Grow anzulegen.
+			</p>
+			<button
+				onclick={openApply}
+				class="w-full bg-gb-green text-gb-bg font-semibold px-4 py-3.5 rounded-xl text-sm shadow-lg shadow-gb-green/20 active:scale-[0.98] transition-transform"
+			>
+				🧪 Nährlösung angemischt &amp; gegeben
+			</button>
+		</div>
 	{/if}
 </div>
 
@@ -624,17 +638,20 @@
 				<div class="flex justify-between"><span class="text-gb-text-muted">Phase/Woche/Tag:</span><span class="font-medium">{calcState.phase} W{calcState.woche}T{calcState.tag}</span></div>
 			</div>
 
+			<!-- v1.3.80: Modal-Buttons auf 44px (Konsistenz zu CheckInForm v1.3.79) -->
 			<div class="flex gap-2">
 				<button
 					onclick={() => (showApply = false)}
-					class="flex-1 bg-gb-surface-2 text-gb-text px-4 py-2.5 rounded-lg text-sm font-medium"
+					class="flex-1 bg-gb-surface-2 text-gb-text px-4 rounded-lg text-sm font-medium"
+					style="min-height:44px"
 				>
 					Abbrechen
 				</button>
 				<button
 					onclick={applyAsCheckin}
 					disabled={!applyGrowId}
-					class="flex-1 bg-gb-green text-gb-bg px-4 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50"
+					class="flex-1 bg-gb-green text-gb-bg px-4 rounded-lg text-sm font-semibold disabled:opacity-50"
+					style="min-height:44px"
 				>
 					Anlegen
 				</button>
@@ -642,3 +659,16 @@
 		</div>
 	</div>
 {/if}
+
+<style>
+	/* v1.3.80: Custom-Chevron für die Voll-Modus details/summary — rotiert bei [open] */
+	.calc-advanced summary::-webkit-details-marker { display: none; }
+	.calc-advanced summary { list-style: none; }
+	.calc-chevron {
+		display: inline-block;
+		transition: transform 0.2s ease;
+	}
+	.calc-advanced[open] .calc-chevron {
+		transform: rotate(90deg);
+	}
+</style>
