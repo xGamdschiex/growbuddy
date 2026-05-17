@@ -176,6 +176,70 @@ describe('calcNutrientUsage', () => {
 		expect(r.byProduct[0].key).toBe('grow');
 		expect(r.byProduct[1].key).toBe('core');
 	});
+
+	it('total_water_l aggregiert nur gewertete Check-ins', () => {
+		const checkins: CheckIn[] = [
+			ci({ day: 1, phase: 'Veg', week: 1, watered: true, nutrients_given: true, water_ml: 3000 }),
+			ci({ day: 2, phase: 'Veg', week: 1, watered: true, nutrients_given: true, water_ml: 2000 }),
+			ci({ day: 3, phase: 'Veg', week: 1, watered: true, nutrients_given: false, water_ml: 5000 }),  // skip
+		];
+		const r = calcNutrientUsage(baseGrow, checkins);
+		expect(r.total_water_l).toBe(5);
+	});
+});
+
+describe('calcNutrientUsage → byPhase', () => {
+	it('schlüsselt Veg + Bloom getrennt auf', () => {
+		const checkins: CheckIn[] = [
+			ci({ day: 1, phase: 'Veg', week: 1, watered: true, nutrients_given: true, water_ml: 5000 }),
+			ci({ day: 30, phase: 'Bloom', week: 1, watered: true, nutrients_given: true, water_ml: 10000 }),
+		];
+		const r = calcNutrientUsage(baseGrow, checkins);
+		expect(r.byPhase.length).toBe(2);
+		expect(r.byPhase[0].phase).toBe('Veg');
+		expect(r.byPhase[1].phase).toBe('Bloom');
+		// Veg: 5L → Pro Grow 10.15g, Pro Core 6.1g, KEIN Pro Bloom
+		const veg = r.byPhase[0];
+		expect(veg.water_l).toBe(5);
+		expect(veg.products.find(p => p.key === 'grow')?.total).toBeCloseTo(10.15, 1);
+		expect(veg.products.find(p => p.key === 'bloom')).toBeUndefined();
+		// Bloom W1: 10L → Pro Bloom 20.3g, Pro Core 12.2g, KEIN Pro Grow
+		const bloom = r.byPhase[1];
+		expect(bloom.water_l).toBe(10);
+		expect(bloom.products.find(p => p.key === 'bloom')?.total).toBeCloseTo(20.3, 1);
+		expect(bloom.products.find(p => p.key === 'grow')).toBeUndefined();
+	});
+
+	it('sortiert Phasen nach Feedline-Reihenfolge (Clone→Veg→Bloom)', () => {
+		// Erst Bloom-Check-in, dann Veg-Check-in — Output sollte trotzdem Veg vor Bloom listen
+		const checkins: CheckIn[] = [
+			ci({ day: 30, phase: 'Bloom', week: 1, watered: true, nutrients_given: true, water_ml: 5000 }),
+			ci({ day: 1, phase: 'Veg', week: 1, watered: true, nutrients_given: true, water_ml: 5000 }),
+		];
+		const r = calcNutrientUsage(baseGrow, checkins);
+		expect(r.byPhase.map(p => p.phase)).toEqual(['Veg', 'Bloom']);
+	});
+
+	it('byPhase ist leer wenn keine gewerteten Check-ins', () => {
+		const r = calcNutrientUsage(baseGrow, []);
+		expect(r.byPhase).toEqual([]);
+		expect(r.total_water_l).toBe(0);
+	});
+
+	it('zählt mehrere Check-ins in gleicher Phase korrekt zusammen', () => {
+		const checkins: CheckIn[] = [
+			ci({ day: 1, phase: 'Veg', week: 1, watered: true, nutrients_given: true, water_ml: 5000 }),
+			ci({ day: 3, phase: 'Veg', week: 1, watered: true, nutrients_given: true, water_ml: 5000 }),
+			ci({ day: 5, phase: 'Veg', week: 2, watered: true, nutrients_given: true, water_ml: 5000 }),
+		];
+		const r = calcNutrientUsage(baseGrow, checkins);
+		expect(r.byPhase.length).toBe(1);
+		expect(r.byPhase[0].n_checkins).toBe(3);
+		expect(r.byPhase[0].water_l).toBe(15);
+		// Pro Grow: 3 × (5L × 20.3 g/10L) = 30.45g
+		expect(r.byPhase[0].products.find(p => p.key === 'grow')?.total).toBeCloseTo(30.45, 1);
+		expect(r.byPhase[0].products.find(p => p.key === 'grow')?.n_checkins).toBe(3);
+	});
 });
 
 describe('productSeries / productSeriesCumulative', () => {

@@ -58,25 +58,42 @@ export interface UsageHistoryPoint {
 	faktor: number;
 }
 
+export interface PhaseUsage {
+	/** Phase-Name, z.B. 'Veg', 'Bloom' */
+	phase: string;
+	/** Anzahl Düng-Check-ins in dieser Phase */
+	n_checkins: number;
+	/** Summe Wassermenge L in dieser Phase */
+	water_l: number;
+	/** Produkte mit ihrem Total in dieser Phase, sortiert nach Total absteigend */
+	products: ProductUsage[];
+}
+
 export interface NutrientUsageResult {
 	/** Düngerlinie die für die Berechnung benutzt wurde, oder null wenn Grow keine hat / unbekannt */
 	feedline: FeedLine | null;
-	/** Aggregat pro Produkt, sortiert nach Total absteigend */
+	/** Aggregat pro Produkt (alle Phasen), sortiert nach Total absteigend */
 	byProduct: ProductUsage[];
+	/** Aggregat pro Phase mit eigener Produkt-Liste, sortiert chronologisch nach Phase-Reihenfolge der Feedline */
+	byPhase: PhaseUsage[];
 	/** Chronologische History für Chart */
 	history: UsageHistoryPoint[];
 	/** Wie viele Check-ins überhaupt mit Düngung gewertet wurden */
 	n_fertigated_checkins: number;
 	/** Wie viele Check-ins übersprungen wurden (kein Schema für Phase/Woche, kein water_ml, etc.) */
 	n_skipped_checkins: number;
+	/** Summe Wassermenge L (nur gewertete Check-ins) */
+	total_water_l: number;
 }
 
 const EMPTY: NutrientUsageResult = {
 	feedline: null,
 	byProduct: [],
+	byPhase: [],
 	history: [],
 	n_fertigated_checkins: 0,
 	n_skipped_checkins: 0,
+	total_water_l: 0,
 };
 
 /**
@@ -104,11 +121,14 @@ export function calcNutrientUsage(grow: Grow, allCheckins: CheckIn[]): NutrientU
 
 	const startMs = new Date(grow.started_at).getTime();
 
-	// Akkumulator pro Produkt-Key
+	// Akkumulator pro Produkt-Key (gesamt)
 	const totals = new Map<string, { name: string; einheit: 'g' | 'mL'; total: number; n: number; kategorie: FeedProduct['kategorie'] }>();
+	// Akkumulator pro Phase → pro Produkt
+	const byPhaseMap = new Map<string, { n: number; water_l: number; products: Map<string, { name: string; einheit: 'g' | 'mL'; total: number; n: number; kategorie: FeedProduct['kategorie'] }> }>();
 	const history: UsageHistoryPoint[] = [];
 	let n_fertigated = 0;
 	let n_skipped = 0;
+	let total_water_l = 0;
 
 	for (const ci of checkins) {
 		// Nur Check-ins mit echter Wassergabe + Dünger
@@ -131,7 +151,17 @@ export function calcNutrientUsage(grow: Grow, allCheckins: CheckIn[]): NutrientU
 		}
 
 		const water_l = ci.water_ml / 1000;
+		total_water_l += water_l;
 		const per_product: Record<string, number> = {};
+
+		// Phase-Bucket vorbereiten
+		let phaseBucket = byPhaseMap.get(ci.phase);
+		if (!phaseBucket) {
+			phaseBucket = { n: 0, water_l: 0, products: new Map() };
+			byPhaseMap.set(ci.phase, phaseBucket);
+		}
+		phaseBucket.n += 1;
+		phaseBucket.water_l += water_l;
 
 		for (const product of feedline.produkte) {
 			const schemaMenge = schema.dosierungen[product.key];
@@ -144,12 +174,28 @@ export function calcNutrientUsage(grow: Grow, allCheckins: CheckIn[]): NutrientU
 
 			per_product[product.key] = menge;
 
+			// Gesamt-Total
 			const acc = totals.get(product.key);
 			if (acc) {
 				acc.total += menge;
 				acc.n += 1;
 			} else {
 				totals.set(product.key, {
+					name: product.name,
+					einheit: product.einheit,
+					total: menge,
+					n: 1,
+					kategorie: product.kategorie,
+				});
+			}
+
+			// Pro Phase
+			const pacc = phaseBucket.products.get(product.key);
+			if (pacc) {
+				pacc.total += menge;
+				pacc.n += 1;
+			} else {
+				phaseBucket.products.set(product.key, {
 					name: product.name,
 					einheit: product.einheit,
 					total: menge,
@@ -184,12 +230,34 @@ export function calcNutrientUsage(grow: Grow, allCheckins: CheckIn[]): NutrientU
 		}))
 		.sort((a, b) => b.total - a.total);
 
+	// Phase-Order aus Feedline (Clone → Veg → Bloom → Flush) — Phasen die nicht im Schema sind kommen ans Ende
+	const phaseOrder = new Map(feedline.phasen.map((p, i) => [p.name, i]));
+	const byPhase: PhaseUsage[] = Array.from(byPhaseMap.entries())
+		.map(([phase, bucket]) => ({
+			phase,
+			n_checkins: bucket.n,
+			water_l: Math.round(bucket.water_l * 100) / 100,
+			products: Array.from(bucket.products.entries())
+				.map(([key, v]) => ({
+					key,
+					name: v.name,
+					einheit: v.einheit,
+					total: Math.round(v.total * 100) / 100,
+					n_checkins: v.n,
+					kategorie: v.kategorie,
+				}))
+				.sort((a, b) => b.total - a.total),
+		}))
+		.sort((a, b) => (phaseOrder.get(a.phase) ?? 999) - (phaseOrder.get(b.phase) ?? 999));
+
 	return {
 		feedline,
 		byProduct,
+		byPhase,
 		history,
 		n_fertigated_checkins: n_fertigated,
 		n_skipped_checkins: n_skipped,
+		total_water_l: Math.round(total_water_l * 100) / 100,
 	};
 }
 

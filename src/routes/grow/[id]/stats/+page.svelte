@@ -258,72 +258,52 @@
 				</div>
 			</div>
 
-			<!-- Wasser + Dünger mit Erklärung -->
+			<!-- v1.4.2: Wasser & Dünger — ein Block (war: 'Verbrauch' + 'Düngerverbrauch' separat) -->
 			<div class="space-y-2">
-				<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">Verbrauch</h2>
-				{#if totalWaterMl > 0}
-					<div class="bg-gb-surface rounded-xl p-4 space-y-1">
-						<div class="flex items-baseline justify-between">
-							<p class="text-xs text-gb-text-muted">💧 Wasser total</p>
-							<p class="text-2xl font-bold text-gb-info">{(totalWaterMl / 1000).toFixed(1)} L</p>
-						</div>
-						<p class="text-[11px] text-gb-text-muted leading-relaxed">
-							Summe aller im Daily-Check-in eingetragenen Wassermengen ("Wasser ml").
-						</p>
-					</div>
-				{:else}
-					<div class="bg-gb-surface rounded-xl p-4">
-						<p class="text-xs text-gb-text-muted">💧 Wasser total</p>
-						<p class="text-sm text-gb-text-muted mt-1">Noch keine Wasser-Mengen geloggt — beim Daily-Check-in unter "Wasser ml" eintragen.</p>
-					</div>
-				{/if}
-
-				{#if totalNutrientMl > 0}
-					<div class="bg-gb-surface rounded-xl p-4 space-y-1">
-						<div class="flex items-baseline justify-between">
-							<p class="text-xs text-gb-text-muted">🧪 Dünger total (mL)</p>
-							<p class="text-2xl font-bold">{totalNutrientMl.toFixed(0)} mL</p>
-						</div>
-						<p class="text-[11px] text-gb-text-muted leading-relaxed">
-							Summe aller im Daily-Check-in eingetragenen Nährstoff-Mengen aus dem Feld
-							"Nährstoff ml". Nutze das nur wenn du beim Gießen die Düngermenge separat mitloggst —
-							typischerweise = Wasser × EC-faktor / Dünger-Konzentration.
-							Erscheint nur wenn du das Feld füllst (aktuell {nutrientCheckins} von {chronCheckins.length} Check-ins).
-						</p>
-					</div>
-				{/if}
-			</div>
-
-			<!-- v1.4.1: Düngerverbrauch pro Produkt (hochgerechnet aus Schema * Wassergabe) -->
-			{#if nutrientUsage && nutrientUsage.feedline}
-				<div class="space-y-2">
-					<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide flex items-center justify-between gap-2">
-						<span>Düngerverbrauch</span>
+				<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide flex items-center justify-between gap-2">
+					<span>Wasser &amp; Dünger</span>
+					{#if nutrientUsage?.feedline}
 						<span class="text-[10px] font-normal normal-case tracking-normal text-gb-text-muted truncate ml-2 max-w-[60%]" title={nutrientUsage.feedline.name}>{nutrientUsage.feedline.name}</span>
-					</h2>
+					{/if}
+				</h2>
 
+				<!-- Top-Tiles: Wasser-Total + Düng-Count -->
+				<div class="grid grid-cols-2 gap-2">
+					<div class="bg-gb-surface rounded-xl p-3">
+						<p class="text-[10px] text-gb-text-muted uppercase tracking-wide">💧 Wasser</p>
+						<p class="text-xl font-bold text-gb-info mt-0.5">{(totalWaterMl / 1000).toFixed(1)}<span class="text-xs font-normal text-gb-text-muted ml-1">L</span></p>
+					</div>
+					<div class="bg-gb-surface rounded-xl p-3">
+						<p class="text-[10px] text-gb-text-muted uppercase tracking-wide">🧪 Düng-Check-ins</p>
+						<p class="text-xl font-bold mt-0.5">{nutrientUsage?.n_fertigated_checkins ?? nutrientCheckins}<span class="text-xs font-normal text-gb-text-muted ml-1">×</span></p>
+					</div>
+				</div>
+
+				<!-- Düngerverbrauch (wenn Feedline gesetzt) -->
+				{#if nutrientUsage?.feedline}
 					{#if nutrientUsage.byProduct.length === 0}
 						<div class="bg-gb-surface rounded-xl p-4 space-y-2">
-							<p class="text-sm text-gb-text-muted">Noch keine Düngung erfasst.</p>
+							<p class="text-sm text-gb-text-muted">Noch keine Düngung berechnet.</p>
 							<p class="text-[11px] text-gb-text-muted leading-relaxed">
-								So aktivieren: Beim Check-in 💧 <span class="text-gb-text">Gegossen</span> +
-								🧪 <span class="text-gb-text">Gedüngt</span> aktivieren und die <span class="text-gb-text">Wassermenge in mL</span> eintragen.
-								Wir rechnen die Produktmengen dann aus dem Düngerschema hoch.
+								Beim Check-in 💧 <span class="text-gb-text">Gegossen</span> +
+								🧪 <span class="text-gb-text">Gedüngt</span> aktivieren und <span class="text-gb-text">Wassermenge (mL)</span> eintragen.
+								Wir rechnen aus dem Düngerschema hoch.
 							</p>
 						</div>
 					{:else}
-						<!-- Produkt-Liste mit Total + Anteil -->
+						<!-- Total über alle Phasen, kompakte Bars -->
 						<div class="bg-gb-surface rounded-xl p-3 space-y-2.5">
+							<p class="text-[10px] text-gb-text-muted uppercase tracking-wide">Gesamt</p>
 							{#each nutrientUsage.byProduct as p}
 								{@const widthPct = nutrientMaxTotal > 0 ? (p.total / nutrientMaxTotal) * 100 : 0}
 								{@const isSelected = selectedProductKey === p.key}
 								{@const color = categoryColor(p.kategorie)}
 								<button type="button" onclick={() => selectedProductKey = p.key}
-									class="w-full text-left space-y-1 group">
+									class="w-full text-left space-y-1 group" style="min-height:44px">
 									<div class="flex items-baseline justify-between gap-2">
 										<span class="text-sm font-medium truncate {isSelected ? 'text-gb-text' : 'text-gb-text-muted group-hover:text-gb-text'}">{p.name}</span>
 										<span class="text-sm font-bold tabular-nums {isSelected ? 'text-gb-text' : 'text-gb-text-muted'}">
-											{p.total.toFixed(p.einheit === 'g' ? 1 : 0)} <span class="text-[10px] font-normal text-gb-text-muted">{p.einheit}</span>
+											{p.total.toFixed(p.einheit === 'g' ? 1 : 0)}<span class="text-[10px] font-normal text-gb-text-muted ml-0.5">{p.einheit}</span>
 										</span>
 									</div>
 									<div class="flex items-center gap-2">
@@ -336,17 +316,43 @@
 							{/each}
 						</div>
 
-						<!-- Hinweis Skipped + Faktor-Erklärung -->
+						<!-- v1.4.2: Aufschlüsselung pro Phase (Veg vs Bloom vs ...) — nur wenn mehrere Phasen -->
+						{#if nutrientUsage.byPhase.length >= 2}
+							{#each nutrientUsage.byPhase as ph}
+								{@const phMax = Math.max(0, ...ph.products.map(pp => pp.total))}
+								<details class="bg-gb-surface rounded-xl overflow-hidden">
+									<summary class="flex items-center justify-between px-3 py-2.5 cursor-pointer select-none" style="min-height:44px">
+										<div class="flex items-baseline gap-2 min-w-0">
+											<span class="text-sm font-semibold">{ph.phase}</span>
+											<span class="text-[11px] text-gb-text-muted">{ph.n_checkins}× · {ph.water_l.toFixed(1)} L</span>
+										</div>
+										<span class="text-gb-text-muted text-xs phase-chev">▸</span>
+									</summary>
+									<div class="px-3 pb-3 space-y-1.5">
+										{#each ph.products as pp}
+											{@const wPct = phMax > 0 ? (pp.total / phMax) * 100 : 0}
+											{@const c = categoryColor(pp.kategorie)}
+											<div class="space-y-0.5">
+												<div class="flex items-baseline justify-between gap-2">
+													<span class="text-xs text-gb-text-muted truncate">{pp.name}</span>
+													<span class="text-xs font-semibold tabular-nums">{pp.total.toFixed(pp.einheit === 'g' ? 1 : 0)} {pp.einheit}</span>
+												</div>
+												<div class="h-1 bg-gb-bg rounded-full overflow-hidden">
+													<div class="h-full" style="width: {wPct}%; background: {c}; opacity: 0.7;"></div>
+												</div>
+											</div>
+										{/each}
+									</div>
+								</details>
+							{/each}
+						{/if}
+
+						<!-- Hinweise -->
 						<div class="text-[11px] text-gb-text-muted leading-relaxed px-1 space-y-1">
-							<p>
-								Hochgerechnet aus {nutrientUsage.n_fertigated_checkins} Düng-Check-in{nutrientUsage.n_fertigated_checkins !== 1 ? 's' : ''}.
-								{#if nutrientUsage.n_skipped_checkins > 0}
-									<span class="text-gb-warning">{nutrientUsage.n_skipped_checkins} übersprungen</span> (Phase/Woche nicht im Schema).
-								{/if}
-							</p>
-							<p class="opacity-80">
-								Wenn EC gemessen wird, skalieren wir mit <code>ec_measured / ec_ziel</code> (clamped 0.3–1.2×) — sonst 100 % Schema-Menge.
-							</p>
+							{#if nutrientUsage.n_skipped_checkins > 0}
+								<p><span class="text-gb-warning">{nutrientUsage.n_skipped_checkins} Check-in{nutrientUsage.n_skipped_checkins !== 1 ? 's' : ''} übersprungen</span> (Phase/Woche nicht im Schema).</p>
+							{/if}
+							<p class="opacity-80">EC-Skalierung: <code>ec_measured / ec_ziel</code> (clamped 0.3–1.2×). Ohne EC → 100 %.</p>
 						</div>
 
 						<!-- Verlauf-Chart für gewähltes Produkt (kumuliert) -->
@@ -359,24 +365,30 @@
 								unit=" {selectedProduct.einheit}"
 								showMinMax
 							/>
-						{:else if selectedProduct}
-							<div class="bg-gb-surface rounded-xl p-3 text-center text-[11px] text-gb-text-muted">
-								{selectedProduct.name}: erst {selectedProductSeries.values.length} Dosierung erfasst — ab 2 zeigen wir den Verlauf.
-							</div>
 						{/if}
 					{/if}
-				</div>
-			{/if}
+				{:else if totalNutrientMl > 0}
+					<!-- Fallback: keine Feedline gesetzt, aber User loggt nutrient_ml manuell -->
+					<div class="bg-gb-surface rounded-xl p-3 space-y-1">
+						<div class="flex items-baseline justify-between">
+							<p class="text-xs text-gb-text-muted">🧪 Nährstoff (mL, manuell)</p>
+							<p class="text-lg font-bold">{totalNutrientMl.toFixed(0)} <span class="text-xs font-normal text-gb-text-muted">mL</span></p>
+						</div>
+						<p class="text-[11px] text-gb-text-muted">Ohne Düngerlinie können wir nicht pro Produkt aufschlüsseln. Weise dem Grow eine Linie zu für Pro-Produkt-Stats.</p>
+					</div>
+				{/if}
+			</div>
 
-			<!-- Phase-Sub-Stats Tabelle -->
-			{#if allPhases.length >= 2}
+			<!-- v1.4.2: Pro Phase — Ø Werte + Tage zusammengeführt -->
+			{#if allPhases.length >= 1 && (allPhases.length >= 2 || phaseDays.length > 0)}
 				<div class="space-y-2">
-					<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">Ø pro Phase</h2>
+					<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">Pro Phase</h2>
 					<div class="bg-gb-surface rounded-xl p-3 overflow-x-auto">
 						<table class="w-full text-xs">
 							<thead>
 								<tr class="text-gb-text-muted text-[10px] uppercase tracking-wide">
 									<th class="text-left font-medium pb-2">Phase</th>
+									<th class="text-right font-medium pb-2">Tage</th>
 									<th class="text-right font-medium pb-2">Temp</th>
 									<th class="text-right font-medium pb-2">RH</th>
 									<th class="text-right font-medium pb-2">VPD</th>
@@ -386,33 +398,19 @@
 							</thead>
 							<tbody>
 								{#each allPhases as phase}
+									{@const days = phaseDays.find(p => p.phase === phase)?.days}
 									<tr class="border-t border-gb-border/50">
 										<td class="py-1.5 font-medium">{phase}</td>
-										<td class="text-right text-gb-text-muted">{tempPerPhase[phase]?.avg !== null && tempPerPhase[phase] !== undefined ? `${tempPerPhase[phase].avg!.toFixed(1)}°` : '—'}</td>
-										<td class="text-right text-gb-text-muted">{rhPerPhase[phase]?.avg !== null && rhPerPhase[phase] !== undefined ? `${rhPerPhase[phase].avg!.toFixed(0)}%` : '—'}</td>
-										<td class="text-right text-gb-text-muted">{vpdPerPhase[phase]?.avg !== null && vpdPerPhase[phase] !== undefined ? vpdPerPhase[phase].avg!.toFixed(2) : '—'}</td>
-										<td class="text-right text-gb-text-muted">{ecPerPhase[phase]?.avg !== null && ecPerPhase[phase] !== undefined ? ecPerPhase[phase].avg!.toFixed(2) : '—'}</td>
-										<td class="text-right text-gb-text-muted">{phPerPhase[phase]?.avg !== null && phPerPhase[phase] !== undefined ? phPerPhase[phase].avg!.toFixed(1) : '—'}</td>
+										<td class="text-right text-gb-text-muted tabular-nums">{days !== undefined ? `${days}d` : '—'}</td>
+										<td class="text-right text-gb-text-muted tabular-nums">{tempPerPhase[phase]?.avg !== null && tempPerPhase[phase] !== undefined ? `${tempPerPhase[phase].avg!.toFixed(1)}°` : '—'}</td>
+										<td class="text-right text-gb-text-muted tabular-nums">{rhPerPhase[phase]?.avg !== null && rhPerPhase[phase] !== undefined ? `${rhPerPhase[phase].avg!.toFixed(0)}%` : '—'}</td>
+										<td class="text-right text-gb-text-muted tabular-nums">{vpdPerPhase[phase]?.avg !== null && vpdPerPhase[phase] !== undefined ? vpdPerPhase[phase].avg!.toFixed(2) : '—'}</td>
+										<td class="text-right text-gb-text-muted tabular-nums">{ecPerPhase[phase]?.avg !== null && ecPerPhase[phase] !== undefined ? ecPerPhase[phase].avg!.toFixed(2) : '—'}</td>
+										<td class="text-right text-gb-text-muted tabular-nums">{phPerPhase[phase]?.avg !== null && phPerPhase[phase] !== undefined ? phPerPhase[phase].avg!.toFixed(1) : '—'}</td>
 									</tr>
 								{/each}
 							</tbody>
 						</table>
-					</div>
-				</div>
-			{/if}
-
-			<!-- Tage pro Phase -->
-			{#if phaseDays.length > 0}
-				<div class="space-y-2">
-					<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">Tage pro Phase</h2>
-					<div class="bg-gb-surface rounded-xl p-3">
-						<div class="flex flex-wrap gap-2">
-							{#each phaseDays as pd}
-								<span class="bg-gb-bg px-3 py-1.5 rounded-lg text-xs">
-									<span class="text-gb-text-muted">{pd.phase}:</span> <span class="font-semibold">{pd.days}d</span>
-								</span>
-							{/each}
-						</div>
 					</div>
 				</div>
 			{/if}
@@ -492,3 +490,11 @@
 		{/if}
 	{/if}
 </div>
+
+<style>
+	/* v1.4.2: details/summary Polish — Default-Marker weg, Chevron rotiert beim Aufklappen */
+	details > summary { list-style: none; }
+	details > summary::-webkit-details-marker { display: none; }
+	.phase-chev { transition: transform 0.2s ease; display: inline-block; }
+	details[open] .phase-chev { transform: rotate(90deg); }
+</style>
