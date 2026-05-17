@@ -1,0 +1,239 @@
+/**
+ * Nutrient-Usage — aggregiert den Düngerverbrauch eines Grows pro Produkt.
+ *
+ * Idee: Für jeden Check-in mit watered=true + water_ml + Grow-feedline_id wird das
+ * Düngerschema (Phase + Woche) gelesen und die im Wasser enthaltene Menge jedes
+ * Produkts (g oder mL) hochgerechnet.
+ *
+ * Faktor:
+ *  - Wenn `ec_measured` UND `schema.ec_ziel` vorhanden: faktor = clamp(ec_measured / ec_ziel, 0.3, 1.2)
+ *    → Wenn der User halb so stark dosiert (gemessen 1.5 vs Ziel 3.0), zählen wir nur die halbe Menge.
+ *  - Sonst: faktor = 1.0 (100% Schema-Dosierung).
+ *
+ * Reservoir-Logik: water_ml ist die TATSÄCHLICH gegebene Wassermenge.
+ * `calcProductDosierung` interpretiert reservoir_L → wir geben water_ml/1000 rein.
+ *
+ * Output enthält:
+ *  - `byProduct`: pro Produkt-Key Total + Einheit + n_checkins
+ *  - `history`: pro Check-in welche Mengen wann gegeben wurden (Chart-fähig)
+ */
+
+import type { CheckIn, Grow } from '$lib/stores/grow';
+import { getFeedLine } from '$lib/calc/feedlines/registry';
+import {
+	getSchemaForWeek,
+	calcProductDosierung,
+	type FeedLine,
+	type FeedProduct,
+} from '$lib/calc/feedlines/types';
+
+export interface ProductUsage {
+	/** Produkt-Key wie 'grow', 'bloom', 'core' */
+	key: string;
+	/** Display-Name 'Pro Grow' */
+	name: string;
+	/** g | mL */
+	einheit: 'g' | 'mL';
+	/** Summe über alle Check-ins (in einheit) */
+	total: number;
+	/** Anzahl Check-ins die dieses Produkt enthielten (Dosierung > 0) */
+	n_checkins: number;
+	/** Welche Produkt-Kategorie ('base' | 'supplement' | ...) — für UI-Gruppierung */
+	kategorie: FeedProduct['kategorie'];
+}
+
+export interface UsageHistoryPoint {
+	/** Check-in created_at */
+	created_at: string;
+	/** Grow-Tag relativ zu started_at (1-basiert) */
+	day: number;
+	/** Wassermenge in L */
+	water_l: number;
+	/** Phase + Woche dieses Check-ins */
+	phase: string;
+	week: number;
+	/** Pro Produkt-Key: Menge in seiner Einheit */
+	per_product: Record<string, number>;
+	/** Faktor der verwendet wurde (1.0 = 100%) */
+	faktor: number;
+}
+
+export interface NutrientUsageResult {
+	/** Düngerlinie die für die Berechnung benutzt wurde, oder null wenn Grow keine hat / unbekannt */
+	feedline: FeedLine | null;
+	/** Aggregat pro Produkt, sortiert nach Total absteigend */
+	byProduct: ProductUsage[];
+	/** Chronologische History für Chart */
+	history: UsageHistoryPoint[];
+	/** Wie viele Check-ins überhaupt mit Düngung gewertet wurden */
+	n_fertigated_checkins: number;
+	/** Wie viele Check-ins übersprungen wurden (kein Schema für Phase/Woche, kein water_ml, etc.) */
+	n_skipped_checkins: number;
+}
+
+const EMPTY: NutrientUsageResult = {
+	feedline: null,
+	byProduct: [],
+	history: [],
+	n_fertigated_checkins: 0,
+	n_skipped_checkins: 0,
+};
+
+/**
+ * Hauptfunktion: berechnet Düngerverbrauch für einen Grow.
+ *
+ * Berücksichtigt nur Check-ins mit:
+ *  - watered = true
+ *  - nutrients_given = true
+ *  - water_ml > 0
+ *  - passende Schema-Zeile für Phase + Woche
+ *
+ * Edge-Cases:
+ *  - Grow ohne feedline_id → leeres Result (feedline=null)
+ *  - feedline_id unbekannt im Registry → leeres Result
+ *  - Phase/Woche nicht im Schema (z.B. 'Seedling' nicht definiert) → Check-in übersprungen
+ */
+export function calcNutrientUsage(grow: Grow, allCheckins: CheckIn[]): NutrientUsageResult {
+	if (!grow.feedline_id) return EMPTY;
+	const feedline = getFeedLine(grow.feedline_id);
+	if (!feedline) return EMPTY;
+
+	const checkins = allCheckins
+		.filter((c) => c.grow_id === grow.id)
+		.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+	const startMs = new Date(grow.started_at).getTime();
+
+	// Akkumulator pro Produkt-Key
+	const totals = new Map<string, { name: string; einheit: 'g' | 'mL'; total: number; n: number; kategorie: FeedProduct['kategorie'] }>();
+	const history: UsageHistoryPoint[] = [];
+	let n_fertigated = 0;
+	let n_skipped = 0;
+
+	for (const ci of checkins) {
+		// Nur Check-ins mit echter Wassergabe + Dünger
+		if (!ci.watered || !ci.nutrients_given || ci.water_ml == null || ci.water_ml <= 0) continue;
+		n_fertigated++;
+
+		const schema = getSchemaForWeek(feedline, ci.phase, ci.week);
+		if (!schema) {
+			n_skipped++;
+			continue;
+		}
+
+		// EC-basierter Faktor: wenn gemessen < Ziel → User dosiert schwächer
+		let faktor = 1.0;
+		if (ci.ec_measured != null && schema.ec_ziel > 0) {
+			faktor = ci.ec_measured / schema.ec_ziel;
+			// Clamp damit Ausreißer (Schema 0.4 → ec_measured 2.0 = 500%) nicht alles verzerren
+			if (faktor < 0.3) faktor = 0.3;
+			if (faktor > 1.2) faktor = 1.2;
+		}
+
+		const water_l = ci.water_ml / 1000;
+		const per_product: Record<string, number> = {};
+
+		for (const product of feedline.produkte) {
+			const schemaMenge = schema.dosierungen[product.key];
+			if (!schemaMenge || schemaMenge <= 0) continue;
+
+			// calcProductDosierung erwartet faktor als Prozent
+			const result = calcProductDosierung(product, schemaMenge, water_l, faktor * 100);
+			const menge = result.menge_tank;
+			if (menge <= 0) continue;
+
+			per_product[product.key] = menge;
+
+			const acc = totals.get(product.key);
+			if (acc) {
+				acc.total += menge;
+				acc.n += 1;
+			} else {
+				totals.set(product.key, {
+					name: product.name,
+					einheit: product.einheit,
+					total: menge,
+					n: 1,
+					kategorie: product.kategorie,
+				});
+			}
+		}
+
+		// Grow-Tag (1-basiert). Math.max für Edge-Case "Check-in vor Start" (Edit-Bug-Resilience).
+		const day = Math.max(1, Math.floor((new Date(ci.created_at).getTime() - startMs) / 86400000) + 1);
+
+		history.push({
+			created_at: ci.created_at,
+			day,
+			water_l,
+			phase: ci.phase,
+			week: ci.week,
+			per_product,
+			faktor,
+		});
+	}
+
+	const byProduct: ProductUsage[] = Array.from(totals.entries())
+		.map(([key, v]) => ({
+			key,
+			name: v.name,
+			einheit: v.einheit,
+			total: Math.round(v.total * 100) / 100,
+			n_checkins: v.n,
+			kategorie: v.kategorie,
+		}))
+		.sort((a, b) => b.total - a.total);
+
+	return {
+		feedline,
+		byProduct,
+		history,
+		n_fertigated_checkins: n_fertigated,
+		n_skipped_checkins: n_skipped,
+	};
+}
+
+/**
+ * Hilfsfunktion: Series pro Produkt für Chart-Plot.
+ *
+ * Liefert für einen Produkt-Key die Tag- + Wert-Arrays (gleicher Schemastil wie
+ * andere Stats-Series). Tage ohne Dosierung dieses Produkts werden NICHT
+ * eingetragen (sparse), damit der Chart nicht durch 0-Werte verzerrt wird.
+ */
+export function productSeries(
+	history: UsageHistoryPoint[],
+	productKey: string,
+): { days: number[]; values: number[] } {
+	const days: number[] = [];
+	const values: number[] = [];
+	for (const h of history) {
+		const v = h.per_product[productKey];
+		if (v != null && v > 0) {
+			days.push(h.day);
+			values.push(Math.round(v * 100) / 100);
+		}
+	}
+	return { days, values };
+}
+
+/**
+ * Hilfsfunktion: kumulierte Series pro Produkt (Total bis Tag X).
+ * Praktisch für "wie viel hab ich bis Tag 42 insgesamt verbraucht"-Charts.
+ */
+export function productSeriesCumulative(
+	history: UsageHistoryPoint[],
+	productKey: string,
+): { days: number[]; values: number[] } {
+	const days: number[] = [];
+	const values: number[] = [];
+	let cum = 0;
+	for (const h of history) {
+		const v = h.per_product[productKey];
+		if (v != null && v > 0) {
+			cum += v;
+			days.push(h.day);
+			values.push(Math.round(cum * 100) / 100);
+		}
+	}
+	return { days, values };
+}

@@ -22,6 +22,7 @@
 	import HealthCard from '$lib/components/HealthCard.svelte';
 	import { phaseTargetSegments, targetFor } from '$lib/utils/phase-targets';
 	import { CHART_COLORS } from '$lib/utils/chart-colors';
+	import { calcNutrientUsage, productSeriesCumulative } from '$lib/utils/nutrient-usage';
 	import { onMount } from 'svelte';
 
 	let growId = $derived($page.params.id);
@@ -161,6 +162,32 @@
 		...Object.keys(tempPerPhase), ...Object.keys(rhPerPhase),
 		...Object.keys(vpdPerPhase), ...Object.keys(ecPerPhase), ...Object.keys(phPerPhase),
 	])));
+
+	// v1.4.1: Düngerverbrauch — hochgerechnet aus Wassergaben + Feedline-Schema
+	let nutrientUsage = $derived(grow ? calcNutrientUsage(grow, growState?.checkins ?? []) : null);
+	let nutrientMaxTotal = $derived(nutrientUsage ? Math.max(0, ...nutrientUsage.byProduct.map(p => p.total)) : 0);
+	let selectedProductKey = $state<string | null>(null);
+	// Default: erstes Produkt (= meistgenutztes)
+	$effect(() => {
+		if (nutrientUsage && nutrientUsage.byProduct.length > 0 && selectedProductKey === null) {
+			selectedProductKey = nutrientUsage.byProduct[0].key;
+		}
+	});
+	let selectedProductSeries = $derived.by(() => {
+		if (!nutrientUsage || !selectedProductKey) return { days: [], values: [] };
+		return productSeriesCumulative(nutrientUsage.history, selectedProductKey);
+	});
+	let selectedProduct = $derived(
+		nutrientUsage?.byProduct.find(p => p.key === selectedProductKey) ?? null
+	);
+	// Kategorie-Farben (visuelle Trennung base vs. supplement vs. ...)
+	function categoryColor(kat: string): string {
+		if (kat === 'base') return CHART_COLORS.nutrient;
+		if (kat === 'supplement') return CHART_COLORS.water;
+		if (kat === 'booster') return CHART_COLORS.vpd;
+		if (kat === 'stimulator') return CHART_COLORS.ec;
+		return CHART_COLORS.rh;
+	}
 </script>
 
 <svelte:head><title>Statistik · {grow?.name ?? 'Grow'}</title></svelte:head>
@@ -266,6 +293,80 @@
 					</div>
 				{/if}
 			</div>
+
+			<!-- v1.4.1: Düngerverbrauch pro Produkt (hochgerechnet aus Schema * Wassergabe) -->
+			{#if nutrientUsage && nutrientUsage.feedline}
+				<div class="space-y-2">
+					<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide flex items-center justify-between gap-2">
+						<span>Düngerverbrauch</span>
+						<span class="text-[10px] font-normal normal-case tracking-normal text-gb-text-muted truncate ml-2 max-w-[60%]" title={nutrientUsage.feedline.name}>{nutrientUsage.feedline.name}</span>
+					</h2>
+
+					{#if nutrientUsage.byProduct.length === 0}
+						<div class="bg-gb-surface rounded-xl p-4 space-y-2">
+							<p class="text-sm text-gb-text-muted">Noch keine Düngung erfasst.</p>
+							<p class="text-[11px] text-gb-text-muted leading-relaxed">
+								So aktivieren: Beim Check-in 💧 <span class="text-gb-text">Gegossen</span> +
+								🧪 <span class="text-gb-text">Gedüngt</span> aktivieren und die <span class="text-gb-text">Wassermenge in mL</span> eintragen.
+								Wir rechnen die Produktmengen dann aus dem Düngerschema hoch.
+							</p>
+						</div>
+					{:else}
+						<!-- Produkt-Liste mit Total + Anteil -->
+						<div class="bg-gb-surface rounded-xl p-3 space-y-2.5">
+							{#each nutrientUsage.byProduct as p}
+								{@const widthPct = nutrientMaxTotal > 0 ? (p.total / nutrientMaxTotal) * 100 : 0}
+								{@const isSelected = selectedProductKey === p.key}
+								{@const color = categoryColor(p.kategorie)}
+								<button type="button" onclick={() => selectedProductKey = p.key}
+									class="w-full text-left space-y-1 group">
+									<div class="flex items-baseline justify-between gap-2">
+										<span class="text-sm font-medium truncate {isSelected ? 'text-gb-text' : 'text-gb-text-muted group-hover:text-gb-text'}">{p.name}</span>
+										<span class="text-sm font-bold tabular-nums {isSelected ? 'text-gb-text' : 'text-gb-text-muted'}">
+											{p.total.toFixed(p.einheit === 'g' ? 1 : 0)} <span class="text-[10px] font-normal text-gb-text-muted">{p.einheit}</span>
+										</span>
+									</div>
+									<div class="flex items-center gap-2">
+										<div class="flex-1 h-1.5 bg-gb-bg rounded-full overflow-hidden">
+											<div class="h-full transition-all" style="width: {widthPct}%; background: {color}; opacity: {isSelected ? 1 : 0.55};"></div>
+										</div>
+										<span class="text-[10px] text-gb-text-muted whitespace-nowrap tabular-nums">{p.n_checkins}×</span>
+									</div>
+								</button>
+							{/each}
+						</div>
+
+						<!-- Hinweis Skipped + Faktor-Erklärung -->
+						<div class="text-[11px] text-gb-text-muted leading-relaxed px-1 space-y-1">
+							<p>
+								Hochgerechnet aus {nutrientUsage.n_fertigated_checkins} Düng-Check-in{nutrientUsage.n_fertigated_checkins !== 1 ? 's' : ''}.
+								{#if nutrientUsage.n_skipped_checkins > 0}
+									<span class="text-gb-warning">{nutrientUsage.n_skipped_checkins} übersprungen</span> (Phase/Woche nicht im Schema).
+								{/if}
+							</p>
+							<p class="opacity-80">
+								Wenn EC gemessen wird, skalieren wir mit <code>ec_measured / ec_ziel</code> (clamped 0.3–1.2×) — sonst 100 % Schema-Menge.
+							</p>
+						</div>
+
+						<!-- Verlauf-Chart für gewähltes Produkt (kumuliert) -->
+						{#if selectedProduct && selectedProductSeries.values.length >= 2}
+							<MiniChart
+								data={selectedProductSeries.values}
+								days={selectedProductSeries.days}
+								color={categoryColor(selectedProduct.kategorie)}
+								label="{selectedProduct.name} kumulativ"
+								unit=" {selectedProduct.einheit}"
+								showMinMax
+							/>
+						{:else if selectedProduct}
+							<div class="bg-gb-surface rounded-xl p-3 text-center text-[11px] text-gb-text-muted">
+								{selectedProduct.name}: erst {selectedProductSeries.values.length} Dosierung erfasst — ab 2 zeigen wir den Verlauf.
+							</div>
+						{/if}
+					{/if}
+				</div>
+			{/if}
 
 			<!-- Phase-Sub-Stats Tabelle -->
 			{#if allPhases.length >= 2}
