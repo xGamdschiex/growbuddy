@@ -20,6 +20,7 @@
 	import MiniChart from '$lib/components/MiniChart.svelte';
 	import MultiSeriesChart, { type ChartSeries } from '$lib/components/MultiSeriesChart.svelte';
 	import HealthCard from '$lib/components/HealthCard.svelte';
+	import Lightbox from '$lib/components/Lightbox.svelte';
 	import { phaseTargetSegments, targetFor } from '$lib/utils/phase-targets';
 	import { CHART_COLORS } from '$lib/utils/chart-colors';
 	import { calcNutrientUsage, productSeries, productSeriesCumulative, calcUsageForecast, type ProductUsage } from '$lib/utils/nutrient-usage';
@@ -417,6 +418,59 @@
 		return out.sort((a, b) => b.day - a.day).slice(0, 5);
 	});
 
+	// v1.4.5: Lightbox-State für Foto-Timeline
+	let lightboxOpen = $state(false);
+	let lightboxIndex = $state(0);
+	let allPhotos = $derived.by<string[]>(() => {
+		const out: string[] = [];
+		for (const c of photoCheckins) {
+			const photos = c.photos_data?.length ? c.photos_data
+				: c.photo_urls?.length ? c.photo_urls
+				: c.photo_data ? [c.photo_data]
+				: c.photo_url ? [c.photo_url]
+				: [];
+			out.push(...photos);
+		}
+		return out;
+	});
+	/** Index der ersten Photo eines Check-ins im flachen allPhotos-Array. */
+	function firstPhotoIndex(ciIdx: number): number {
+		let idx = 0;
+		for (let i = 0; i < ciIdx; i++) {
+			const c = photoCheckins[i];
+			const n = c.photos_data?.length ?? c.photo_urls?.length ?? (c.photo_data || c.photo_url ? 1 : 0);
+			idx += n;
+		}
+		return idx;
+	}
+	function openLightbox(ciIdx: number) {
+		lightboxIndex = firstPhotoIndex(ciIdx);
+		lightboxOpen = true;
+	}
+
+	// v1.4.5: Notes-Highlights — chronologisch absteigend, Top 5 mit nicht-leeren Notizen
+	let notesHighlights = $derived(
+		chronCheckins
+			.filter((c: CheckIn) => c.notes && c.notes.trim().length >= 3)
+			.slice()
+			.reverse()
+			.slice(0, 5)
+			.map((c: CheckIn) => ({ day: dayOf(c), phase: c.phase, week: c.week, day_in_phase: c.day, notes: c.notes.trim(), date: c.created_at }))
+	);
+
+	// v1.4.5: Pro-Phase Tap-Info — welche Cell gerade getappt für Target-Tooltip
+	let phaseInfoCell = $state<{ phase: string; key: 'temp' | 'rh' | 'vpd' | 'ec' | 'ph'; value: number } | null>(null);
+	function showCellInfo(phase: string, key: 'temp' | 'rh' | 'vpd' | 'ec' | 'ph', value: number | null) {
+		if (value === null) { phaseInfoCell = null; return; }
+		// Toggle off wenn gleiche Zelle nochmal getappt
+		if (phaseInfoCell && phaseInfoCell.phase === phase && phaseInfoCell.key === key) {
+			phaseInfoCell = null;
+		} else {
+			phaseInfoCell = { phase, key, value };
+		}
+	}
+	let phaseInfoTarget = $derived(phaseInfoCell ? targetFor(phaseInfoCell.key, phaseInfoCell.phase) : null);
+
 	// v1.4.4: Best-Day — Check-in mit meisten Werten im optimal-Bereich
 	let bestDay = $derived.by(() => {
 		let best: { day: number; ok: number; total: number; phase: string } | null = null;
@@ -724,20 +778,36 @@
 									<tr class="border-t border-gb-border/50">
 										<td class="py-1.5 font-medium">{phase}</td>
 										<td class="text-right text-gb-text-muted tabular-nums">{days !== undefined ? `${days}d` : '—'}</td>
-										<td class="text-right tabular-nums font-medium {statusBg(targetStatus(phase, 'temp', tempAvg))}">{tempAvg !== null ? `${tempAvg.toFixed(1)}°` : '—'}</td>
-										<td class="text-right tabular-nums font-medium {statusBg(targetStatus(phase, 'rh', rhAvg))}">{rhAvg !== null ? `${rhAvg.toFixed(0)}%` : '—'}</td>
-										<td class="text-right tabular-nums font-medium {statusBg(targetStatus(phase, 'vpd', vpdAvg))}">{vpdAvg !== null ? vpdAvg.toFixed(2) : '—'}</td>
-										<td class="text-right tabular-nums font-medium {statusBg(targetStatus(phase, 'ec', ecAvg))}">{ecAvg !== null ? ecAvg.toFixed(2) : '—'}</td>
-										<td class="text-right tabular-nums font-medium {statusBg(targetStatus(phase, 'ph', phAvg))}">{phAvg !== null ? phAvg.toFixed(1) : '—'}</td>
+										<td class="text-right tabular-nums font-medium cursor-pointer {statusBg(targetStatus(phase, 'temp', tempAvg))}" onclick={() => showCellInfo(phase, 'temp', tempAvg)}>{tempAvg !== null ? `${tempAvg.toFixed(1)}°` : '—'}</td>
+										<td class="text-right tabular-nums font-medium cursor-pointer {statusBg(targetStatus(phase, 'rh', rhAvg))}" onclick={() => showCellInfo(phase, 'rh', rhAvg)}>{rhAvg !== null ? `${rhAvg.toFixed(0)}%` : '—'}</td>
+										<td class="text-right tabular-nums font-medium cursor-pointer {statusBg(targetStatus(phase, 'vpd', vpdAvg))}" onclick={() => showCellInfo(phase, 'vpd', vpdAvg)}>{vpdAvg !== null ? vpdAvg.toFixed(2) : '—'}</td>
+										<td class="text-right tabular-nums font-medium cursor-pointer {statusBg(targetStatus(phase, 'ec', ecAvg))}" onclick={() => showCellInfo(phase, 'ec', ecAvg)}>{ecAvg !== null ? ecAvg.toFixed(2) : '—'}</td>
+										<td class="text-right tabular-nums font-medium cursor-pointer {statusBg(targetStatus(phase, 'ph', phAvg))}" onclick={() => showCellInfo(phase, 'ph', phAvg)}>{phAvg !== null ? phAvg.toFixed(1) : '—'}</td>
 									</tr>
 								{/each}
 							</tbody>
 						</table>
-						<div class="flex items-center gap-3 mt-2 pt-2 border-t border-gb-border/50 text-[10px] text-gb-text-muted">
-							<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-gb-green"></span>optimal</span>
-							<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-gb-warning"></span>grenzwertig</span>
-							<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-gb-danger"></span>kritisch</span>
-						</div>
+
+						<!-- v1.4.5: Tap-Info-Strip mit Target-Range für gewählte Zelle -->
+						{#if phaseInfoCell && phaseInfoTarget}
+							{@const unit = phaseInfoCell.key === 'temp' ? '°C' : phaseInfoCell.key === 'rh' ? '%' : phaseInfoCell.key === 'vpd' ? ' kPa' : ''}
+							{@const dp = phaseInfoCell.key === 'temp' ? 1 : phaseInfoCell.key === 'rh' ? 0 : 2}
+							{@const status = targetStatus(phaseInfoCell.phase, phaseInfoCell.key, phaseInfoCell.value)}
+							<div class="mt-2 bg-gb-bg/60 rounded-lg px-3 py-2 flex items-baseline justify-between gap-2 text-xs">
+								<span class="text-gb-text-muted">{phaseInfoCell.phase} · {phaseInfoCell.key.toUpperCase()}</span>
+								<span class="font-medium {statusBg(status)} tabular-nums">
+									{phaseInfoCell.value.toFixed(dp)}{unit}
+									<span class="text-gb-text-muted ml-1 font-normal">/ Soll {phaseInfoTarget.min.toFixed(dp)}–{phaseInfoTarget.max.toFixed(dp)}{unit}</span>
+								</span>
+							</div>
+						{:else}
+							<div class="flex items-center gap-3 mt-2 pt-2 border-t border-gb-border/50 text-[10px] text-gb-text-muted flex-wrap">
+								<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-gb-green"></span>optimal</span>
+								<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-gb-warning"></span>grenzwertig</span>
+								<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-gb-danger"></span>kritisch</span>
+								<span class="ml-auto opacity-70">Zelle tippen für Soll-Range</span>
+							</div>
+						{/if}
 					</div>
 				</div>
 			{/if}
@@ -804,15 +874,15 @@
 								<a href="/grow/{grow.id}" class="text-[10px] text-gb-text-muted hover:text-gb-text">{photoCheckins.length} Fotos · alle ansehen →</a>
 							</div>
 							<div class="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-								{#each photoCheckins as ci}
+								{#each photoCheckins as ci, idx}
 									{@const src = firstPhotoOf(ci)}
 									{#if src}
-										<div class="shrink-0">
-											<div class="w-20 h-20 rounded-lg overflow-hidden bg-gb-bg ring-1 ring-gb-border/40">
-												<img {src} alt="Tag {dayOf(ci)}" loading="lazy" class="w-full h-full object-cover" />
+										<button type="button" onclick={() => openLightbox(idx)} class="shrink-0 group" aria-label="Foto T{dayOf(ci)}, {ci.phase} W{ci.week}T{ci.day}">
+											<div class="w-20 h-20 rounded-lg overflow-hidden bg-gb-bg ring-1 ring-gb-border/40 group-hover:ring-gb-accent/50 group-active:ring-gb-accent transition-colors">
+												<img {src} alt="Tag {dayOf(ci)}" loading="lazy" class="w-full h-full object-cover pointer-events-none" />
 											</div>
 											<p class="text-[10px] text-gb-text-muted text-center mt-1 tabular-nums">T{dayOf(ci)} · {ci.phase}</p>
-										</div>
+										</button>
 									{/if}
 								{/each}
 							</div>
@@ -840,8 +910,8 @@
 				</div>
 			{/if}
 
-			<!-- v1.4.4: Highlights — Best-Day + Anomalien -->
-			{#if bestDay || anomalies.length > 0}
+			<!-- v1.4.4: Highlights — Best-Day + Anomalien + Notes (v1.4.5) -->
+			{#if bestDay || anomalies.length > 0 || notesHighlights.length > 0}
 				<div class="space-y-2">
 					<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">Highlights</h2>
 
@@ -875,7 +945,30 @@
 							</p>
 						</div>
 					{/if}
+
+					<!-- v1.4.5: Notes-Highlights (Top 5 letzte mit Notiz) -->
+					{#if notesHighlights.length > 0}
+						<div class="bg-gb-surface rounded-xl p-3 space-y-2">
+							<p class="text-[10px] text-gb-text-muted uppercase tracking-wide">📝 Letzte Notizen</p>
+							<div class="space-y-2">
+								{#each notesHighlights as n}
+									<div class="text-xs space-y-0.5 pb-2 border-b border-gb-border/30 last:border-0 last:pb-0">
+										<div class="flex items-baseline justify-between gap-2 text-[10px] text-gb-text-muted">
+											<span>T{n.day} · {n.phase} W{n.week}T{n.day_in_phase}</span>
+											<span class="tabular-nums">{new Date(n.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}</span>
+										</div>
+										<p class="text-gb-text leading-relaxed line-clamp-3 whitespace-pre-wrap break-words">{n.notes}</p>
+									</div>
+								{/each}
+							</div>
+						</div>
+					{/if}
 				</div>
+			{/if}
+
+			<!-- v1.4.5: Lightbox für Foto-Verlauf -->
+			{#if lightboxOpen}
+				<Lightbox photos={allPhotos} startIndex={lightboxIndex} onClose={() => lightboxOpen = false} />
 			{/if}
 		{/if}
 	{/if}
