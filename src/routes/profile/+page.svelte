@@ -12,6 +12,7 @@
 	import { ACHIEVEMENTS } from '$lib/data/achievements';
 	import { downloadBackup, importBackup, readFileAsText } from '$lib/utils/backup';
 	import { markBackupDone } from '$lib/utils/backup-reminder';
+	import { tombstones } from '$lib/utils/tombstones';
 	import { toastStore } from '$lib/stores/toast';
 	import type { AchievementStats, Achievement } from '$lib/data/achievements';
 	import type { GrowState, Grow, CheckIn } from '$lib/stores/grow';
@@ -217,8 +218,14 @@
 				return ta >= tb ? a : b;
 			};
 
+			// v1.4.7: Lokale Tombstones rausfiltern (siehe layout.svelte)
+			const tomb = tombstones.get();
+			const deletedGrowIds = new Set(tomb.grows);
+			const deletedCheckinIds = new Set(tomb.checkins);
+
 			const growsById = new Map(growState.grows.map((g: Grow) => [g.id, g]));
 			for (const cg of data.grows as Grow[]) {
+				if (deletedGrowIds.has(cg.id)) continue;
 				const local = growsById.get(cg.id);
 				growsById.set(cg.id, local ? pickNewer(local, cg) : cg);
 			}
@@ -226,6 +233,7 @@
 
 			const checkinsById = new Map(growState.checkins.map((c: CheckIn) => [c.id, c]));
 			for (const cc of data.checkins as CheckIn[]) {
+				if (deletedCheckinIds.has(cc.id)) continue;
 				const local = checkinsById.get(cc.id);
 				if (local) {
 					const winner = pickNewer(local, cc);

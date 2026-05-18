@@ -8,6 +8,7 @@ import { writable, derived } from 'svelte/store';
 import { supabase } from '$lib/supabase';
 import { uploadCheckinPhoto, uploadCheckinPhotos } from '$lib/utils/storage';
 import type { GrowState, Grow, CheckIn } from '$lib/stores/grow';
+import { tombstones } from '$lib/utils/tombstones';
 
 export type SyncStatus = 'idle' | 'syncing' | 'success' | 'error';
 
@@ -43,10 +44,31 @@ function createSyncStore() {
 	return {
 		subscribe,
 
-		/** Push: Lokale Daten → Supabase (upsert) */
+		/** Push: Lokale Daten → Supabase (upsert + tombstone-deletes) */
 		async push(userId: string, state: GrowState): Promise<boolean> {
 			set({ status: 'syncing', last_synced: null, error: null });
 			try {
+				// v1.4.7: Erst Tombstones als Cloud-DELETEs verarbeiten — sonst werden
+				// gleich darunter upgesertete Einträge sofort wieder gelöscht (Race)
+				const t = tombstones.get();
+				if (t.checkins.length > 0) {
+					const { error: dcErr } = await supabase
+						.from('checkins')
+						.delete()
+						.in('id', t.checkins)
+						.eq('user_id', userId);
+					if (!dcErr) tombstones.clearCheckins(t.checkins);
+					// Fehler nicht thrown — Tombstones bleiben für nächsten Push
+				}
+				if (t.grows.length > 0) {
+					const { error: dgErr } = await supabase
+						.from('grows')
+						.delete()
+						.in('id', t.grows)
+						.eq('user_id', userId);
+					if (!dgErr) tombstones.clearGrows(t.grows);
+				}
+
 				// Grows upserten (ohne lokale Felder)
 				if (state.grows.length > 0) {
 					const growRows = state.grows.map(g => ({

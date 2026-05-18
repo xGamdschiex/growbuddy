@@ -22,6 +22,7 @@
 	import { onMount } from 'svelte';
 	import { logger } from '$lib/utils/logger';
 	import { shouldShowBackupReminder, markReminderShown } from '$lib/utils/backup-reminder';
+	import { tombstones } from '$lib/utils/tombstones';
 
 	let { children }: { children: Snippet } = $props();
 	let toasts = $state<Toast[]>([]);
@@ -108,14 +109,20 @@
 				const tb = b.updated_at ? new Date(b.updated_at).getTime() : 0;
 				return ta >= tb ? a : b;
 			};
+			// v1.4.7: Lokal gelöschte IDs ignorieren — sonst kommen sie aus Cloud zurück
+			const tomb = tombstones.get();
+			const deletedGrowIds = new Set(tomb.grows);
+			const deletedCheckinIds = new Set(tomb.checkins);
 			const local = growState;
 			const growsById = new Map(local.grows.map(g => [g.id, g]));
 			for (const cg of cloud.grows) {
+				if (deletedGrowIds.has(cg.id)) continue;  // tombstone
 				const l = growsById.get(cg.id);
 				growsById.set(cg.id, l ? pickNewer(l, cg) : cg);
 			}
 			const checkinsById = new Map(local.checkins.map(c => [c.id, c]));
 			for (const cc of cloud.checkins) {
+				if (deletedCheckinIds.has(cc.id)) continue;  // tombstone
 				const l = checkinsById.get(cc.id);
 				if (l) {
 					const winner = pickNewer(l, cc);

@@ -7,6 +7,7 @@
 import { writable, derived } from 'svelte/store';
 import type { Medium, GrowPhase } from '$lib/data/science';
 import { safeSetItem } from '$lib/utils/storage-safe';
+import { tombstones } from '$lib/utils/tombstones';
 
 // ─── TYPES ──────────────────────────────────────────────────────────────
 
@@ -196,10 +197,17 @@ function createGrowStore() {
 		},
 
 		deleteGrow(id: string): void {
-			update(s => ({
-				grows: s.grows.filter(g => g.id !== id),
-				checkins: s.checkins.filter(c => c.grow_id !== id),
-			}));
+			// v1.4.7: Tombstone-Tracking → wird beim nächsten Cloud-Push als DELETE gesendet
+			// (sonst kommt der Eintrag beim nächsten Pull aus Supabase zurück)
+			update(s => {
+				const ciIds = s.checkins.filter(c => c.grow_id === id).map(c => c.id);
+				tombstones.addGrow(id);
+				tombstones.addCheckins(ciIds);
+				return {
+					grows: s.grows.filter(g => g.id !== id),
+					checkins: s.checkins.filter(c => c.grow_id !== id),
+				};
+			});
 		},
 
 		addCheckIn(checkin: Omit<CheckIn, 'id' | 'created_at'>): string {
@@ -230,6 +238,8 @@ function createGrowStore() {
 		},
 
 		deleteCheckIn(id: string): void {
+			// v1.4.7: Tombstone-Tracking (siehe deleteGrow)
+			tombstones.addCheckin(id);
 			update(s => ({
 				...s,
 				checkins: s.checkins.filter(c => c.id !== id),
