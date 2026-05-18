@@ -119,6 +119,8 @@
 	let ciMore = $state(init.more);
 	let ciPrefilled = $state(init.prefilled);
 	let compressing = $state(false);
+	// v1.4.8: Success-Burst beim Submit (kurze ✓-Animation vor onDone)
+	let submitSuccess = $state(false);
 
 	// Auto-Berechnung Phase/Woche/Tag (Lauri-Logik) — nur neuer Check-in, bis User manuell eingreift
 	$effect(() => {
@@ -278,7 +280,12 @@
 			syncStore.push(authState.user.id, snapshot).catch(() => {});
 		}
 
-		onDone?.();
+		// v1.4.8: Success-Burst → 350ms ✓ einblenden, dann onDone
+		submitSuccess = true;
+		setTimeout(() => {
+			submitSuccess = false;
+			onDone?.();
+		}, 450);
 	}
 </script>
 
@@ -491,8 +498,12 @@
 	</div>
 
 	<!-- Submit (v1.3.79: XP-Hint immer sichtbar bei neuen Check-ins, Bonus-Multiplier nur wenn aktiv) -->
-	<button type="button" class="ci-cta" onclick={submitCheckin}>
-		✓ {editingCi ? 'Änderungen speichern' : tr('checkin.save')}{#if !editingCi} · +{Math.round(10 * multiplierValue)} XP{#if multiplierValue > 1} <span class="ci-cta-bonus">({multiplierValue}× Streak)</span>{/if}{/if}
+	<button type="button" class="ci-cta" onclick={submitCheckin} disabled={submitSuccess}>
+		{#if submitSuccess}
+			<span class="burst-in" style="font-size: 22px;">✓</span> Gespeichert
+		{:else}
+			✓ {editingCi ? 'Änderungen speichern' : tr('checkin.save')}{#if !editingCi} · +{Math.round(10 * multiplierValue)} XP{#if multiplierValue > 1} <span class="ci-cta-bonus">({multiplierValue}× Streak)</span>{/if}{/if}
+		{/if}
 	</button>
 </div>
 

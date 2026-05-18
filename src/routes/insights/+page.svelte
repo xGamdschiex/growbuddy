@@ -105,7 +105,7 @@
 	{#if totals.grows === 0}
 		<!-- Empty-State: noch keine Grows -->
 		<div class="bg-gb-surface rounded-xl p-6 text-center space-y-4">
-			<div class="text-5xl">🌱</div>
+			<div class="text-5xl"><span class="idle-sway">🌱</span></div>
 			<div class="space-y-1">
 				<p class="font-semibold">Noch keine Daten zum Auswerten</p>
 				<p class="text-sm text-gb-text-muted leading-relaxed">

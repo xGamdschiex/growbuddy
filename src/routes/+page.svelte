@@ -141,7 +141,10 @@
 			{/if}
 		</div>
 		<div class="bg-gb-surface rounded-xl p-3 text-center">
-			<p class="text-2xl font-bold text-gb-warning">{streakInfo.current}</p>
+			<!-- v1.4.8: 🔥 mit dynamic pulse je nach Streak-Level -->
+			<p class="text-2xl font-bold text-gb-warning">
+				{#if streakInfo.current > 0}<span class="{streakInfo.current >= 14 ? 'flame-high' : streakInfo.current >= 4 ? 'flame-med' : 'flame-low'}">🔥</span> {/if}{streakInfo.current}
+			</p>
 			<p class="text-xs text-gb-text-muted">{tr('home.streak')}</p>
 			{#if longestStreak > streakInfo.current && longestStreak > 0}
 				<p class="text-[10px] text-gb-text-muted mt-0.5">best {longestStreak}</p>

@@ -24,6 +24,7 @@
 	import { phaseTargetSegments, targetFor } from '$lib/utils/phase-targets';
 	import { CHART_COLORS } from '$lib/utils/chart-colors';
 	import { calcNutrientUsage, productSeries, productSeriesCumulative, calcUsageForecast, type ProductUsage } from '$lib/utils/nutrient-usage';
+	import { getFeedLine } from '$lib/calc/feedlines/registry';
 	import { currentPhasePosition } from '$lib/utils/phase';
 	import { onMount } from 'svelte';
 
@@ -246,6 +247,26 @@
 	let currentPos = $derived(grow ? currentPhasePosition(grow, growState?.checkins ?? []) : null);
 	let growTotalDays = $derived(grow ? totalGrowDays(grow, growState?.checkins ?? []) : 0);
 
+	// v1.4.8: Phase-Progress aus Feedline-Schema (Tag-in-Phase / Schema-Tage-für-Phase)
+	let phaseProgress = $derived.by(() => {
+		if (!currentPos || !grow?.feedline_id) return null;
+		const fl = getFeedLine(grow.feedline_id);
+		if (!fl) return null;
+		const pc = fl.phasen.find(p => p.name === currentPos.phase);
+		if (!pc) return null;
+		const schemaDays = pc.schema_wochen * 7;
+		const maxDays = pc.max_wochen * 7;
+		const pct = Math.min(100, Math.max(0, (currentPos.daysIn / schemaDays) * 100));
+		return {
+			phase: currentPos.phase,
+			daysIn: currentPos.daysIn,
+			schemaDays,
+			maxDays,
+			pct,
+			over: currentPos.daysIn > schemaDays,
+		};
+	});
+
 	// v1.4.4: Phase-Bänder für Charts — Tag-basiert
 	let phaseBandsForCharts = $derived.by(() => {
 		if (!grow) return [];
@@ -339,6 +360,8 @@
 		chartRange = r;
 		chartOffset = 0;
 	}
+	// v1.4.8: Sliding-Indicator-Position (0-3) basierend auf aktuellem Range
+	let rangeTabIdx = $derived(chartRange === '14d' ? 0 : chartRange === '30d' ? 1 : chartRange === 'phase' ? 2 : 3);
 	function panOlder() {
 		if (chartRange === 'phase') {
 			chartOffset = Math.min(phaseBandsForCharts.length - 1, chartOffset + 1);
@@ -515,7 +538,7 @@
 
 		{#if chronCheckins.length === 0}
 			<div class="bg-gb-surface rounded-xl p-6 text-center">
-				<p class="text-3xl mb-3">📈</p>
+				<p class="text-3xl mb-3"><span class="idle-sway">📈</span></p>
 				<p class="text-sm text-gb-text-muted">Noch keine Daten — leg ein paar Check-ins an, dann erscheint hier deine Auswertung.</p>
 			</div>
 		{:else}
@@ -534,6 +557,24 @@
 						<p class="text-lg font-bold tabular-nums">{growTotalDays}</p>
 					</div>
 				</div>
+
+				<!-- v1.4.8: Phase-Progress-Bar (aus Feedline-Schema) -->
+				{#if phaseProgress}
+					<div class="space-y-1">
+						<div class="flex items-baseline justify-between text-[10px] text-gb-text-muted">
+							<span>{phaseProgress.phase}-Phase</span>
+							<span class="tabular-nums">
+								{phaseProgress.daysIn} / {phaseProgress.schemaDays} d
+								{#if phaseProgress.over}<span class="text-gb-warning ml-1">über</span>{/if}
+							</span>
+						</div>
+						<div class="h-1.5 bg-gb-bg/60 rounded-full overflow-hidden">
+							<div class="h-full phase-progress-fill {phaseProgress.over ? 'bg-gb-warning' : 'bg-gb-green'}"
+								style="width: {phaseProgress.pct}%"></div>
+						</div>
+					</div>
+				{/if}
+
 				<div class="grid grid-cols-3 gap-2 pt-2 border-t border-gb-border/50">
 					<div>
 						<p class="text-[10px] text-gb-text-muted uppercase tracking-wide">Konsistenz</p>
@@ -849,24 +890,29 @@
 				<div class="space-y-2">
 					<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">Verlauf</h2>
 
-					<!-- Range-Toolbar -->
+					<!-- v1.4.8: Range-Toolbar mit sliding-indicator (smooth Tab-Switch) -->
 					<div class="bg-gb-surface rounded-xl p-2 space-y-2">
 						<div class="flex items-center gap-1">
-							<div class="flex-1 grid grid-cols-4 gap-1">
-								{#each [{ k: '14d' as RangeMode, l: '14d' }, { k: '30d' as RangeMode, l: '30d' }, { k: 'phase' as RangeMode, l: 'Phase' }, { k: 'all' as RangeMode, l: 'Gesamt' }] as opt}
-									<button type="button" onclick={() => setRange(opt.k)}
-										class="text-[11px] font-medium rounded-lg transition-colors
-											{chartRange === opt.k ? 'bg-gb-green text-gb-bg' : 'text-gb-text-muted hover:text-gb-text'}"
-										style="min-height:32px">
-										{opt.l}
-									</button>
-								{/each}
+							<div class="flex-1 relative bg-gb-bg/40 rounded-lg p-0.5">
+								<!-- Sliding indicator -->
+								<div class="absolute top-0.5 bottom-0.5 bg-gb-green rounded-md range-indicator"
+									style="left: calc({rangeTabIdx * 25}% + 2px); width: calc(25% - 4px);"></div>
+								<div class="relative grid grid-cols-4">
+									{#each [{ k: '14d' as RangeMode, l: '14d' }, { k: '30d' as RangeMode, l: '30d' }, { k: 'phase' as RangeMode, l: 'Phase' }, { k: 'all' as RangeMode, l: 'Gesamt' }] as opt}
+										<button type="button" onclick={() => setRange(opt.k)}
+											class="text-[11px] font-medium rounded-md transition-colors relative z-10
+												{chartRange === opt.k ? 'text-gb-bg' : 'text-gb-text-muted hover:text-gb-text'}"
+											style="min-height:32px">
+											{opt.l}
+										</button>
+									{/each}
+								</div>
 							</div>
 							<div class="flex gap-0.5 ml-1">
 								<button type="button" onclick={panOlder} disabled={!canPanOlder} aria-label="Älter"
-									class="w-9 h-8 flex items-center justify-center rounded-lg text-gb-text-muted disabled:opacity-30 hover:text-gb-text hover:bg-gb-bg/50">←</button>
+									class="w-9 h-8 flex items-center justify-center rounded-lg text-gb-text-muted disabled:opacity-30 hover:text-gb-text hover:bg-gb-bg/50 transition-colors active:scale-90">←</button>
 								<button type="button" onclick={panNewer} disabled={!canPanNewer} aria-label="Neuer"
-									class="w-9 h-8 flex items-center justify-center rounded-lg text-gb-text-muted disabled:opacity-30 hover:text-gb-text hover:bg-gb-bg/50">→</button>
+									class="w-9 h-8 flex items-center justify-center rounded-lg text-gb-text-muted disabled:opacity-30 hover:text-gb-text hover:bg-gb-bg/50 transition-colors active:scale-90">→</button>
 							</div>
 						</div>
 						<p class="text-[10px] text-gb-text-muted text-center">{chartWindowLabel}</p>
@@ -1007,4 +1053,15 @@
 </div>
 
 <!-- v1.4.3: details-CSS entfernt (Phase-<details> wurden zu Tab-Switch). -->
+
+<style>
+	/* v1.4.8: Range-Toolbar sliding-indicator — smooth Übergang zwischen Tabs */
+	.range-indicator {
+		transition: left var(--anim-medium, 250ms) var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1));
+	}
+	/* v1.4.8: Phase-Progress-Bar Fill-Animation */
+	.phase-progress-fill {
+		transition: width var(--anim-slow, 400ms) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+	}
+</style>
 

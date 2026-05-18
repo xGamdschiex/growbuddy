@@ -88,7 +88,8 @@
 			</div>
 			<div class="dc-head-right">
 				{#if streakInfo.current > 0}
-					<span class="dc-streak">🔥 {streakInfo.current}T{#if multiplier > 1} · {multiplier}×{/if}</span>
+					{@const flameClass = streakInfo.current >= 14 ? 'flame-high' : streakInfo.current >= 4 ? 'flame-med' : 'flame-low'}
+					<span class="dc-streak"><span class={flameClass}>🔥</span> {streakInfo.current}T{#if multiplier > 1} · {multiplier}×{/if}</span>
 				{/if}
 				{#if alreadyToday}
 					<span class="dc-already">✓ heute</span>

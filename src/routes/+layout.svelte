@@ -396,13 +396,15 @@
 <nav class="fixed bottom-0 inset-x-0 bg-gb-surface border-t border-gb-border safe-bottom z-50">
 	<div class="flex justify-around items-center h-16 max-w-lg mx-auto">
 		{#each navItems as item}
+			{@const active = isActive(item.href)}
 			<a
 				href={item.href}
 				onclick={() => hapticLight()}
-				class="flex flex-col items-center gap-0.5 px-3 py-2 text-xs transition-colors
-					{isActive(item.href) ? 'text-gb-green' : 'text-gb-text-muted hover:text-gb-text'}"
+				class="flex flex-col items-center gap-0.5 px-3 py-2 text-xs nav-link
+					{active ? 'text-gb-green' : 'text-gb-text-muted hover:text-gb-text'}"
 			>
-				<span class="flex items-center justify-center h-7 w-12 rounded-full transition-colors {isActive(item.href) ? 'bg-gb-green/15' : ''}">
+				<!-- v1.4.8: Icon-Container mit smooth scale bei active -->
+				<span class="flex items-center justify-center h-7 w-12 rounded-full nav-icon-bg {active ? 'bg-gb-green/15 nav-icon-active' : ''}">
 					<svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
 						{#if item.icon === 'home'}
 							<path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1" />
@@ -417,9 +419,30 @@
 						{/if}
 					</svg>
 				</span>
-				<span class="{isActive(item.href) ? 'font-semibold' : ''}">{tr(item.key)}</span>
+				<span class="{active ? 'font-semibold' : ''}">{tr(item.key)}</span>
+				<!-- v1.4.8: Active-Dot-Indicator -->
+				<span class="nav-dot {active ? 'nav-dot-active' : ''}"></span>
 			</a>
 		{/each}
 	</div>
 </nav>
+
+<style>
+	.nav-link { position: relative; transition: color var(--anim-fast, 150ms) ease; }
+	.nav-icon-bg {
+		transition: background-color var(--anim-fast, 150ms) ease, transform var(--anim-medium, 250ms) var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1));
+	}
+	.nav-icon-active { transform: scale(1.08); }
+	.nav-dot {
+		display: block;
+		width: 4px; height: 4px;
+		border-radius: 50%;
+		background: var(--color-gb-green);
+		opacity: 0;
+		transform: translateY(-2px) scale(0.5);
+		transition: opacity var(--anim-medium, 250ms) ease, transform var(--anim-medium, 250ms) var(--ease-spring);
+		margin-top: 1px;
+	}
+	.nav-dot-active { opacity: 1; transform: translateY(0) scale(1); }
+</style>
 {/if}

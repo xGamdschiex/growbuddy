@@ -27,7 +27,7 @@
 
 	<!-- App-Identität -->
 	<div class="bg-gb-surface rounded-xl p-5 text-center space-y-3">
-		<div class="text-5xl">🌱</div>
+		<div class="text-5xl"><span class="idle-sway">🌱</span></div>
 		<div>
 			<p class="font-bold text-lg">GrowBuddy</p>
 			<p class="text-xs text-gb-text-muted">Grow Journal &amp; Plant Care</p>
