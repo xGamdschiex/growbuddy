@@ -71,6 +71,24 @@ export interface PhaseUsage {
 	products: ProductUsage[];
 }
 
+/**
+ * v1.4.6: Diagnostische Stats pro Phase — zeigt User WARUM eine Phase keine
+ * Düngungs-Daten produziert hat. Wird für ALLE Phasen mit ≥1 Check-in befüllt,
+ * unabhängig vom Düngungs-Filter.
+ */
+export interface PhaseCheckinStats {
+	/** Phase-Name */
+	phase: string;
+	/** Alle Check-ins in dieser Phase (auch ohne Wasser/Dünger) */
+	n_total: number;
+	/** Check-ins mit watered=true UND water_ml>0 */
+	n_watered: number;
+	/** Check-ins die in `byPhase` gewertet wurden (alle 3 Filter erfüllt + Schema gefunden) */
+	n_fertigated: number;
+	/** Check-ins die gewertet wären (Filter erfüllt) aber Schema fehlte */
+	n_skipped: number;
+}
+
 export interface NutrientUsageResult {
 	/** Düngerlinie die für die Berechnung benutzt wurde, oder null wenn Grow keine hat / unbekannt */
 	feedline: FeedLine | null;
@@ -78,6 +96,11 @@ export interface NutrientUsageResult {
 	byProduct: ProductUsage[];
 	/** Aggregat pro Phase mit eigener Produkt-Liste, sortiert chronologisch nach Phase-Reihenfolge der Feedline */
 	byPhase: PhaseUsage[];
+	/**
+	 * v1.4.6: Diagnose-Stats für ALLE Phasen mit Check-ins (auch ohne Düngung).
+	 * Damit kann UI dem User zeigen warum Phase X keine Daten hat.
+	 */
+	phaseCheckinStats: PhaseCheckinStats[];
 	/** Chronologische History für Chart */
 	history: UsageHistoryPoint[];
 	/** Wie viele Check-ins überhaupt mit Düngung gewertet wurden */
@@ -92,6 +115,7 @@ const EMPTY: NutrientUsageResult = {
 	feedline: null,
 	byProduct: [],
 	byPhase: [],
+	phaseCheckinStats: [],
 	history: [],
 	n_fertigated_checkins: 0,
 	n_skipped_checkins: 0,
@@ -127,21 +151,36 @@ export function calcNutrientUsage(grow: Grow, allCheckins: CheckIn[]): NutrientU
 	const totals = new Map<string, { name: string; einheit: 'g' | 'mL'; total: number; n: number; kategorie: FeedProduct['kategorie'] }>();
 	// Akkumulator pro Phase → pro Produkt
 	const byPhaseMap = new Map<string, { n: number; water_l: number; products: Map<string, { name: string; einheit: 'g' | 'mL'; total: number; n: number; kategorie: FeedProduct['kategorie'] }> }>();
+	// v1.4.6: Diagnostische Stats pro Phase (ALLE Check-ins, vor Filter)
+	const phaseStatsMap = new Map<string, { n_total: number; n_watered: number; n_fertigated: number; n_skipped: number }>();
 	const history: UsageHistoryPoint[] = [];
 	let n_fertigated = 0;
 	let n_skipped = 0;
 	let total_water_l = 0;
 
 	for (const ci of checkins) {
+		// v1.4.6: Diagnostik FÜR ALLE Check-ins sammeln (vor Filter)
+		const phaseKey = ci.phase || 'Unbekannt';
+		let stats = phaseStatsMap.get(phaseKey);
+		if (!stats) {
+			stats = { n_total: 0, n_watered: 0, n_fertigated: 0, n_skipped: 0 };
+			phaseStatsMap.set(phaseKey, stats);
+		}
+		stats.n_total++;
+		const hasWaterMl = ci.water_ml != null && ci.water_ml > 0;
+		if (ci.watered && hasWaterMl) stats.n_watered++;
+
 		// Nur Check-ins mit echter Wassergabe + Dünger
-		if (!ci.watered || !ci.nutrients_given || ci.water_ml == null || ci.water_ml <= 0) continue;
+		if (!ci.watered || !ci.nutrients_given || !hasWaterMl) continue;
 		n_fertigated++;
 
 		const schema = getSchemaForWeek(feedline, ci.phase, ci.week);
 		if (!schema) {
 			n_skipped++;
+			stats.n_skipped++;
 			continue;
 		}
+		stats.n_fertigated++;
 
 		// EC-basierter Faktor: wenn gemessen < Ziel → User dosiert schwächer
 		let faktor = 1.0;
@@ -152,7 +191,7 @@ export function calcNutrientUsage(grow: Grow, allCheckins: CheckIn[]): NutrientU
 			if (faktor > 1.2) faktor = 1.2;
 		}
 
-		const water_l = ci.water_ml / 1000;
+		const water_l = (ci.water_ml as number) / 1000;
 		total_water_l += water_l;
 		const per_product: Record<string, number> = {};
 
@@ -254,10 +293,16 @@ export function calcNutrientUsage(grow: Grow, allCheckins: CheckIn[]): NutrientU
 		}))
 		.sort((a, b) => (phaseOrder.get(a.phase) ?? 999) - (phaseOrder.get(b.phase) ?? 999));
 
+	// v1.4.6: phaseCheckinStats (sortiert nach Feedline-Phase-Order)
+	const phaseCheckinStats: PhaseCheckinStats[] = Array.from(phaseStatsMap.entries())
+		.map(([phase, s]) => ({ phase, ...s }))
+		.sort((a, b) => (phaseOrder.get(a.phase) ?? 999) - (phaseOrder.get(b.phase) ?? 999));
+
 	return {
 		feedline,
 		byProduct,
 		byPhase,
+		phaseCheckinStats,
 		history,
 		n_fertigated_checkins: n_fertigated,
 		n_skipped_checkins: n_skipped,

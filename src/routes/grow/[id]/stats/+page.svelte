@@ -169,9 +169,10 @@
 	let nutrientUsage = $derived(grow ? calcNutrientUsage(grow, growState?.checkins ?? []) : null);
 
 	// v1.4.3: Phase-Tab-Switch (Gesamt / Veg / Bloom / ...)
+	// v1.4.6: Tab-Liste enthält ALLE Phasen mit Check-ins (auch ohne Düngung) — sonst sieht User nicht warum Daten fehlen
 	let selectedTab = $state<string>('total');  // 'total' | phase-name
 	let availableTabs = $derived.by(() => {
-		const phases = nutrientUsage?.byPhase.map(p => p.phase) ?? [];
+		const phases = nutrientUsage?.phaseCheckinStats.map(p => p.phase) ?? [];
 		return [{ key: 'total', label: 'Gesamt' }, ...phases.map(p => ({ key: p, label: p }))];
 	});
 
@@ -191,6 +192,12 @@
 			water_l: phase?.water_l ?? 0,
 			n_checkins: phase?.n_checkins ?? 0,
 		};
+	});
+
+	/** v1.4.6: Diagnose-Stats für den aktiven Tab (für Empty-State-Erklärung) */
+	let activePhaseDiag = $derived.by(() => {
+		if (!nutrientUsage || selectedTab === 'total') return null;
+		return nutrientUsage.phaseCheckinStats.find(p => p.phase === selectedTab) ?? null;
 	});
 
 	let nutrientMaxTotal = $derived(Math.max(0, ...viewData.products.map(p => p.total)));
@@ -637,9 +644,34 @@
 
 					<!-- Produkt-Liste für gewählten Tab (sortiert nach Total) -->
 					{#if viewData.products.length === 0}
-						<div class="bg-gb-surface rounded-xl p-4 text-center text-sm text-gb-text-muted">
-							In Phase „{selectedTab}" wurden noch keine Produkte angewendet.
-						</div>
+						<!-- v1.4.6: Diagnose statt nur "keine Produkte" — User sieht WARUM nichts da ist -->
+						{#if activePhaseDiag}
+							<div class="bg-gb-warning/10 border border-gb-warning/20 rounded-xl p-3 space-y-2">
+								<p class="text-sm font-semibold text-gb-warning">
+									Keine Düngungen in {selectedTab} berechnet
+								</p>
+								<div class="text-[11px] text-gb-text-muted space-y-0.5 leading-relaxed">
+									<p>• <span class="text-gb-text tabular-nums">{activePhaseDiag.n_total}</span> Check-in{activePhaseDiag.n_total !== 1 ? 's' : ''} in dieser Phase</p>
+									<p>• <span class="text-gb-text tabular-nums">{activePhaseDiag.n_watered}</span> davon mit Wassermenge geloggt</p>
+									{#if activePhaseDiag.n_skipped > 0}
+										<p class="text-gb-danger">• <span class="tabular-nums">{activePhaseDiag.n_skipped}</span> übersprungen — {selectedTab} W? ist nicht im Düngerschema definiert</p>
+									{:else}
+										<p>• <span class="tabular-nums">0</span> davon mit 🧪 <span class="text-gb-text">Gedüngt</span> aktiviert</p>
+									{/if}
+								</div>
+								<p class="text-[11px] text-gb-text-muted leading-relaxed pt-1 border-t border-gb-border/40">
+									{#if activePhaseDiag.n_skipped > 0}
+										Tipp: Deine Düngerlinie ({nutrientUsage.feedline?.name}) hat kein Schema für „{selectedTab}". Andere Düngerlinie wählen oder bestehende Check-ins als „Veg" / „Bloom" markieren.
+									{:else}
+										Tipp: Beim Check-in 💧 <span class="text-gb-text">Gegossen</span> + 🧪 <span class="text-gb-text">Gedüngt</span> aktivieren und Wassermenge (mL) eintragen.
+									{/if}
+								</p>
+							</div>
+						{:else}
+							<div class="bg-gb-surface rounded-xl p-4 text-center text-sm text-gb-text-muted">
+								In Phase „{selectedTab}" wurden noch keine Produkte angewendet.
+							</div>
+						{/if}
 					{:else}
 						<div class="bg-gb-surface rounded-xl p-3 space-y-2.5">
 							{#each viewData.products as p}

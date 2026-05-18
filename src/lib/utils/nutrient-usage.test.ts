@@ -281,6 +281,71 @@ describe('productSeries / productSeriesCumulative', () => {
 	});
 });
 
+describe('calcNutrientUsage → phaseCheckinStats (v1.4.6 Diagnose)', () => {
+	it('erfasst ALLE Phasen mit Check-ins, auch ohne Düngung', () => {
+		const checkins: CheckIn[] = [
+			// Veg: 3 Check-ins — keine Düngung
+			ci({ day: 1, phase: 'Veg', week: 1, watered: true, water_ml: 3000 }),
+			ci({ day: 3, phase: 'Veg', week: 1, watered: true, water_ml: 3000 }),
+			ci({ day: 5, phase: 'Veg', week: 2 }),
+			// Bloom: 2 Check-ins — beide voll
+			ci({ day: 30, phase: 'Bloom', week: 1, watered: true, nutrients_given: true, water_ml: 10000 }),
+			ci({ day: 33, phase: 'Bloom', week: 1, watered: true, nutrients_given: true, water_ml: 10000 }),
+		];
+		const r = calcNutrientUsage(baseGrow, checkins);
+		expect(r.phaseCheckinStats).toHaveLength(2);
+		const veg = r.phaseCheckinStats.find(p => p.phase === 'Veg')!;
+		expect(veg.n_total).toBe(3);
+		expect(veg.n_watered).toBe(2);
+		expect(veg.n_fertigated).toBe(0);
+		expect(veg.n_skipped).toBe(0);
+		const bloom = r.phaseCheckinStats.find(p => p.phase === 'Bloom')!;
+		expect(bloom.n_total).toBe(2);
+		expect(bloom.n_watered).toBe(2);
+		expect(bloom.n_fertigated).toBe(2);
+		expect(bloom.n_skipped).toBe(0);
+	});
+
+	it('zählt n_skipped wenn Phase im Schema fehlt', () => {
+		// Athena hat kein 'Seedling' Schema
+		const checkins: CheckIn[] = [
+			ci({ day: 1, phase: 'Seedling', week: 1, watered: true, nutrients_given: true, water_ml: 1000 }),
+			ci({ day: 3, phase: 'Seedling', week: 1, watered: true, nutrients_given: true, water_ml: 1000 }),
+		];
+		const r = calcNutrientUsage(baseGrow, checkins);
+		const seedling = r.phaseCheckinStats.find(p => p.phase === 'Seedling')!;
+		expect(seedling.n_total).toBe(2);
+		expect(seedling.n_watered).toBe(2);
+		expect(seedling.n_fertigated).toBe(0);  // gewertet wurden 0, weil Schema fehlt
+		expect(seedling.n_skipped).toBe(2);
+	});
+
+	it('phaseCheckinStats sortiert nach Feedline-Phase-Order', () => {
+		const checkins: CheckIn[] = [
+			ci({ day: 30, phase: 'Bloom', week: 1 }),
+			ci({ day: 1, phase: 'Veg', week: 1 }),
+		];
+		const r = calcNutrientUsage(baseGrow, checkins);
+		// Athena phasen: Clone(0), Veg(1), Bloom(2)
+		expect(r.phaseCheckinStats.map(p => p.phase)).toEqual(['Veg', 'Bloom']);
+	});
+
+	it('leer wenn keine Check-ins', () => {
+		const r = calcNutrientUsage(baseGrow, []);
+		expect(r.phaseCheckinStats).toEqual([]);
+	});
+
+	it('Check-in nur "watered" (ohne mL) zählt nicht als n_watered', () => {
+		const checkins: CheckIn[] = [
+			ci({ day: 1, phase: 'Veg', week: 1, watered: true, water_ml: null }),
+		];
+		const r = calcNutrientUsage(baseGrow, checkins);
+		const veg = r.phaseCheckinStats.find(p => p.phase === 'Veg')!;
+		expect(veg.n_total).toBe(1);
+		expect(veg.n_watered).toBe(0);
+	});
+});
+
 describe('calcUsageForecast', () => {
 	it('null wenn keine History', () => {
 		const r = calcNutrientUsage(baseGrow, []);
