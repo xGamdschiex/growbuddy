@@ -302,6 +302,7 @@ export const de: Record<string, string> = {
 	'legal.title': 'Rechtliches',
 	'legal.impressum': 'Impressum',
 	'legal.privacy': 'Datenschutz',
+	'legal.cannabis': 'Cannabis-Recht',
 
 	// Pro Features
 	'pro.feat_grows': 'Unbegrenzte Grows',
@@ -348,8 +349,6 @@ export const de: Record<string, string> = {
 	'onboarding.goal_improve_desc': 'Mehr Ertrag, bessere Qualität',
 	'onboarding.goal_document': 'Grows dokumentieren',
 	'onboarding.goal_document_desc': 'Alles an einem Ort festhalten',
-	'onboarding.goal_commercial': 'Professioneller Anbau',
-	'onboarding.goal_commercial_desc': 'CSC oder kommerzieller Betrieb',
 
 	// Auth
 	'auth.login': 'Anmelden',

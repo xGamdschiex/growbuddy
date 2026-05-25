@@ -9,7 +9,7 @@ const STORAGE_KEY = 'growbuddy_onboarding';
 interface OnboardingState {
 	completed: boolean;
 	experience: 'beginner' | 'intermediate' | 'advanced' | null;
-	goal: 'first_grow' | 'improve' | 'document' | 'commercial' | null;
+	goal: 'first_grow' | 'improve' | 'document' | null;
 }
 
 const DEFAULTS: OnboardingState = {

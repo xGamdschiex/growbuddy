@@ -22,6 +22,8 @@
 	import StrainList from '$lib/components/StrainList.svelte';
 	import SpacePicker from '$lib/components/SpacePicker.svelte';
 	import { getStrainEntries, joinedStrainName, totalPlantCount, validateStrains } from '$lib/utils/grow-strains';
+	import { householdStore } from '$lib/stores/household';
+	import { plantLimit } from '$lib/utils/compliance';
 
 	let tr: (key: string, params?: Record<string, string | number>) => string = $state((k: string) => k);
 	const feedlines = getAllFeedLines();
@@ -29,6 +31,7 @@
 	let growId = $derived($page.params.id);
 	let growState: any = $state({ grows: [], checkins: [] });
 	let userIsPro = $state(false);
+	let adults = $state(1);
 
 	let grow = $derived<Grow | undefined>(growState?.grows?.find((g: Grow) => g.id === growId));
 	let checkinCount = $derived(growState?.checkins?.filter((c: any) => c.grow_id === growId).length ?? 0);
@@ -52,11 +55,22 @@
 	let strainsValid = $derived(validateStrains(strainEntries));
 	let showDeleteConfirm = $state(false);
 
+	// Compliance: andere aktive Grows + aktuell editierte Anzahl vs. Limit (3 × Erwachsene, §9 KCanG)
+	let otherActivePlants = $derived(
+		(growState?.grows ?? [])
+			.filter((g: Grow) => g.status === 'active' && g.id !== growId)
+			.reduce((s: number, g: Grow) => s + (g.plant_count || 0), 0)
+	);
+	let editedPlants = $derived(strainEntries.reduce((s, e) => s + (e.plant_count > 0 ? e.plant_count : 0), 0));
+	let plantLimitTotal = $derived(plantLimit(adults));
+	let wouldExceedLimit = $derived(status === 'active' && (otherActivePlants + editedPlants) > plantLimitTotal);
+
 	onMount(() => {
 		const subs = [
 			t.subscribe(v => tr = v),
 			growStore.subscribe(v => growState = v),
 			isPro.subscribe(v => userIsPro = v),
+			householdStore.subscribe(v => adults = v.adults),
 		];
 		return () => subs.forEach(u => u());
 	});
@@ -321,6 +335,19 @@
 				<label for="edit-yield" class="block text-xs text-gb-text-muted mb-1">Ertrag (g, trocken)</label>
 				<input id="edit-yield" type="number" bind:value={yieldG} min="0" max="9999" step="1"
 					class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-2.5 text-sm" />
+			</div>
+		{/if}
+
+		<!-- Compliance-Warnung: Pflanzen-Limit (Soft, blockiert nicht) -->
+		{#if wouldExceedLimit}
+			<div class="bg-gb-warning/10 border border-gb-warning/30 rounded-xl p-3">
+				<p class="text-sm font-medium text-gb-warning">⚠️ Über dem Pflanzen-Limit</p>
+				<p class="text-xs text-gb-text-muted mt-1 leading-relaxed">
+					Insgesamt <strong>{otherActivePlants + editedPlants}</strong> lebende Pflanzen in aktiven Grows.
+					In Deutschland sind max. <strong>{plantLimitTotal}</strong> erlaubt ({adults} × 3, §9 KCanG).
+					Personen im Haushalt änderst du in den
+					<a href="/settings" class="text-gb-green underline">Einstellungen</a>.
+				</p>
 			</div>
 		{/if}
 

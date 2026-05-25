@@ -41,14 +41,26 @@ echo "→ Gradle assembleRelease"
   -PGROWBUDDY_KEY_ALIAS=growbuddy \
   -PGROWBUDDY_KEY_PASSWORD=growbuddy2026) >/dev/null 2>&1
 
-# 4. ADB install + push + cleanup vorherige APK
+# 4. ADB install + push (best-effort — WLAN-Debug kann aus sein, blockiert den Release NICHT)
 echo "→ ADB install + push"
-"$ADB" connect "$DEVICE" >/dev/null 2>&1 || true
-"$ADB" -s "$DEVICE" install -r "$APK" >/dev/null
-"$ADB" -s "$DEVICE" shell "am force-stop app.growbuddy.de"
-"$ADB" -s "$DEVICE" shell "monkey -p app.growbuddy.de -c android.intent.category.LAUNCHER 1" >/dev/null 2>&1
-"$ADB" -s "$DEVICE" push "$APK" "//sdcard/Download/GrowBuddy-$VERSION.apk" >/dev/null
-"$ADB" -s "$DEVICE" shell "rm -f //sdcard/Download/GrowBuddy-$PREV_VERSION.apk" >/dev/null 2>&1
+DEVICE_OK=0
+if "$ADB" connect "$DEVICE" >/dev/null 2>&1 && "$ADB" -s "$DEVICE" install -r "$APK" >/dev/null 2>&1; then
+  DEVICE_OK=1
+  "$ADB" -s "$DEVICE" shell "am force-stop app.growbuddy.de" >/dev/null 2>&1 || true
+  "$ADB" -s "$DEVICE" shell "monkey -p app.growbuddy.de -c android.intent.category.LAUNCHER 1" >/dev/null 2>&1 || true
+  "$ADB" -s "$DEVICE" push "$APK" "//sdcard/Download/GrowBuddy-$VERSION.apk" >/dev/null 2>&1 || true
+  "$ADB" -s "$DEVICE" shell "rm -f //sdcard/Download/GrowBuddy-$PREV_VERSION.apk" >/dev/null 2>&1 || true
+else
+  echo "  ⚠ Gerät $DEVICE nicht erreichbar — Device-Install übersprungen (WLAN-Debug aus?)"
+fi
+
+# 4b. PC-Downloads-Kopie aktuell halten (zum Weitergeben an Freunde)
+echo "→ PC-Downloads aktualisieren"
+DOWNLOADS="$HOME/Downloads"
+if [ -d "$DOWNLOADS" ]; then
+  cp -f "$APK" "$DOWNLOADS/GrowBuddy-$VERSION.apk"
+  rm -f "$DOWNLOADS/GrowBuddy-$PREV_VERSION.apk"
+fi
 
 # 5. Git commit + tag + push (alles in einem)
 echo "→ Git commit + tag v$VERSION"
@@ -58,4 +70,9 @@ git push >/dev/null 2>&1
 git tag "v$VERSION"
 git push origin "v$VERSION" >/dev/null 2>&1
 
-echo "✓ v$VERSION released (versionCode $NEW_CODE) — Device + GitHub aktuell"
+echo "✓ v$VERSION released (versionCode $NEW_CODE) — GitHub + PC-Downloads aktuell"
+if [ "$DEVICE_OK" = "1" ]; then
+  echo "  📱 Gerät aktualisiert"
+else
+  echo "  📱 Gerät NICHT aktualisiert (offline) — APK liegt in Downloads zum Sideload / später via ADB"
+fi

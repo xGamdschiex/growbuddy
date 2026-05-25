@@ -11,7 +11,7 @@
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
 	let step = $state(0);
 	let experience = $state<'beginner' | 'intermediate' | 'advanced' | null>(null);
-	let goal = $state<'first_grow' | 'improve' | 'document' | 'commercial' | null>(null);
+	let goal = $state<'first_grow' | 'improve' | 'document' | null>(null);
 	let loginEmail = $state('');
 	let loginLoading = $state(false);
 	let loginMessage = $state('');
@@ -167,7 +167,6 @@
 		{ val: 'first_grow', icon: '🌱', title: tr('onboarding.goal_first'), desc: tr('onboarding.goal_first_desc') },
 		{ val: 'improve', icon: '📈', title: tr('onboarding.goal_improve'), desc: tr('onboarding.goal_improve_desc') },
 		{ val: 'document', icon: '📋', title: tr('onboarding.goal_document'), desc: tr('onboarding.goal_document_desc') },
-		{ val: 'commercial', icon: '🏢', title: tr('onboarding.goal_commercial'), desc: tr('onboarding.goal_commercial_desc') },
 	]);
 </script>
 

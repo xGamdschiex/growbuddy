@@ -302,6 +302,7 @@ export const en: Record<string, string> = {
 	'legal.title': 'Legal',
 	'legal.impressum': 'Imprint',
 	'legal.privacy': 'Privacy',
+	'legal.cannabis': 'Cannabis law',
 
 	// Pro Features
 	'pro.feat_grows': 'Unlimited Grows',
@@ -348,8 +349,6 @@ export const en: Record<string, string> = {
 	'onboarding.goal_improve_desc': 'More yield, better quality',
 	'onboarding.goal_document': 'Document grows',
 	'onboarding.goal_document_desc': 'Keep everything in one place',
-	'onboarding.goal_commercial': 'Professional growing',
-	'onboarding.goal_commercial_desc': 'CSC or commercial operation',
 
 	// Auth
 	'auth.login': 'Sign in',

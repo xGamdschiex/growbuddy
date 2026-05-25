@@ -3,6 +3,8 @@
 	import { growStore, totalGrows, activeGrows } from '$lib/stores/grow';
 	import { xpStore } from '$lib/stores/xp';
 	import { proStore, isPro, limits } from '$lib/stores/pro';
+	import { householdStore } from '$lib/stores/household';
+	import { plantLimit } from '$lib/utils/compliance';
 	import { t } from '$lib/i18n';
 	import { onMount } from 'svelte';
 	import { getAllFeedLines } from '$lib/calc/feedlines/registry';
@@ -17,16 +19,19 @@
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
 	const feedlines = getAllFeedLines();
 	let activeCount = $state(0);
+	let activePlants = $state(0);
+	let adults = $state(1);
 	let lim = $state<any>({});
 	let userIsPro = $state(false);
 	let atLimit = $derived(activeCount >= (lim.max_active_grows ?? 1));
 
 	onMount(() => {
 		const subs = [
-			activeGrows.subscribe(v => activeCount = v.length),
+			activeGrows.subscribe(v => { activeCount = v.length; activePlants = v.reduce((s, g) => s + (g.plant_count || 0), 0); }),
 			limits.subscribe(v => lim = v),
 			isPro.subscribe(v => userIsPro = v),
 			totalGrows.subscribe(v => growCount = v),
+			householdStore.subscribe(v => adults = v.adults),
 		];
 		return () => subs.forEach(u => u());
 	});
@@ -44,6 +49,11 @@
 	let cocoPerliteRatio = $state(70); // % Kokos (Rest Perlite)
 
 	let strainsValid = $derived(validateStrains(strainEntries));
+
+	// Compliance: würde dieser Grow das Pflanzen-Limit (3 × Erwachsene, §9 KCanG) sprengen?
+	let newPlants = $derived(strainEntries.reduce((s, e) => s + (e.plant_count > 0 ? e.plant_count : 0), 0));
+	let plantLimitTotal = $derived(plantLimit(adults));
+	let wouldExceedLimit = $derived(activePlants + newPlants > plantLimitTotal);
 
 	let growCount = $state(0);
 
@@ -237,6 +247,19 @@
 			<a href="/pro" class="inline-block mt-3 bg-gb-accent text-white font-semibold text-sm px-5 py-2.5 rounded-lg hover:bg-gb-accent/80 transition-colors">
 				{tr('grow.unlock_pro')}
 			</a>
+		</div>
+	{/if}
+
+	<!-- Compliance-Warnung: Pflanzen-Limit (Soft, blockiert nicht) -->
+	{#if wouldExceedLimit}
+		<div class="bg-gb-warning/10 border border-gb-warning/30 rounded-xl p-3">
+			<p class="text-sm font-medium text-gb-warning">⚠️ Über dem Pflanzen-Limit</p>
+			<p class="text-xs text-gb-text-muted mt-1 leading-relaxed">
+				Mit diesem Grow hättest du <strong>{activePlants + newPlants}</strong> lebende Pflanzen.
+				In Deutschland sind max. <strong>{plantLimitTotal}</strong> erlaubt ({adults} × 3, §9 KCanG).
+				Reduziere die Anzahl oder passe die Personen im Haushalt in den
+				<a href="/settings" class="text-gb-green underline">Einstellungen</a> an.
+			</p>
 		</div>
 	{/if}
 

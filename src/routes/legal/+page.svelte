@@ -2,9 +2,15 @@
 	import { t } from '$lib/i18n';
 	import { onMount } from 'svelte';
 	let tr = $state<any>((k: string) => k);
-	let tab = $state<'impressum' | 'datenschutz'>('impressum');
+	let tab = $state<'impressum' | 'datenschutz' | 'cannabis'>('impressum');
 
-	onMount(() => t.subscribe(v => tr = v));
+	onMount(() => {
+		const unsub = t.subscribe(v => tr = v);
+		// Tab per URL vorwählbar (z.B. /legal?tab=cannabis aus den Einstellungen)
+		const urlTab = new URLSearchParams(window.location.search).get('tab');
+		if (urlTab === 'cannabis' || urlTab === 'datenschutz') tab = urlTab;
+		return unsub;
+	});
 </script>
 
 <div class="px-4 pt-6 max-w-lg mx-auto space-y-6 pb-24">
@@ -14,16 +20,21 @@
 	</div>
 
 	<!-- Tabs -->
-	<div class="bg-gb-surface rounded-xl p-1 flex">
+	<div class="bg-gb-surface rounded-xl p-1 flex gap-1">
 		<button onclick={() => tab = 'impressum'}
-			class="flex-1 py-2.5 rounded-lg text-sm font-medium transition-colors
+			class="flex-1 py-2.5 rounded-lg text-xs font-medium transition-colors
 				{tab === 'impressum' ? 'bg-gb-green text-gb-bg' : 'text-gb-text-muted'}">
 			{tr('legal.impressum')}
 		</button>
 		<button onclick={() => tab = 'datenschutz'}
-			class="flex-1 py-2.5 rounded-lg text-sm font-medium transition-colors
+			class="flex-1 py-2.5 rounded-lg text-xs font-medium transition-colors
 				{tab === 'datenschutz' ? 'bg-gb-green text-gb-bg' : 'text-gb-text-muted'}">
 			{tr('legal.privacy')}
+		</button>
+		<button onclick={() => tab = 'cannabis'}
+			class="flex-1 py-2.5 rounded-lg text-xs font-medium transition-colors
+				{tab === 'cannabis' ? 'bg-gb-green text-gb-bg' : 'text-gb-text-muted'}">
+			{tr('legal.cannabis')}
 		</button>
 	</div>
 
@@ -71,7 +82,7 @@
 				</p>
 			</div>
 		</div>
-	{:else}
+	{:else if tab === 'datenschutz'}
 		<div class="bg-gb-surface rounded-xl p-5 space-y-4 text-sm leading-relaxed">
 			<h2 class="font-bold text-lg">Datenschutzerklärung</h2>
 
@@ -176,6 +187,68 @@
 			</div>
 
 			<p class="text-xs text-gb-text-muted">Stand: April 2026</p>
+		</div>
+	{:else}
+		<!-- Cannabis-Recht (DE KCanG) — vereinfachte Zusammenfassung, keine Rechtsberatung -->
+		<div class="bg-gb-surface rounded-xl p-5 space-y-4 text-sm leading-relaxed">
+			<h2 class="font-bold text-lg">Cannabis-Recht (Deutschland)</h2>
+			<p class="text-gb-text-muted">
+				Seit dem 1. April 2024 (Konsumcannabisgesetz, KCanG) ist der private Eigenanbau
+				für Volljährige unter Auflagen erlaubt. Die wichtigsten Grenzen im Überblick:
+			</p>
+
+			<div>
+				<p class="font-semibold">🌿 Pflanzen</p>
+				<p class="text-gb-text-muted mt-1">
+					Max. <strong>3 lebende Pflanzen gleichzeitig pro volljähriger Person</strong> im Haushalt.
+					Leben mehrere Erwachsene zusammen, steigt das Limit entsprechend (2 → 6, 3 → 9 …).
+					Die Personenzahl stellst du in den <a href="/settings" class="text-gb-green">Einstellungen</a> ein.
+				</p>
+			</div>
+
+			<div>
+				<p class="font-semibold">⚖️ Besitz</p>
+				<p class="text-gb-text-muted mt-1">
+					Zuhause bis zu <strong>50 g</strong> getrocknetes Cannabis, unterwegs bis zu <strong>25 g</strong>.
+				</p>
+			</div>
+
+			<div>
+				<p class="font-semibold">🔞 Alter</p>
+				<p class="text-gb-text-muted mt-1">Nur für Volljährige (18+).</p>
+			</div>
+
+			<div>
+				<p class="font-semibold">🔒 Lagerung &amp; Jugendschutz</p>
+				<p class="text-gb-text-muted mt-1">
+					Pflanzen und Ernte müssen vor dem Zugriff von Kindern und Jugendlichen geschützt
+					(z. B. abschließbar) und nicht öffentlich einsehbar aufbewahrt werden.
+				</p>
+			</div>
+
+			<div>
+				<p class="font-semibold">🚫 Konsum-Verbotszonen</p>
+				<p class="text-gb-text-muted mt-1">
+					Kein Konsum innerhalb von 100 m um Schulen, Spielplätze, Kinder- und Jugendeinrichtungen
+					sowie Sportstätten. In Fußgängerzonen erst ab 20 Uhr.
+				</p>
+			</div>
+
+			<div>
+				<p class="font-semibold">🤝 Keine Weitergabe</p>
+				<p class="text-gb-text-muted mt-1">
+					Anbau ausschließlich für den Eigenbedarf. Die Abgabe, der Verkauf oder das Verschenken
+					an andere ist verboten.
+				</p>
+			</div>
+
+			<div class="bg-gb-warning/10 border border-gb-warning/30 rounded-lg p-3">
+				<p class="text-xs text-gb-text-muted leading-relaxed">
+					<strong class="text-gb-warning">Keine Rechtsberatung.</strong>
+					Vereinfachte Zusammenfassung (Stand 2024/25). Maßgeblich ist allein das KCanG;
+					Bundesländer können Details abweichend regeln. Im Zweifel rechtlich prüfen lassen.
+				</p>
+			</div>
 		</div>
 	{/if}
 </div>

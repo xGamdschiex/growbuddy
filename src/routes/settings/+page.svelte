@@ -9,6 +9,7 @@
 	import { xpStore } from '$lib/stores/xp';
 	import { streakStore } from '$lib/stores/streak';
 	import { growStore } from '$lib/stores/grow';
+	import { householdStore, complianceStatus } from '$lib/stores/household';
 	import { onboardingStore } from '$lib/stores/onboarding';
 	import { supabase } from '$lib/supabase';
 	import { goto } from '$app/navigation';
@@ -20,6 +21,8 @@
 	let userIsPro = $state(false);
 	let loggedIn = $state(false);
 	let auth = $state<any>({ user: null });
+	let household = $state<{ adults: number }>({ adults: 1 });
+	let compliance = $state<{ adults: number; limit: number; current: number; over: boolean; remaining: number }>({ adults: 1, limit: 3, current: 0, over: false, remaining: 3 });
 
 	onMount(() => {
 		const subs = [
@@ -28,6 +31,8 @@
 			isPro.subscribe(v => userIsPro = v),
 			isLoggedIn.subscribe(v => loggedIn = v),
 			authStore.subscribe(v => auth = v),
+			householdStore.subscribe(v => household = v),
+			complianceStatus.subscribe(v => compliance = v),
 		];
 		return () => subs.forEach(u => u());
 	});
@@ -252,6 +257,56 @@
 					</button>
 				</div>
 			</div>
+		</div>
+	</div>
+
+	<!-- Anbau & Recht -->
+	<div class="space-y-3">
+		<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">Anbau &amp; Recht</h2>
+		<div class="bg-gb-surface rounded-xl p-4 space-y-3">
+			<div class="flex items-center justify-between gap-3">
+				<div class="min-w-0">
+					<p class="font-medium text-sm">Erwachsene im Haushalt</p>
+					<p class="text-xs text-gb-text-muted">Volljährige (18+) — je Person 3 Pflanzen erlaubt</p>
+				</div>
+				<div class="flex items-center gap-2 shrink-0">
+					<button onclick={() => householdStore.decrement()} aria-label="Weniger Erwachsene"
+						disabled={household.adults <= 1}
+						class="w-11 h-11 rounded-lg bg-gb-bg border border-gb-border text-xl font-bold leading-none disabled:opacity-40 hover:bg-gb-surface-2 transition-colors">
+						−
+					</button>
+					<span class="w-8 text-center font-bold text-lg tabular-nums">{household.adults}</span>
+					<button onclick={() => householdStore.increment()} aria-label="Mehr Erwachsene"
+						disabled={household.adults >= 20}
+						class="w-11 h-11 rounded-lg bg-gb-bg border border-gb-border text-xl font-bold leading-none disabled:opacity-40 hover:bg-gb-surface-2 transition-colors">
+						+
+					</button>
+				</div>
+			</div>
+
+			<div class="flex items-center justify-between pt-3 border-t border-gb-border text-sm">
+				<span class="text-gb-text-muted">Erlaubtes Pflanzen-Limit</span>
+				<span class="font-bold">{compliance.limit} Pflanzen</span>
+			</div>
+
+			{#if compliance.over}
+				<div class="bg-gb-warning/10 border border-gb-warning/30 rounded-lg p-3">
+					<p class="text-xs text-gb-warning font-medium leading-relaxed">
+						⚠️ {compliance.current} Pflanzen in aktiven Grows — über dem Limit von {compliance.limit}.
+						Erhöhe die Personenzahl oder reduziere Pflanzen.
+					</p>
+				</div>
+			{:else}
+				<p class="text-xs text-gb-text-muted">
+					Aktuell {compliance.current} Pflanze{compliance.current === 1 ? '' : 'n'} in aktiven Grows.
+				</p>
+			{/if}
+
+			<p class="text-[11px] text-gb-text-muted leading-relaxed border-t border-gb-border pt-3">
+				Deutschland (KCanG): max. 3 lebende Pflanzen <strong>pro volljähriger Person</strong> im Haushalt
+				gleichzeitig. <span class="text-gb-text-dim">Keine Rechtsberatung.</span>
+			</p>
+			<a href="/legal?tab=cannabis" class="block text-xs text-gb-green font-medium">Mehr zum Cannabis-Recht →</a>
 		</div>
 	</div>
 

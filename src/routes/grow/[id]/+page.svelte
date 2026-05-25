@@ -545,6 +545,13 @@
 							class="w-full bg-gb-bg border border-gb-border rounded-lg px-3 py-2.5 text-sm" />
 					</div>
 
+					<!-- 50-g- & Lagerungs-Hinweis (KCanG) -->
+					<div class="bg-gb-info/10 border border-gb-info/20 rounded-lg p-3">
+						<p class="text-xs text-gb-text-muted leading-relaxed">
+							ℹ️ Zuhause max. <strong class="text-gb-text">50 g</strong> getrocknet erlaubt — kindersicher &amp; vor Minderjährigen geschützt lagern (KCanG).
+						</p>
+					</div>
+
 					<!-- Confirm/Cancel -->
 					<div class="flex gap-3">
 						<button onclick={confirmHarvest}

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { growStore, activeGrows, harvestedGrows, totalHarvests } from '$lib/stores/grow';
+	import { complianceStatus } from '$lib/stores/household';
 	import { currentStreak, hasCheckinToday, streakMultiplier, streakInDanger, streakStore } from '$lib/stores/streak';
 	import { isLoggedIn } from '$lib/stores/auth';
 	import { syncStore } from '$lib/stores/sync';
@@ -23,6 +24,7 @@
 	let multiplier = $state(1);
 	let danger = $state(false);
 	let longestStreak = $state(0);
+	let compliance = $state<{ adults: number; limit: number; current: number; over: boolean; remaining: number }>({ adults: 1, limit: 3, current: 0, over: false, remaining: 3 });
 
 	onMount(() => {
 		const subs = [
@@ -30,6 +32,7 @@
 			activeGrows.subscribe(v => active = v),
 			harvestedGrows.subscribe(v => harvested = v),
 			totalHarvests.subscribe(v => harvestCount = v),
+			complianceStatus.subscribe(v => compliance = v),
 			isLoggedIn.subscribe(v => loggedIn = v),
 			syncStore.subscribe(v => sync = v),
 			currentStreak.subscribe(v => streakInfo = v),
@@ -151,6 +154,30 @@
 			{/if}
 		</div>
 	</div>
+
+	<!-- Compliance: Pflanzen-Limit (DE KCanG, je Erwachsener 3 Pflanzen) -->
+	{#if active.length > 0}
+		<a href="/settings"
+			class="block rounded-xl p-3 border transition-colors
+				{compliance.over ? 'bg-gb-warning/10 border-gb-warning/40 hover:bg-gb-warning/15' : 'bg-gb-surface border-transparent hover:bg-gb-surface-2'}">
+			<div class="flex items-center justify-between gap-3">
+				<div class="flex items-center gap-2 min-w-0">
+					<span class="text-lg shrink-0">{compliance.over ? '⚠️' : '🌿'}</span>
+					<div class="min-w-0">
+						<p class="text-sm font-medium truncate">
+							{compliance.over ? 'Über dem Pflanzen-Limit' : 'Pflanzen im erlaubten Rahmen'}
+						</p>
+						<p class="text-[11px] text-gb-text-muted truncate">
+							{compliance.over ? '§9 KCanG — Anzahl anpassen' : `${compliance.adults} Erwachsene${compliance.adults === 1 ? 'r' : ''} · je 3 Pflanzen`}
+						</p>
+					</div>
+				</div>
+				<span class="text-lg font-bold tabular-nums shrink-0 {compliance.over ? 'text-gb-warning' : 'text-gb-green'}">
+					{compliance.current}/{compliance.limit}
+				</span>
+			</div>
+		</a>
+	{/if}
 
 	<!-- Aktive Grows -->
 	{#if active.length > 0}
