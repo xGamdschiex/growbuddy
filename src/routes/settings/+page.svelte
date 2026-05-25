@@ -10,6 +10,8 @@
 	import { streakStore } from '$lib/stores/streak';
 	import { growStore } from '$lib/stores/grow';
 	import { householdStore, complianceStatus } from '$lib/stores/household';
+	import { privacyStore } from '$lib/stores/privacy';
+	import { estimateStorageQuota } from '$lib/utils/storage-safe';
 	import { onboardingStore } from '$lib/stores/onboarding';
 	import { supabase } from '$lib/supabase';
 	import { goto } from '$app/navigation';
@@ -23,6 +25,12 @@
 	let auth = $state<any>({ user: null });
 	let household = $state<{ adults: number }>({ adults: 1 });
 	let compliance = $state<{ adults: number; limit: number; current: number; over: boolean; remaining: number }>({ adults: 1, limit: 3, current: 0, over: false, remaining: 3 });
+	let privacy = $state<{ localOnly: boolean }>({ localOnly: false });
+	let storage = $state<{ used: number; quota: number; percent: number } | null>(null);
+
+	function fmtMB(bytes: number): string {
+		return (bytes / 1048576).toFixed(bytes < 10485760 ? 1 : 0);
+	}
 
 	onMount(() => {
 		const subs = [
@@ -33,7 +41,9 @@
 			authStore.subscribe(v => auth = v),
 			householdStore.subscribe(v => household = v),
 			complianceStatus.subscribe(v => compliance = v),
+			privacyStore.subscribe(v => privacy = v),
 		];
+		estimateStorageQuota().then(s => storage = s);
 		return () => subs.forEach(u => u());
 	});
 
@@ -322,6 +332,52 @@
 				<span class="text-gb-text-muted text-sm">→</span>
 			</div>
 		</a>
+	</div>
+
+	<!-- Cloud & Privatsphäre -->
+	<div class="space-y-3">
+		<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">Cloud &amp; Privatsphäre</h2>
+		<div class="bg-gb-surface rounded-xl p-4 space-y-3">
+			<div class="flex items-center justify-between gap-3">
+				<div class="min-w-0">
+					<p class="font-medium text-sm">Nur lokal (Cloud aus)</p>
+					<p class="text-xs text-gb-text-muted">Synchronisiert nichts — alle Daten &amp; Fotos bleiben auf diesem Gerät.</p>
+				</div>
+				<button
+					onclick={() => privacyStore.setLocalOnly(!privacy.localOnly)}
+					aria-label="Nur-lokal-Modus umschalten"
+					class="w-12 h-7 rounded-full transition-colors relative shrink-0
+						{privacy.localOnly ? 'bg-gb-green' : 'bg-gb-border'}">
+					<div class="absolute top-0.5 w-6 h-6 rounded-full bg-white shadow transition-transform
+						{privacy.localOnly ? 'translate-x-5' : 'translate-x-0.5'}"></div>
+				</button>
+			</div>
+
+			{#if privacy.localOnly && loggedIn}
+				<div class="bg-gb-info/10 border border-gb-info/20 rounded-lg p-2.5">
+					<p class="text-xs text-gb-text-muted">☁️ Cloud-Sync pausiert — du bleibst eingeloggt. Schalter aus = Sync wieder an.</p>
+				</div>
+			{/if}
+
+			{#if storage}
+				<div class="pt-2 border-t border-gb-border space-y-1.5">
+					<div class="flex items-center justify-between text-xs">
+						<span class="text-gb-text-muted">Lokaler Speicher</span>
+						<span class="font-medium">{fmtMB(storage.used)} MB{storage.quota ? ` / ${fmtMB(storage.quota)} MB` : ''}</span>
+					</div>
+					{#if storage.quota}
+						<div class="h-1.5 bg-gb-bg rounded-full overflow-hidden">
+							<div class="h-full rounded-full {storage.percent > 85 ? 'bg-gb-danger' : 'bg-gb-green'}"
+								style="width: {Math.max(2, Math.min(100, storage.percent))}%"></div>
+						</div>
+					{/if}
+				</div>
+			{/if}
+
+			<p class="text-[11px] text-gb-text-muted leading-relaxed">
+				Fotos &amp; Check-ins werden lokal auf dem Gerät gespeichert. Sichere sie regelmäßig per Export (unten).
+			</p>
+		</div>
 	</div>
 
 	<!-- Daten -->

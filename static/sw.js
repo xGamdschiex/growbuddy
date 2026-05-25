@@ -2,7 +2,7 @@
  * GrowBuddy Service Worker v3 — Stale-While-Revalidate + Notification-Handler + Update-Flow.
  */
 
-const CACHE_VERSION = 'growbuddy-v1.4.9';
+const CACHE_VERSION = 'growbuddy-v1.4.10';
 const SHELL_FILES = [
 	'/',
 	'/manifest.json',

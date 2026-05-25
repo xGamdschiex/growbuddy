@@ -8,6 +8,7 @@
 	import { hasCheckinToday, currentStreak } from '$lib/stores/streak';
 	import { authStore } from '$lib/stores/auth';
 	import { syncStore } from '$lib/stores/sync';
+	import { privacyStore } from '$lib/stores/privacy';
 	import { growStore, demoActive } from '$lib/stores/grow';
 	import type { GrowState, Grow, CheckIn } from '$lib/stores/grow';
 	import { t } from '$lib/i18n';
@@ -32,7 +33,10 @@
 	let auth = $state<any>({ user: null, loading: true });
 	let growState = $state<GrowState>({ grows: [], checkins: [] });
 	let demoOn = $state(false);
+	let localOnly = $state(false);
 	onMount(() => {
+		// Persistenten Speicher anfragen → OS verdrängt lokale Daten/Fotos nicht (Durability)
+		try { navigator.storage?.persist?.(); } catch { /* nicht unterstützt */ }
 		const subs = [
 			onboardingStore.subscribe(v => onboarding = v),
 			authStore.subscribe(v => auth = v),
@@ -40,6 +44,7 @@
 			toastStore.subscribe(v => toasts = v),
 			t.subscribe(v => tr = v),
 			demoActive.subscribe(v => demoOn = v),
+			privacyStore.subscribe(v => localOnly = v.localOnly),
 		];
 		return () => subs.forEach(u => u());
 	});
@@ -97,6 +102,8 @@
 			pushReady = false;
 			return;
 		}
+		// Nur-lokal-Modus: keinerlei Cloud-Kontakt (kein Pull/Push)
+		if (localOnly) { pushReady = false; initialPullPending = false; return; }
 		if (lastPulledUserId === auth.user.id) return;
 		lastPulledUserId = auth.user.id;
 		const uid = auth.user.id;
@@ -147,9 +154,9 @@
 		}).catch(() => { pushReady = true; initialPullPending = false; });
 	});
 
-	// Auto-Push debounced bei Store-Änderungen (nur wenn eingeloggt + Pull durch)
+	// Auto-Push debounced bei Store-Änderungen (nur wenn eingeloggt + Pull durch + nicht Nur-lokal)
 	$effect(() => {
-		if (!auth.user || !pushReady) return;
+		if (!auth.user || !pushReady || localOnly) return;
 		const uid = auth.user.id;
 		const snapshot = growState;
 		clearTimeout(pushTimer);

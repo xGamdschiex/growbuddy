@@ -14,6 +14,8 @@ const BACKUP_KEYS = [
 	'growbuddy_locale',
 	'growbuddy_drying_start',
 	'growbuddy_curing_start',
+	'growbuddy_household',
+	'growbuddy_privacy',
 ];
 
 export interface BackupData {

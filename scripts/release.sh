@@ -42,16 +42,21 @@ echo "→ Gradle assembleRelease"
   -PGROWBUDDY_KEY_PASSWORD=growbuddy2026) >/dev/null 2>&1
 
 # 4. ADB install + push (best-effort — WLAN-Debug kann aus sein, blockiert den Release NICHT)
+# Ziel-Gerät: bevorzugt $DEVICE, sonst erstes bereits verbundenes Gerät
+# (WLAN-Debug vergibt zufällige Ports → mit `adb pair`/mDNS verbundenes Gerät automatisch nutzen).
 echo "→ ADB install + push"
 DEVICE_OK=0
-if "$ADB" connect "$DEVICE" >/dev/null 2>&1 && "$ADB" -s "$DEVICE" install -r "$APK" >/dev/null 2>&1; then
+"$ADB" connect "$DEVICE" >/dev/null 2>&1 || true
+TARGET=$("$ADB" devices | awk '$2=="device"{print $1; exit}')
+if [ -n "$TARGET" ] && "$ADB" -s "$TARGET" install -r "$APK" >/dev/null 2>&1; then
   DEVICE_OK=1
-  "$ADB" -s "$DEVICE" shell "am force-stop app.growbuddy.de" >/dev/null 2>&1 || true
-  "$ADB" -s "$DEVICE" shell "monkey -p app.growbuddy.de -c android.intent.category.LAUNCHER 1" >/dev/null 2>&1 || true
-  "$ADB" -s "$DEVICE" push "$APK" "//sdcard/Download/GrowBuddy-$VERSION.apk" >/dev/null 2>&1 || true
-  "$ADB" -s "$DEVICE" shell "rm -f //sdcard/Download/GrowBuddy-$PREV_VERSION.apk" >/dev/null 2>&1 || true
+  "$ADB" -s "$TARGET" shell "am force-stop app.growbuddy.de" >/dev/null 2>&1 || true
+  "$ADB" -s "$TARGET" shell "monkey -p app.growbuddy.de -c android.intent.category.LAUNCHER 1" >/dev/null 2>&1 || true
+  "$ADB" -s "$TARGET" push "$APK" "//sdcard/Download/GrowBuddy-$VERSION.apk" >/dev/null 2>&1 || true
+  "$ADB" -s "$TARGET" shell "rm -f //sdcard/Download/GrowBuddy-$PREV_VERSION.apk" >/dev/null 2>&1 || true
+  echo "  📱 Ziel-Gerät: $TARGET"
 else
-  echo "  ⚠ Gerät $DEVICE nicht erreichbar — Device-Install übersprungen (WLAN-Debug aus?)"
+  echo "  ⚠ Kein Gerät erreichbar — Device-Install übersprungen (WLAN-Debug aus?)"
 fi
 
 # 4b. PC-Downloads-Kopie aktuell halten (zum Weitergeben an Freunde)
