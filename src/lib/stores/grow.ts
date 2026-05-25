@@ -8,6 +8,7 @@ import { writable, derived } from 'svelte/store';
 import type { Medium, GrowPhase } from '$lib/data/science';
 import { safeSetItem } from '$lib/utils/storage-safe';
 import { tombstones } from '$lib/utils/tombstones';
+import { putPhoto, getPhoto, deletePhotos, newPhotoId } from '$lib/utils/photo-store';
 
 // ─── TYPES ──────────────────────────────────────────────────────────────
 
@@ -57,7 +58,9 @@ export interface CheckIn {
 	week: number;
 	day: number;
 	photo_data: string | null;   // base64 data URL (legacy, single photo)
-	photos_data: string[];       // base64 array, max 5 (lokal vor Upload)
+	photos_data: string[];       // base64 array (im Speicher; persistiert via photo_ids/IndexedDB)
+	/** Lokale Foto-Referenzen in IndexedDB (v1.4.11+) — ersetzt Base64-in-localStorage. */
+	photo_ids?: string[];
 	photo_url?: string | null;   // Signed URL von Supabase Storage (Single, legacy)
 	photo_urls?: string[];       // Signed URL Array von Supabase Storage (nach Sync)
 	temp: number | null;
@@ -120,7 +123,17 @@ function loadState(): GrowState {
 }
 
 function saveState(state: GrowState): void {
-	safeSetItem(STORAGE_KEY, JSON.stringify(state));
+	// Fotos mit IndexedDB-Referenz (photo_ids) NICHT als Base64 in localStorage schreiben
+	// — sonst Quota-Sprengung. Base64 bleibt im Speicher und liegt sicher in IndexedDB.
+	const persisted: GrowState = {
+		grows: state.grows,
+		checkins: state.checkins.map(c =>
+			(c.photo_ids && c.photo_ids.length)
+				? { ...c, photo_data: null, photos_data: [] }
+				: c
+		),
+	};
+	safeSetItem(STORAGE_KEY, JSON.stringify(persisted));
 }
 
 // ─── STORE ──────────────────────────────────────────────────────────────
@@ -130,6 +143,46 @@ function createGrowStore() {
 
 	// Auto-save bei jeder Änderung
 	subscribe((state) => saveState(state));
+
+	// v1.4.11: Fotos einmalig von Base64-localStorage → IndexedDB migrieren und beim
+	// App-Start wieder in den Speicher holen (Anzeige/Sync lesen weiter photos_data).
+	// Läuft über die JEWEILS aktuelle State (kein Clobber eines parallelen Cloud-Pulls).
+	async function runMigrateHydrate(): Promise<void> {
+		if (typeof window === 'undefined') return;
+		let snap: GrowState = { grows: [], checkins: [] };
+		const u = subscribe(s => { snap = s; }); u();
+		const patches = new Map<string, { photo_ids: string[]; photos_data: string[] }>();
+		for (const c of snap.checkins) {
+			const arrB64 = (c.photos_data ?? []).filter(p => p?.startsWith('data:'));
+			const singleB64 = (!arrB64.length && c.photo_data && c.photo_data.startsWith('data:')) ? [c.photo_data] : [];
+			const b64 = [...arrB64, ...singleB64];
+			if ((!c.photo_ids || !c.photo_ids.length) && b64.length) {
+				// Migration: Base64 → IndexedDB
+				const ids: string[] = [];
+				let ok = true;
+				for (const b of b64) {
+					const pid = newPhotoId();
+					try { await putPhoto(pid, b); ids.push(pid); } catch { ok = false; break; }
+				}
+				if (ok) patches.set(c.id, { photo_ids: ids, photos_data: b64 });
+				else if (ids.length) void deletePhotos(ids);
+			} else if (c.photo_ids?.length && !(c.photos_data?.length)) {
+				// Hydration: photo_ids vorhanden, Base64 nach Reload weg → aus IndexedDB laden
+				const urls = (await Promise.all(c.photo_ids.map(getPhoto))).filter((x): x is string => !!x);
+				if (urls.length) patches.set(c.id, { photo_ids: c.photo_ids, photos_data: urls });
+			}
+		}
+		if (patches.size) {
+			update(s => ({
+				...s,
+				checkins: s.checkins.map(c => {
+					const p = patches.get(c.id);
+					return p ? { ...c, photo_ids: p.photo_ids, photos_data: p.photos_data, photo_data: p.photos_data[0] ?? null } : c;
+				}),
+			}));
+		}
+	}
+	if (typeof window !== 'undefined') setTimeout(runMigrateHydrate, 0);
 
 	return {
 		subscribe,
@@ -200,9 +253,12 @@ function createGrowStore() {
 			// v1.4.7: Tombstone-Tracking → wird beim nächsten Cloud-Push als DELETE gesendet
 			// (sonst kommt der Eintrag beim nächsten Pull aus Supabase zurück)
 			update(s => {
-				const ciIds = s.checkins.filter(c => c.grow_id === id).map(c => c.id);
+				const ciForGrow = s.checkins.filter(c => c.grow_id === id);
+				const ciIds = ciForGrow.map(c => c.id);
+				const photoIds = ciForGrow.flatMap(c => c.photo_ids ?? []);
 				tombstones.addGrow(id);
 				tombstones.addCheckins(ciIds);
+				if (photoIds.length) void deletePhotos(photoIds); // IndexedDB-Fotos aufräumen
 				return {
 					grows: s.grows.filter(g => g.id !== id),
 					checkins: s.checkins.filter(c => c.grow_id !== id),
@@ -210,10 +266,23 @@ function createGrowStore() {
 			});
 		},
 
-		addCheckIn(checkin: Omit<CheckIn, 'id' | 'created_at'>): string {
+		async addCheckIn(checkin: Omit<CheckIn, 'id' | 'created_at'>): Promise<string> {
 			const id = crypto.randomUUID();
 			const now = new Date().toISOString();
-			let newId = id;
+			// Base64-Fotos → IndexedDB (await: erst sicher speichern, DANN photo_ids setzen)
+			const base64 = (checkin.photos_data ?? []).filter(p => p?.startsWith('data:'));
+			let photo_ids = [...(checkin.photo_ids ?? [])];
+			if (base64.length) {
+				const ids: string[] = [];
+				let ok = true;
+				for (const b of base64) {
+					const pid = newPhotoId();
+					try { await putPhoto(pid, b); ids.push(pid); } catch { ok = false; break; }
+				}
+				// Nur wenn ALLE Fotos sicher in IDB → photo_ids setzen (sonst Base64-Fallback in localStorage)
+				if (ok) photo_ids = [...photo_ids, ...ids];
+				else if (ids.length) void deletePhotos(ids);
+			}
 			update(s => {
 				// Erbt is_public vom zugehörigen Grow falls nicht explizit gesetzt
 				const parentGrow = s.grows.find(g => g.id === checkin.grow_id);
@@ -222,28 +291,57 @@ function createGrowStore() {
 					id,
 					created_at: now,
 					updated_at: now,
+					photo_ids,
 					is_public: checkin.is_public ?? parentGrow?.is_public ?? false,
 				};
 				return { ...s, checkins: [...s.checkins, newCheckin] };
 			});
-			return newId;
+			return id;
 		},
 
-		updateCheckIn(id: string, patch: Partial<Omit<CheckIn, 'id' | 'grow_id' | 'created_at'>>): void {
+		async updateCheckIn(id: string, patch: Partial<Omit<CheckIn, 'id' | 'grow_id' | 'created_at'>>): Promise<void> {
 			const now = new Date().toISOString();
+			// Wenn der Patch Fotos enthält: neue Base64 → IndexedDB, photo_ids neu setzen
+			let newPhotoIds: string[] | null = null;
+			if (patch.photos_data !== undefined) {
+				const base64 = (patch.photos_data ?? []).filter(p => p?.startsWith('data:'));
+				if (base64.length) {
+					const ids: string[] = [];
+					let ok = true;
+					for (const b of base64) {
+						const pid = newPhotoId();
+						try { await putPhoto(pid, b); ids.push(pid); } catch { ok = false; break; }
+					}
+					if (ok) newPhotoIds = ids;
+					else if (ids.length) void deletePhotos(ids);
+				} else {
+					newPhotoIds = []; // alle Fotos entfernt
+				}
+			}
 			update(s => ({
 				...s,
-				checkins: s.checkins.map(c => c.id === id ? { ...c, ...patch, updated_at: now } : c),
+				checkins: s.checkins.map(c => {
+					if (c.id !== id) return c;
+					const merged: CheckIn = { ...c, ...patch, updated_at: now };
+					if (newPhotoIds !== null) {
+						const old = c.photo_ids ?? [];
+						const toDelete = old.filter(o => !newPhotoIds!.includes(o));
+						if (toDelete.length) void deletePhotos(toDelete);
+						merged.photo_ids = newPhotoIds;
+					}
+					return merged;
+				}),
 			}));
 		},
 
 		deleteCheckIn(id: string): void {
 			// v1.4.7: Tombstone-Tracking (siehe deleteGrow)
 			tombstones.addCheckin(id);
-			update(s => ({
-				...s,
-				checkins: s.checkins.filter(c => c.id !== id),
-			}));
+			update(s => {
+				const c = s.checkins.find(x => x.id === id);
+				if (c?.photo_ids?.length) void deletePhotos(c.photo_ids); // IndexedDB-Fotos aufräumen
+				return { ...s, checkins: s.checkins.filter(c => c.id !== id) };
+			});
 		},
 
 		getCheckInsForGrow(state: GrowState, growId: string): CheckIn[] {

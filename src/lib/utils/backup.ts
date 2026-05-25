@@ -4,6 +4,7 @@
 
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Capacitor } from '@capacitor/core';
+import { getAllPhotos, putPhotos } from '$lib/utils/photo-store';
 
 const BACKUP_KEYS = [
 	'growbuddy_grows',
@@ -22,10 +23,12 @@ export interface BackupData {
 	version: string;
 	created_at: string;
 	data: Record<string, any>;
+	/** Fotos aus IndexedDB als {id: dataUrl} (v1.1.0+). */
+	photos?: Record<string, string>;
 }
 
-/** Exportiert alle GrowBuddy-Daten als JSON */
-export function exportBackup(): string {
+/** Exportiert alle GrowBuddy-Daten als JSON (inkl. Fotos aus IndexedDB) */
+export async function exportBackup(): Promise<string> {
 	const data: Record<string, any> = {};
 	for (const key of BACKUP_KEYS) {
 		const raw = localStorage.getItem(key);
@@ -37,10 +40,13 @@ export function exportBackup(): string {
 			}
 		}
 	}
+	// Fotos liegen seit v1.4.11 in IndexedDB → fürs Backup mit einbetten
+	const photos = await getAllPhotos();
 	const backup: BackupData = {
-		version: '1.0.0',
+		version: '1.1.0',
 		created_at: new Date().toISOString(),
 		data,
+		photos,
 	};
 	return JSON.stringify(backup, null, 2);
 }
@@ -54,7 +60,7 @@ export function exportBackup(): string {
  *          oder "Download" für Web.
  */
 export async function downloadBackup(): Promise<string> {
-	const json = exportBackup();
+	const json = await exportBackup();
 	const filename = `growbuddy-backup-${new Date().toISOString().slice(0, 10)}.json`;
 
 	// Native (Capacitor Android/iOS)
@@ -82,8 +88,8 @@ export async function downloadBackup(): Promise<string> {
 	return 'Downloads';
 }
 
-/** Importiert Backup aus JSON-String */
-export function importBackup(jsonStr: string): { success: boolean; error?: string; keys?: number } {
+/** Importiert Backup aus JSON-String (inkl. Fotos zurück in IndexedDB) */
+export async function importBackup(jsonStr: string): Promise<{ success: boolean; error?: string; keys?: number }> {
 	try {
 		const backup: BackupData = JSON.parse(jsonStr);
 		if (!backup.version || !backup.data) {
@@ -95,6 +101,10 @@ export function importBackup(jsonStr: string): { success: boolean; error?: strin
 				localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
 				count++;
 			}
+		}
+		// Fotos (Backup v1.1.0+) zurück in IndexedDB schreiben
+		if (backup.photos && typeof backup.photos === 'object') {
+			await putPhotos(backup.photos);
 		}
 		return { success: true, keys: count };
 	} catch {

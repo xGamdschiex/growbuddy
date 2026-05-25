@@ -138,6 +138,7 @@
 							...cc,
 							photo_data: l.photo_data ?? cc.photo_data,
 							photos_data: l.photos_data?.length ? l.photos_data : (cc.photos_data ?? []),
+							photo_ids: l.photo_ids ?? cc.photo_ids,
 						});
 					} else {
 						checkinsById.set(cc.id, winner);

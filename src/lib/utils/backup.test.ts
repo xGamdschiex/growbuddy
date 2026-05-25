@@ -2,7 +2,8 @@
  * Backup/Restore Roundtrip-Tests.
  *
  * Sichert: Export → Import → identische localStorage-Daten.
- * Fokus auf Mary-Jane-Sprint: User darf Daten verlieren, wenn Backup kaputt ist.
+ * Seit v1.4.11 sind Export/Import async (Fotos liegen in IndexedDB; im Test
+ * ist IndexedDB nicht verfügbar → Foto-Map ist leer, Roundtrip bleibt valide).
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -24,19 +25,19 @@ beforeEach(() => {
 });
 
 describe('Backup — Export/Import Roundtrip', () => {
-	it('Export → Import: Daten unverändert', () => {
+	it('Export → Import: Daten unverändert', async () => {
 		const grows = { grows: [{ id: 'g1', name: 'Test' }], checkins: [] };
 		const xp = { total_xp: 1234, events: [] };
 		localStorage.setItem('growbuddy_grows', JSON.stringify(grows));
 		localStorage.setItem('growbuddy_xp', JSON.stringify(xp));
 
-		const json = exportBackup();
+		const json = await exportBackup();
 		expect(json).toContain('growbuddy_grows');
 		expect(json).toContain('growbuddy_xp');
 
 		// Cleare und re-importiere
 		localStorage.clear();
-		const result = importBackup(json);
+		const result = await importBackup(json);
 
 		expect(result.success).toBe(true);
 		expect(result.keys).toBe(2);
@@ -44,27 +45,27 @@ describe('Backup — Export/Import Roundtrip', () => {
 		expect(JSON.parse(localStorage.getItem('growbuddy_xp')!)).toEqual(xp);
 	});
 
-	it('Export ohne Daten: leeres data-Objekt, valides JSON', () => {
-		const json = exportBackup();
+	it('Export ohne Daten: leeres data-Objekt, valides JSON', async () => {
+		const json = await exportBackup();
 		const parsed = JSON.parse(json);
 		expect(parsed.version).toBeDefined();
 		expect(parsed.created_at).toBeDefined();
 		expect(parsed.data).toEqual({});
 	});
 
-	it('Import: ungültiges JSON → success=false, error-Message', () => {
-		const result = importBackup('das ist kein JSON');
+	it('Import: ungültiges JSON → success=false, error-Message', async () => {
+		const result = await importBackup('das ist kein JSON');
 		expect(result.success).toBe(false);
 		expect(result.error).toBeDefined();
 	});
 
-	it('Import: JSON ohne version/data → success=false', () => {
-		const result = importBackup('{"foo": "bar"}');
+	it('Import: JSON ohne version/data → success=false', async () => {
+		const result = await importBackup('{"foo": "bar"}');
 		expect(result.success).toBe(false);
 		expect(result.error).toMatch(/Format/i);
 	});
 
-	it('Import: unbekannte Keys werden ignoriert (Whitelist-Schutz)', () => {
+	it('Import: unbekannte Keys werden ignoriert (Whitelist-Schutz)', async () => {
 		const backup = {
 			version: '1.0.0',
 			created_at: new Date().toISOString(),
@@ -75,7 +76,7 @@ describe('Backup — Export/Import Roundtrip', () => {
 			},
 		};
 		localStorage.clear();
-		const result = importBackup(JSON.stringify(backup));
+		const result = await importBackup(JSON.stringify(backup));
 
 		expect(result.success).toBe(true);
 		expect(result.keys).toBe(1); // nur growbuddy_grows
@@ -83,7 +84,7 @@ describe('Backup — Export/Import Roundtrip', () => {
 		expect(localStorage.getItem('another_unknown')).toBeNull();
 	});
 
-	it('Roundtrip mit allen BACKUP_KEYS: alle bekannten Keys werden restored', () => {
+	it('Roundtrip mit allen BACKUP_KEYS: alle bekannten Keys werden restored', async () => {
 		const allKeys = {
 			growbuddy_grows: { grows: [{ id: 'g1' }], checkins: [{ id: 'c1' }] },
 			growbuddy_xp: { total_xp: 999 },
@@ -98,9 +99,9 @@ describe('Backup — Export/Import Roundtrip', () => {
 			localStorage.setItem(k, JSON.stringify(v));
 		}
 
-		const json = exportBackup();
+		const json = await exportBackup();
 		localStorage.clear();
-		const result = importBackup(json);
+		const result = await importBackup(json);
 
 		expect(result.success).toBe(true);
 		expect(result.keys).toBe(Object.keys(allKeys).length);
@@ -112,12 +113,12 @@ describe('Backup — Export/Import Roundtrip', () => {
 		}
 	});
 
-	it('Strings (nicht-JSON) werden auch korrekt restored', () => {
+	it('Strings (nicht-JSON) werden auch korrekt restored', async () => {
 		// Falls jemand mal einen Key direkt als String speichert
 		localStorage.setItem('growbuddy_locale', 'en');
-		const json = exportBackup();
+		const json = await exportBackup();
 		localStorage.clear();
-		const result = importBackup(json);
+		const result = await importBackup(json);
 		expect(result.success).toBe(true);
 		expect(localStorage.getItem('growbuddy_locale')).toBe('en');
 	});

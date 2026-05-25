@@ -7,6 +7,7 @@
 import { writable, derived } from 'svelte/store';
 import { supabase } from '$lib/supabase';
 import { uploadCheckinPhoto, uploadCheckinPhotos } from '$lib/utils/storage';
+import { getPhoto } from '$lib/utils/photo-store';
 import type { GrowState, Grow, CheckIn } from '$lib/stores/grow';
 import { tombstones } from '$lib/utils/tombstones';
 
@@ -101,7 +102,12 @@ function createSyncStore() {
 				if (state.checkins.length > 0) {
 					const checkinRows = await Promise.all(state.checkins.map(async c => {
 						// Mehrere Fotos uploaden (bevorzugt), sonst Legacy-Einzel
-						const rawPhotos = (c.photos_data ?? []).filter(p => p?.startsWith('data:'));
+						let rawPhotos = (c.photos_data ?? []).filter(p => p?.startsWith('data:'));
+						// Falls Base64 nicht im Speicher (z.B. vor Hydration nach Reload): aus IndexedDB holen
+						if (!rawPhotos.length && c.photo_ids?.length) {
+							rawPhotos = (await Promise.all(c.photo_ids.map(getPhoto)))
+								.filter((p): p is string => !!p && p.startsWith('data:'));
+						}
 						// Bestehende Cloud-URLs erhalten (verhindert Überschreiben mit leerem Array)
 						let photoUrls: string[] = c.photo_urls ?? [];
 						let photoUrl: string | null = c.photo_url ?? null;

@@ -402,7 +402,7 @@
 						const input = e.target as HTMLInputElement;
 						if (!input.files?.[0]) return;
 						const text = await readFileAsText(input.files[0]);
-						const result = importBackup(text);
+						const result = await importBackup(text);
 						if (result.success) {
 							toastStore.success(`${result.keys} Datensätze importiert`);
 							setTimeout(() => window.location.reload(), 1500);

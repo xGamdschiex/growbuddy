@@ -53,7 +53,7 @@ export function calculateGrowScore(grow: Grow, checkins: CheckIn[]): ScoreBreakd
 	const environment = envScore;
 
 	// ─── Dokumentation (20%) ────��─────────────────────────────
-	const withPhoto = checkins.filter(c => c.photo_data).length;
+	const withPhoto = checkins.filter(c => c.photo_data || c.photos_data?.length || c.photo_ids?.length || c.photo_urls?.length).length;
 	const withFullData = checkins.filter(c => c.temp && c.rh && c.ec_measured && c.ph_measured).length;
 	const withNotes = checkins.filter(c => c.notes.trim().length > 0).length;
 

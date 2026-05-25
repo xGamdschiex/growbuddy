@@ -212,7 +212,7 @@
 		return new Date(dateStr).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
 	}
 
-	function submitCheckin() {
+	async function submitCheckin() {
 		const validTemp = ciTemp !== null ? clampNumber(ciTemp, RANGES.temp.min, RANGES.temp.max) : null;
 		const validRh = ciRh !== null ? clampNumber(ciRh, RANGES.rh.min, RANGES.rh.max) : null;
 		const ecMs = ciEc !== null ? toMsPerCm(ciEc, ciEcUnit) : null;
@@ -247,9 +247,9 @@
 		};
 
 		if (editingCi) {
-			growStore.updateCheckIn(editingCi.id, patch);
+			await growStore.updateCheckIn(editingCi.id, patch);
 		} else {
-			growStore.addCheckIn({ grow_id: grow.id, ...patch });
+			await growStore.addCheckIn({ grow_id: grow.id, ...patch });
 			const isFull = !!(validTemp && validRh && validEc && validPh);
 			xpStore.awardCheckIn(ciPhotos.length > 0, isFull, multiplierValue);
 
