@@ -6,10 +6,11 @@
  */
 
 export const MAX_PHOTOS = 5;
-// Reduziert von 1024×0.75 → 800×0.65 (~50% kleinere base64-Strings — wichtig für
-// localStorage-Quota auf Tester-Geräten). Qualität bleibt für Doku-Zwecke ausreichend.
-export const PHOTO_MAX_SIZE = 800;
-export const PHOTO_QUALITY = 0.65;
+// v1.4.12: Fotos liegen seit v1.4.11 in IndexedDB (kein ~5-MB-localStorage-Limit mehr)
+// → höhere Qualität für Doku/Detail (Blätter, Trichome, Mängel) + bessere AI-Doctor-Diagnose.
+// 1600px/0.8 ≈ 250-450 KB/Foto. Vorher 800px/0.65 — nur wegen localStorage-Quota gedrosselt.
+export const PHOTO_MAX_SIZE = 1600;
+export const PHOTO_QUALITY = 0.8;
 
 function nextTick(): Promise<void> {
 	return new Promise(r => setTimeout(r, 0));

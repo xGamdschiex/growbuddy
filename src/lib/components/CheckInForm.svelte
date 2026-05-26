@@ -188,7 +188,7 @@
 		if (!files.length) return;
 		compressing = true;
 		try {
-			const { images, errors } = await compressBatch(files, 800);
+			const { images, errors } = await compressBatch(files);
 			if (images.length > 0) {
 				ciPhotos = [...ciPhotos, ...images].slice(0, MAX_PHOTOS);
 			}
