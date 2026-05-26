@@ -60,42 +60,6 @@
 	// Pro-Status
 	let userIsPro = $state(false);
 
-	// Public-Check-in Repair (für Bestandsdaten von vor v1.3.26):
-	// Repair-Link nur sichtbar wenn echte Inkonsistenz besteht (Anzahl Check-ins
-	// mit abweichendem is_public-Flag > 0). Sonst Noise im UI.
-	let publicMismatchCount = $derived(
-		grow ? (growState?.checkins ?? []).filter((c: CheckIn) =>
-			c.grow_id === grow.id && c.is_public !== (grow.is_public ?? false)
-		).length : 0
-	);
-	let repairBusy = $state(false);
-	async function repairPublicCheckins() {
-		if (!grow || repairBusy) return;
-		repairBusy = true;
-		try {
-			// Lokal alle Check-ins dieses Grows auf grow.is_public setzen
-			const targetPublic = grow.is_public ?? false;
-			const affected = (growState?.checkins ?? []).filter((c: CheckIn) =>
-				c.grow_id === grow.id && c.is_public !== targetPublic
-			);
-			for (const c of affected) {
-				growStore.updateCheckIn(c.id, { is_public: targetPublic });
-			}
-			// Cloud-Push wenn eingeloggt
-			let authState: any = { user: null };
-			authStore.subscribe(s => authState = s)();
-			let snapshot: any = growState;
-			growStore.subscribe(s => snapshot = s)();
-			if (authState.user) {
-				await syncStore.push(authState.user.id, snapshot);
-			}
-			toastStore.success(`${affected.length} Check-ins nachsynchronisiert`);
-		} catch (e: any) {
-			toastStore.warning('Fehlgeschlagen: ' + (e?.message ?? 'unbekannt'));
-		} finally {
-			repairBusy = false;
-		}
-	}
 
 	// Chart-Daten (chronologisch sortiert)
 	let chronCheckins = $derived(
@@ -662,44 +626,6 @@
 			</div>
 		{/if}
 
-		<!-- Sichtbarkeit (v1.3.78: kompaktiert — Single-Row + Repair-Link nur wenn echte Inkonsistenz) -->
-		<div role="button" tabindex="0"
-			onclick={() => {
-				const newVal = !grow.is_public;
-				growStore.updateGrow(grow.id, { is_public: newVal });
-				growStore.subscribe(s => growState = s)();
-				toastStore.success(newVal ? '🌍 Grow ist jetzt öffentlich' : '🔒 Grow ist jetzt privat');
-			}}
-			onkeydown={(e) => {
-				if (e.key === 'Enter' || e.key === ' ') {
-					e.preventDefault();
-					const newVal = !grow.is_public;
-					growStore.updateGrow(grow.id, { is_public: newVal });
-					growStore.subscribe(s => growState = s)();
-					toastStore.success(newVal ? '🌍 Grow ist jetzt öffentlich' : '🔒 Grow ist jetzt privat');
-				}
-			}}
-			class="w-full bg-gb-surface border border-gb-border rounded-xl px-3 py-2.5 flex items-center justify-between gap-3 text-left cursor-pointer">
-			<div class="min-w-0 flex-1">
-				<p class="text-sm">
-					<span class="font-medium">{grow.is_public ? '🌍 Öffentlich' : '🔒 Privat'}</span>
-					<span class="text-gb-text-muted text-xs">
-						· {grow.is_public ? 'Im Community-Feed' : 'Nur du siehst diesen Grow'}
-					</span>
-				</p>
-				{#if grow.is_public && publicMismatchCount > 0}
-					<button type="button" onclick={(e) => { e.stopPropagation(); repairPublicCheckins(); }}
-						disabled={repairBusy}
-						class="text-[11px] text-gb-info hover:underline disabled:opacity-50 mt-1">
-						{repairBusy ? 'Synchronisiere…' : `🔧 ${publicMismatchCount} Check-in${publicMismatchCount === 1 ? '' : 's'} nachsynchronisieren`}
-					</button>
-				{/if}
-			</div>
-			<div class="relative h-6 w-11 rounded-full transition-colors shrink-0" class:bg-gb-green={grow.is_public} class:bg-gb-bg={!grow.is_public}>
-				<div class="absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all"
-					class:left-0.5={!grow.is_public} class:left-[22px]={grow.is_public}></div>
-			</div>
-		</div>
 
 		<!-- Health-Card (Komponente, geteilt mit stats-Page) -->
 		{#if hasHealthData}

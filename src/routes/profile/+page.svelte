@@ -5,7 +5,6 @@
 	import { reminderStore } from '$lib/stores/reminders';
 	import { authStore, isLoggedIn } from '$lib/stores/auth';
 	import { syncStore } from '$lib/stores/sync';
-	import { profileStore, myProfile } from '$lib/stores/profile';
 	import { onMount } from 'svelte';
 	import { t, locale } from '$lib/i18n';
 	import type { Locale } from '$lib/i18n';
@@ -38,7 +37,6 @@
 			totalGrows.subscribe(x => grows = x),
 			totalHarvests.subscribe(x => harvests = x),
 			syncStore.subscribe(x => sync = x),
-			myProfile.subscribe(x => profile = x),
 			authStore.subscribe(x => auth = x),
 			isPro.subscribe(x => userIsPro = x),
 			reminderStore.subscribe(x => reminder = x),
@@ -50,74 +48,6 @@
 	let loginEmail = $state('');
 	let loginLoading = $state(false);
 	let loginMessage = $state('');
-
-	// Username/Bio Editor (Phase 2 Beta)
-	let profile: any = $state(null);
-	let editingProfile = $state(false);
-	let usernameInput = $state('');
-	let bioInput = $state('');
-	let savingProfile = $state(false);
-	let profileError = $state('');
-
-	function startEditProfile() {
-		usernameInput = profile?.username ?? '';
-		bioInput = profile?.bio ?? '';
-		profileError = '';
-		editingProfile = true;
-	}
-	function cancelEditProfile() {
-		editingProfile = false;
-		profileError = '';
-	}
-	async function saveProfile() {
-		if (savingProfile) return;
-		profileError = '';
-		savingProfile = true;
-		try {
-			if (usernameInput.trim() !== profile?.username) {
-				const res = await profileStore.updateUsername(usernameInput);
-				if (res.error) { profileError = res.error; return; }
-			}
-			if (bioInput !== (profile?.bio ?? '')) {
-				const res = await profileStore.updateBio(bioInput);
-				if (res.error) { profileError = res.error; return; }
-			}
-			toastStore.success('Profil aktualisiert');
-			editingProfile = false;
-		} finally {
-			savingProfile = false;
-		}
-	}
-
-	// Avatar-Upload (Phase 2 Beta)
-	let uploadingAvatar = $state(false);
-	async function handleAvatarUpload(e: Event) {
-		const input = e.target as HTMLInputElement;
-		const file = input.files?.[0];
-		input.value = ''; // reset für nächstes Mal
-		if (!file || uploadingAvatar) return;
-		uploadingAvatar = true;
-		try {
-			const { compressImage } = await import('$lib/utils/photo');
-			// 256x256, q=0.7 → typisch <30KB Base64
-			const dataUrl = await compressImage(file, 256, 0.7);
-			const res = await profileStore.updateAvatar(dataUrl);
-			if (res.error) toastStore.warning(res.error);
-			else toastStore.success('Avatar aktualisiert');
-		} catch (err: any) {
-			toastStore.warning('Bild konnte nicht verarbeitet werden');
-		} finally {
-			uploadingAvatar = false;
-		}
-	}
-	async function removeAvatar() {
-		if (uploadingAvatar) return;
-		uploadingAvatar = true;
-		const res = await profileStore.updateAvatar(null);
-		if (res.error) toastStore.warning(res.error);
-		else toastStore.success('Avatar entfernt');
-		uploadingAvatar = false;
-	}
 
 	async function sendMagicLink() {
 		if (!loginEmail.trim()) return;
@@ -495,81 +425,6 @@
 						style="min-height:44px">
 						{tr('auth.logout')}
 					</button>
-				</div>
-
-				<!-- Public-Profile Editor (Phase 2 Beta) -->
-				<div class="border-t border-gb-border pt-3">
-					{#if !editingProfile}
-						<div class="flex items-center gap-3">
-							<!-- Avatar mit Upload-Overlay -->
-							<label class="relative w-14 h-14 rounded-full bg-gb-green/10 border-2 border-gb-green flex items-center justify-center overflow-hidden cursor-pointer shrink-0"
-								class:opacity-60={uploadingAvatar}>
-								{#if profile?.avatar_url}
-									<img src={profile.avatar_url} alt="" class="w-full h-full object-cover" />
-								{:else}
-									<span class="text-2xl">🌱</span>
-								{/if}
-								{#if uploadingAvatar}
-									<div class="absolute inset-0 bg-black/40 flex items-center justify-center">
-										<div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-									</div>
-								{/if}
-								<input type="file" accept="image/*" class="hidden" onchange={handleAvatarUpload} disabled={uploadingAvatar} />
-							</label>
-							<div class="min-w-0 flex-1">
-								<p class="text-xs text-gb-text-muted">Öffentliches Profil</p>
-								<p class="text-sm font-medium truncate">@{profile?.username ?? '—'}</p>
-								{#if profile?.bio}
-									<p class="text-xs text-gb-text-muted truncate mt-0.5">{profile.bio}</p>
-								{/if}
-							</div>
-							<!-- v1.3.81: 28→44px Touch-Target -->
-							<button onclick={startEditProfile}
-								class="text-xs text-gb-info bg-gb-info/10 px-3 rounded-lg font-medium hover:bg-gb-info/20 shrink-0"
-								style="min-height:44px">
-								Bearbeiten
-							</button>
-						</div>
-						{#if profile?.avatar_url}
-							<button onclick={removeAvatar} disabled={uploadingAvatar}
-								class="text-[11px] text-gb-text-muted hover:text-gb-danger mt-2 disabled:opacity-50">
-								Avatar entfernen
-							</button>
-						{:else}
-							<p class="text-[11px] text-gb-text-muted mt-2">Tippe auf 🌱 um ein Avatar-Bild hochzuladen</p>
-						{/if}
-					{:else}
-						<div class="space-y-2">
-							<label class="block">
-								<span class="text-xs text-gb-text-muted">Username (3–20 Zeichen, a-z 0-9 _)</span>
-								<input type="text" bind:value={usernameInput} maxlength="20"
-									autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false"
-									class="mt-1 w-full bg-gb-bg border border-gb-border rounded-lg px-3 py-2.5 text-sm" />
-							</label>
-							<label class="block">
-								<span class="text-xs text-gb-text-muted">Bio (optional, max 280 Zeichen)</span>
-								<textarea bind:value={bioInput} maxlength="280" rows="2"
-									class="mt-1 w-full bg-gb-bg border border-gb-border rounded-lg px-3 py-2 text-sm resize-none"></textarea>
-								<span class="text-[10px] text-gb-text-muted">{bioInput.length}/280</span>
-							</label>
-							{#if profileError}
-								<p class="text-xs text-gb-danger">{profileError}</p>
-							{/if}
-							<!-- v1.3.81: 32→44px Touch-Target -->
-							<div class="flex gap-2">
-								<button onclick={saveProfile} disabled={savingProfile}
-									class="flex-1 bg-gb-green text-gb-bg font-medium text-sm rounded-lg disabled:opacity-50"
-									style="min-height:44px">
-									{savingProfile ? '...' : 'Speichern'}
-								</button>
-								<button onclick={cancelEditProfile} disabled={savingProfile}
-									class="flex-1 bg-gb-bg border border-gb-border text-gb-text font-medium text-sm rounded-lg"
-									style="min-height:44px">
-									Abbrechen
-								</button>
-							</div>
-						</div>
-					{/if}
 				</div>
 
 				<!-- Sync Buttons (v1.3.81: 40→44px Touch-Target) -->
