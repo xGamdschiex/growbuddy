@@ -19,6 +19,7 @@
 	import { toastStore } from '$lib/stores/toast';
 	import { t } from '$lib/i18n';
 	import { compressBatch, MAX_PHOTOS } from '$lib/utils/photo';
+	import { putOriginal } from '$lib/utils/photo-store';
 	import { calcVPD, getVPDStatus } from '$lib/data/science';
 	import { clampNumber, RANGES } from '$lib/utils/validation';
 	import { toMsPerCm, fromMsPerCm, type ECEinheit } from '$lib/calc/units';
@@ -189,6 +190,11 @@
 		compressing = true;
 		try {
 			const { images, errors } = await compressBatch(files);
+			// Original-Dateien merken (1:1-Mapping nur sicher, wenn nichts fehlschlug) →
+			// werden beim Speichern als Blob in IndexedDB abgelegt (Originalqualität, rein lokal).
+			if (images.length === files.length) {
+				for (let i = 0; i < images.length; i++) newFiles.set(images[i], files[i]);
+			}
 			if (images.length > 0) {
 				ciPhotos = [...ciPhotos, ...images].slice(0, MAX_PHOTOS);
 			}
@@ -210,6 +216,24 @@
 
 	function formatDate(dateStr: string): string {
 		return new Date(dateStr).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+	}
+
+	// Original-Bilder (volle Qualität) → IndexedDB-Blobs. Map: Thumbnail-DataURL → Original-File.
+	const newFiles = new Map<string, File>();
+
+	/** Speichert Originale als Blob unter den photo_ids des gerade gespeicherten Check-ins. Best-effort. */
+	async function storeOriginals(checkinId: string) {
+		if (newFiles.size === 0) return;
+		try {
+			let ci: any = null;
+			growStore.subscribe(s => { ci = s.checkins.find((c: any) => c.id === checkinId); })();
+			const ids: string[] = ci?.photo_ids ?? [];
+			const thumbs: string[] = ci?.photos_data ?? [];
+			for (let i = 0; i < ids.length; i++) {
+				const file = thumbs[i] ? newFiles.get(thumbs[i]) : undefined;
+				if (file) await putOriginal(ids[i], file);
+			}
+		} catch { /* best-effort — Thumbnail bleibt Fallback */ }
 	}
 
 	async function submitCheckin() {
@@ -246,10 +270,12 @@
 			notes: ciNotes.trim(),
 		};
 
+		let savedCheckinId: string;
 		if (editingCi) {
 			await growStore.updateCheckIn(editingCi.id, patch);
+			savedCheckinId = editingCi.id;
 		} else {
-			await growStore.addCheckIn({ grow_id: grow.id, ...patch });
+			savedCheckinId = await growStore.addCheckIn({ grow_id: grow.id, ...patch });
 			const isFull = !!(validTemp && validRh && validEc && validPh);
 			xpStore.awardCheckIn(ciPhotos.length > 0, isFull, multiplierValue);
 
@@ -268,6 +294,9 @@
 				streakStore.updateLongest(currentS.current);
 			}, 100);
 		}
+
+		// Originale (volle Qualität) lokal als Blob ablegen — best-effort, nicht blockierend
+		void storeOriginals(savedCheckinId);
 
 		hapticSuccess();
 

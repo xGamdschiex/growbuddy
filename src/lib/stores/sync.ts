@@ -6,8 +6,6 @@
 
 import { writable, derived } from 'svelte/store';
 import { supabase } from '$lib/supabase';
-import { uploadCheckinPhoto, uploadCheckinPhotos } from '$lib/utils/storage';
-import { getPhoto } from '$lib/utils/photo-store';
 import type { GrowState, Grow, CheckIn } from '$lib/stores/grow';
 import { tombstones } from '$lib/utils/tombstones';
 
@@ -101,30 +99,11 @@ function createSyncStore() {
 				// Check-ins upserten — Fotos via Storage hochladen, Metadata in DB
 				if (state.checkins.length > 0) {
 					const checkinRows = await Promise.all(state.checkins.map(async c => {
-						// Mehrere Fotos uploaden (bevorzugt), sonst Legacy-Einzel
-						let rawPhotos = (c.photos_data ?? []).filter(p => p?.startsWith('data:'));
-						// Falls Base64 nicht im Speicher (z.B. vor Hydration nach Reload): aus IndexedDB holen
-						if (!rawPhotos.length && c.photo_ids?.length) {
-							rawPhotos = (await Promise.all(c.photo_ids.map(getPhoto)))
-								.filter((p): p is string => !!p && p.startsWith('data:'));
-						}
-						// Bestehende Cloud-URLs erhalten (verhindert Überschreiben mit leerem Array)
-						let photoUrls: string[] = c.photo_urls ?? [];
-						let photoUrl: string | null = c.photo_url ?? null;
-						if (rawPhotos.length > 0) {
-							const newUrls = await uploadCheckinPhotos(userId, c.id, rawPhotos);
-							if (newUrls.length > 0) {
-								photoUrls = [...photoUrls, ...newUrls];
-								photoUrl = photoUrls[0];
-							}
-						} else if (c.photo_data && c.photo_data.startsWith('data:') && photoUrls.length === 0) {
-							const url = await uploadCheckinPhoto(userId, c.id, c.photo_data);
-							if (url) {
-								photoUrl = url;
-								photoUrls = [url];
-							}
-						}
-						const hasPhoto = photoUrls.length > 0 || !!photoUrl;
+						// v1.4.14: Fotos verlassen das Gerät NICHT mehr — kein Upload.
+						// Bestehende Cloud-URLs (aus früheren Versionen) bleiben erhalten.
+						const photoUrls: string[] = c.photo_urls ?? [];
+						const photoUrl: string | null = c.photo_url ?? null;
+						const hasPhoto = photoUrls.length > 0 || !!photoUrl || (c.photo_ids?.length ?? 0) > 0;
 						return {
 							id: c.id,
 							user_id: userId,

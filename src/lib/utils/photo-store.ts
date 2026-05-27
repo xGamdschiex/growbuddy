@@ -10,8 +10,9 @@
  */
 
 const DB_NAME = 'growbuddy';
-const STORE = 'photos';
-const VERSION = 1;
+const STORE = 'photos';            // Anzeige-/Thumbnail-Data-URLs (klein, wird in den Speicher hydriert)
+const ORIGINALS = 'originals';     // Original-Bilder als Blob (groß, NUR lazy fürs Vollbild)
+const VERSION = 2;
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -26,6 +27,7 @@ function openDB(): Promise<IDBDatabase> {
 		req.onupgradeneeded = () => {
 			const db = req.result;
 			if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
+			if (!db.objectStoreNames.contains(ORIGINALS)) db.createObjectStore(ORIGINALS);
 		};
 		req.onsuccess = () => resolve(req.result);
 		req.onerror = () => reject(req.error);
@@ -70,21 +72,59 @@ export async function getPhoto(id: string): Promise<string | null> {
 	}
 }
 
-/** Löscht mehrere Fotos (best-effort). */
+/** Löscht mehrere Fotos (Thumbnail + Original, best-effort). */
 export async function deletePhotos(ids: string[]): Promise<void> {
 	if (!hasIDB() || !ids.length) return;
 	try {
 		const db = await openDB();
 		await new Promise<void>((resolve) => {
-			const tx = db.transaction(STORE, 'readwrite');
+			const tx = db.transaction([STORE, ORIGINALS], 'readwrite');
 			const os = tx.objectStore(STORE);
-			for (const id of ids) os.delete(id);
+			const oo = tx.objectStore(ORIGINALS);
+			for (const id of ids) { os.delete(id); oo.delete(id); }
 			tx.oncomplete = () => resolve();
 			tx.onerror = () => resolve();
 			tx.onabort = () => resolve();
 		});
 	} catch {
 		/* ignore */
+	}
+}
+
+/** Speichert das ORIGINAL-Bild (Blob, unkomprimiert) unter `id`. Best-effort. */
+export async function putOriginal(id: string, blob: Blob): Promise<void> {
+	if (!hasIDB()) return;
+	try {
+		const db = await openDB();
+		await new Promise<void>((resolve, reject) => {
+			const tx = db.transaction(ORIGINALS, 'readwrite');
+			tx.objectStore(ORIGINALS).put(blob, id);
+			tx.oncomplete = () => resolve();
+			tx.onerror = () => reject(tx.error);
+			tx.onabort = () => reject(tx.error);
+		});
+	} catch {
+		/* ignore — Thumbnail bleibt als Fallback */
+	}
+}
+
+/**
+ * Liefert eine Object-URL fürs Original (Vollbild). Caller MUSS sie nach Gebrauch
+ * mit URL.revokeObjectURL() freigeben. Gibt null zurück, wenn kein Original existiert.
+ */
+export async function getOriginalObjectUrl(id: string): Promise<string | null> {
+	if (!hasIDB()) return null;
+	try {
+		const db = await openDB();
+		const blob = await new Promise<Blob | null>((resolve) => {
+			const tx = db.transaction(ORIGINALS, 'readonly');
+			const req = tx.objectStore(ORIGINALS).get(id);
+			req.onsuccess = () => resolve((req.result as Blob) ?? null);
+			req.onerror = () => resolve(null);
+		});
+		return blob ? URL.createObjectURL(blob) : null;
+	} catch {
+		return null;
 	}
 }
 
