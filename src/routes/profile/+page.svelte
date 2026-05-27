@@ -91,51 +91,6 @@
 		}
 	}
 
-	let repairing = $state(false);
-	async function repairPhotos() {
-		if (!auth.user || repairing) return;
-		repairing = true;
-		try {
-			const { supabase } = await import('$lib/supabase');
-			const userId = auth.user.id;
-			// Liste alle Storage-Files unter {userId}/
-			const { data: files, error: listErr } = await supabase.storage.from('checkin-photos').list(userId);
-			if (listErr) throw listErr;
-			// Map von checkinId → URLs (Multi: {checkinId}-{idx}.jpg, Single: {checkinId}.jpg)
-			const checkinFiles = new Map<string, string[]>();
-			for (const f of files ?? []) {
-				const m = f.name.match(/^([0-9a-f-]+?)(?:-(\d+))?\.jpg$/i);
-				if (!m) continue;
-				const cid = m[1];
-				if (!checkinFiles.has(cid)) checkinFiles.set(cid, []);
-				checkinFiles.get(cid)!.push(`${userId}/${f.name}`);
-			}
-			let repaired = 0;
-			for (const [cid, paths] of checkinFiles.entries()) {
-				paths.sort();
-				const signed = await Promise.all(paths.map(p =>
-					supabase.storage.from('checkin-photos').createSignedUrl(p, 60 * 60 * 24 * 365).then(r => r.data?.signedUrl)
-				));
-				const urls = signed.filter((u): u is string => !!u);
-				if (urls.length === 0) continue;
-				const { error } = await supabase.from('checkins').update({
-					photo_url: urls[0],
-					photo_urls: urls,
-					has_photo: true,
-				}).eq('id', cid).eq('user_id', userId);
-				if (!error) {
-					repaired++;
-					// Auch lokales State updaten — sonst sieht User die alten/leeren URLs bis zum Pull
-					growStore.updateCheckIn(cid, { photo_url: urls[0], photo_urls: urls });
-				}
-			}
-			toastStore.success(`${repaired} Check-ins repariert`);
-		} catch (e: any) {
-			toastStore.warning('Repair fehlgeschlagen: ' + (e?.message ?? 'unbekannt'));
-		} finally {
-			repairing = false;
-		}
-	}
 
 	async function pullSync() {
 		if (!auth.user) return;
@@ -226,17 +181,6 @@
 	let reminder: any = $state({ enabled: false, time: '19:00', permission: 'default' });
 	let currentLocale: Locale = $state('de');
 
-	// Demo-Grow Status (für Mary-Jane-Demo)
-	let demoActive = $derived(growStore.hasDemo(growState));
-
-	function loadDemoGrow() {
-		growStore.loadDemo();
-		toastStore.success('Demo-Grow geladen — 35 Tage, 14 Check-ins');
-	}
-	function clearDemoGrow() {
-		growStore.clearDemo();
-		toastStore.info('Demo-Grow entfernt');
-	}
 </script>
 
 <div class="px-4 pt-6 max-w-lg mx-auto space-y-6 pb-24">
@@ -376,35 +320,6 @@
 			</div>
 			<p class="text-xs text-gb-text-muted text-center">Sichere deine Daten als JSON-Datei</p>
 		</div>
-
-		<!-- Demo-Grow (Mary-Jane-Demo) -->
-		<div class="bg-gb-surface rounded-xl p-4 space-y-2">
-			<div class="flex items-center gap-2">
-				<span class="text-lg">🎬</span>
-				<p class="text-sm font-medium">Demo-Grow</p>
-				{#if demoActive}
-					<span class="ml-auto text-[10px] bg-gb-green/15 text-gb-green px-2 py-0.5 rounded-full">aktiv</span>
-				{/if}
-			</div>
-			<p class="text-xs text-gb-text-muted leading-relaxed">
-				Lädt einen 35-Tage-Demo-Grow mit 14 plausiblen Check-ins (für Demo-Zwecke). Beeinflusst echte Grows nicht — jederzeit reset-bar.
-			</p>
-			<div class="flex gap-2 pt-1">
-				{#if !demoActive}
-					<button onclick={loadDemoGrow}
-						class="flex-1 bg-gb-accent/15 border border-gb-accent/30 text-gb-accent font-medium text-sm py-2.5 rounded-lg hover:bg-gb-accent/25 transition-colors"
-						style="min-height:44px;">
-						🎬 Demo laden
-					</button>
-				{:else}
-					<button onclick={clearDemoGrow}
-						class="flex-1 bg-gb-danger/10 border border-gb-danger/20 text-gb-danger font-medium text-sm py-2.5 rounded-lg hover:bg-gb-danger/20 transition-colors"
-						style="min-height:44px;">
-						🗑️ Demo entfernen
-					</button>
-				{/if}
-			</div>
-		</div>
 	</div>
 
 	<!-- Account & Cloud-Sync -->
@@ -450,12 +365,6 @@
 						{tr('sync.never')}
 					{/if}
 				</p>
-
-				<!-- Photo-Repair (One-Off) -->
-				<button onclick={repairPhotos} disabled={repairing}
-					class="w-full text-xs text-gb-text-muted hover:text-gb-text py-2 disabled:opacity-50">
-					{repairing ? '⏳ Repariere...' : '🔧 Cloud-Fotos reparieren'}
-				</button>
 			</div>
 		{:else}
 			<!-- Nicht eingeloggt -->

@@ -108,20 +108,19 @@
 			<div>
 				<p class="font-semibold">3. Fotos</p>
 				<p class="text-gb-text-muted mt-1">
-					Fotos werden auf max. 800px verkleinert und als JPEG (Qualität 70%) komprimiert
-					im localStorage gespeichert. Fotos verlassen nie dein Gerät, es sei denn du
-					aktivierst Cloud-Sync (zukünftig).
+					Fotos werden als kleines Anzeige-Bild und im Original lokal in der IndexedDB
+					deines Geräts gespeichert. <strong>Sie verlassen das Gerät nie</strong> — kein
+					Cloud-Upload. Einzige Ausnahme: der AI-Pflanzen-Doktor (Punkt 5), wenn du ihn nutzt.
 				</p>
 			</div>
 
 			<div>
 				<p class="font-semibold">4. Cloud-Sync (optional, nach Login)</p>
 				<p class="text-gb-text-muted mt-1">
-					Wenn du dich einloggst und Cloud-Sync nutzt, werden deine Grows + Check-ins
-					verschlüsselt auf Servern in der EU (Supabase, Frankfurt) gespeichert.
-					Fotos werden in einem privaten Storage-Bucket abgelegt, nur du kannst sie lesen
-					(Row-Level-Security, Signed URLs mit 7-Tage-Gültigkeit).
-					Du kannst Cloud-Sync jederzeit deaktivieren und deine Cloud-Daten löschen.
+					Wenn du dich einloggst und „Nur lokal" nicht aktiv ist, werden nur die
+					<strong>Textdaten</strong> deiner Grows + Check-ins (Messwerte, Notizen — <strong>keine
+					Fotos</strong>) auf Servern in der EU (Supabase, Frankfurt) gespeichert.
+					Du kannst den Sync jederzeit über „Nur lokal" abschalten und deine Cloud-Daten löschen.
 				</p>
 			</div>
 
@@ -186,7 +185,7 @@
 				</p>
 			</div>
 
-			<p class="text-xs text-gb-text-muted">Stand: April 2026</p>
+			<p class="text-xs text-gb-text-muted">Stand: Mai 2026</p>
 		</div>
 	{:else}
 		<!-- Cannabis-Recht (DE KCanG) — vereinfachte Zusammenfassung, keine Rechtsberatung -->
