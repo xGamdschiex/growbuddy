@@ -321,12 +321,32 @@
 
 	// Lightbox State
 	let lightboxPhotos: string[] = $state([]);
+	let lightboxPhotoIds: (string | undefined)[] = $state([]);
 	let lightboxIndex = $state(0);
 	let lightboxOpen = $state(false);
-	function openLightbox(photos: string[], idx: number) {
+	function openLightbox(photos: string[], ids: (string | undefined)[], idx: number) {
 		lightboxPhotos = photos;
+		lightboxPhotoIds = ids;
 		lightboxIndex = idx;
 		lightboxOpen = true;
+	}
+
+	// Anzeige-Quellen + parallele lokale photo_ids (Original im Vollbild, Fallback = Thumbnail/Cloud-URL)
+	function photoEntries(c: CheckIn): { srcs: string[]; ids: (string | undefined)[] } {
+		if (c.photo_urls?.length) return { srcs: c.photo_urls, ids: c.photo_urls.map(() => undefined) };
+		if (c.photos_data?.length) {
+			const ids = (c.photo_ids?.length === c.photos_data.length) ? c.photo_ids! : c.photos_data.map(() => undefined);
+			return { srcs: c.photos_data, ids };
+		}
+		if (c.photo_url) return { srcs: [c.photo_url], ids: [undefined] };
+		if (c.photo_data) return { srcs: [c.photo_data], ids: [c.photo_ids?.[0]] };
+		return { srcs: [], ids: [] };
+	}
+	function flatPhotoEntries(cs: CheckIn[]): { srcs: string[]; ids: (string | undefined)[] } {
+		const srcs: string[] = [];
+		const ids: (string | undefined)[] = [];
+		for (const c of cs) { const e = photoEntries(c); srcs.push(...e.srcs); ids.push(...e.ids); }
+		return { srcs, ids };
 	}
 
 	// Custom Delete-Confirm-Sheet (statt nativem confirm)
@@ -734,15 +754,13 @@
 				</p>
 			{:else}
 				<!-- Foto Grid (alle Fotos aller Check-ins): erst Cloud-URLs, dann lokale Base64 -->
-				{@const allPhotos = checkins.flatMap((c: CheckIn) =>
-					(c.photo_urls?.length ? c.photo_urls
-						: c.photos_data?.length ? c.photos_data
-						: (c.photo_url ? [c.photo_url] : (c.photo_data ? [c.photo_data] : [])))
-				)}
+				{@const allEntries = flatPhotoEntries(checkins)}
+				{@const allPhotos = allEntries.srcs}
+				{@const allPhotoIds = allEntries.ids}
 				{#if allPhotos.length > 0}
 					<div class="grid grid-cols-4 gap-1 rounded-xl overflow-hidden">
 						{#each allPhotos.slice(0, 8) as src, i}
-							<button type="button" onclick={() => openLightbox(allPhotos, i)} class="aspect-square overflow-hidden relative">
+							<button type="button" onclick={() => openLightbox(allPhotos, allPhotoIds, i)} class="aspect-square overflow-hidden relative">
 								<img {src} alt="Foto {i + 1}" class="aspect-square object-cover w-full hover:opacity-80 transition-opacity cursor-zoom-in" />
 								{#if i === 7 && allPhotos.length > 8}
 									<div class="absolute inset-0 bg-black/60 flex items-center justify-center pointer-events-none">
@@ -756,9 +774,9 @@
 
 				<!-- Check-in List -->
 				{#each checkins as ci}
-					{@const ciAllPhotos = ci.photo_urls?.length ? ci.photo_urls
-						: ci.photos_data?.length ? ci.photos_data
-						: (ci.photo_url ? [ci.photo_url] : (ci.photo_data ? [ci.photo_data] : []))}
+					{@const ciEntries = photoEntries(ci)}
+					{@const ciAllPhotos = ciEntries.srcs}
+					{@const ciPhotoIds = ciEntries.ids}
 					<div class="bg-gb-surface rounded-xl p-3 space-y-2">
 						<div class="flex justify-between items-start">
 							<div>
@@ -798,13 +816,13 @@
 							<p class="text-sm text-gb-text-muted">{ci.notes}</p>
 						{/if}
 						{#if ciAllPhotos.length === 1}
-							<button type="button" onclick={() => openLightbox(ciAllPhotos, 0)} class="w-full block">
+							<button type="button" onclick={() => openLightbox(ciAllPhotos, ciPhotoIds, 0)} class="w-full block">
 								<img src={ciAllPhotos[0]} alt="Check-in" class="w-full rounded-lg max-h-64 object-cover cursor-zoom-in hover:opacity-90 transition-opacity" />
 							</button>
 						{:else if ciAllPhotos.length > 1}
 							<div class="grid grid-cols-3 gap-1">
 								{#each ciAllPhotos as src, i}
-									<button type="button" onclick={() => openLightbox(ciAllPhotos, i)} class="aspect-square">
+									<button type="button" onclick={() => openLightbox(ciAllPhotos, ciPhotoIds, i)} class="aspect-square">
 										<img {src} alt="Foto {i + 1}" class="aspect-square object-cover rounded-lg w-full cursor-zoom-in hover:opacity-90 transition-opacity" />
 									</button>
 								{/each}
@@ -817,7 +835,7 @@
 	</div>
 
 	{#if lightboxOpen}
-		<Lightbox photos={lightboxPhotos} startIndex={lightboxIndex} onClose={() => lightboxOpen = false} />
+		<Lightbox photos={lightboxPhotos} photoIds={lightboxPhotoIds} startIndex={lightboxIndex} onClose={() => lightboxOpen = false} />
 	{/if}
 
 	{#if pendingDeleteId}

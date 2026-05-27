@@ -463,6 +463,23 @@
 		}
 		return out;
 	});
+	// Parallele lokale photo_ids zu allPhotos (Original im Vollbild, Fallback = Thumbnail)
+	let allPhotoIds = $derived.by<(string | undefined)[]>(() => {
+		const out: (string | undefined)[] = [];
+		for (const c of photoCheckins) {
+			if (c.photos_data?.length) {
+				const ids = (c.photo_ids?.length === c.photos_data.length) ? c.photo_ids! : c.photos_data.map(() => undefined);
+				out.push(...ids);
+			} else if (c.photo_urls?.length) {
+				out.push(...c.photo_urls.map(() => undefined));
+			} else if (c.photo_data) {
+				out.push(c.photo_ids?.[0]);
+			} else if (c.photo_url) {
+				out.push(undefined);
+			}
+		}
+		return out;
+	});
 	/** Index der ersten Photo eines Check-ins im flachen allPhotos-Array. */
 	function firstPhotoIndex(ciIdx: number): number {
 		let idx = 0;
@@ -1046,7 +1063,7 @@
 
 			<!-- v1.4.5: Lightbox für Foto-Verlauf -->
 			{#if lightboxOpen}
-				<Lightbox photos={allPhotos} startIndex={lightboxIndex} onClose={() => lightboxOpen = false} />
+				<Lightbox photos={allPhotos} photoIds={allPhotoIds} startIndex={lightboxIndex} onClose={() => lightboxOpen = false} />
 			{/if}
 		{/if}
 	{/if}

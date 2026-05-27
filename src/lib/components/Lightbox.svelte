@@ -1,10 +1,13 @@
 <script lang="ts">
+	import { getOriginalObjectUrl } from '$lib/utils/photo-store';
 	interface Props {
 		photos: string[];
+		/** Optional: lokale IndexedDB-IDs parallel zu photos. Existiert ein Original, wird es im Vollbild geladen. */
+		photoIds?: (string | undefined)[];
 		startIndex?: number;
 		onClose: () => void;
 	}
-	let { photos, startIndex = 0, onClose }: Props = $props();
+	let { photos, photoIds = [], startIndex = 0, onClose }: Props = $props();
 
 	// startIndex nur initial nehmen (Prev/Next override später)
 	// svelte-ignore state_referenced_locally
@@ -26,6 +29,22 @@
 	let panStartX = 0, panStartY = 0, panStartTx = 0, panStartTy = 0;
 	let swipeStartX = 0;
 	let lastTapTime = 0;
+
+	// ── Original (volle Qualität) lazy laden — Fallback aufs übergebene Thumbnail ──
+	let originalUrl = $state<string | null>(null);
+	$effect(() => {
+		const id = photoIds[current];
+		originalUrl = null;
+		if (!id) return;
+		let active = true;
+		let created: string | null = null;
+		getOriginalObjectUrl(id).then((url) => {
+			if (!active) { if (url) URL.revokeObjectURL(url); return; }
+			if (url) { created = url; originalUrl = url; }
+		});
+		return () => { active = false; if (created) URL.revokeObjectURL(created); };
+	});
+	let displaySrc = $derived(originalUrl ?? photos[current]);
 
 	function resetZoom(animate = true) {
 		smooth = animate;
@@ -156,7 +175,7 @@
 	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<img
-		src={photos[current]}
+		src={displaySrc}
 		alt="Foto {current + 1}"
 		class="max-w-full max-h-[90vh] object-contain"
 		style="transform: translate({tx}px, {ty}px) scale({scale}); transition: {smooth ? 'transform 0.2s ease' : 'none'}; will-change: transform;"
