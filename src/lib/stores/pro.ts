@@ -177,8 +177,9 @@ export const proStore = createProStore();
 // ─── DERIVED ────────────────────────────────────────────────────────────
 
 export const currentTier = derived(proStore, $s => $s.tier);
-export const isPro = derived(proStore, $s => $s.tier === 'pro' || $s.tier === 'csc');
-export const limits = derived(proStore, $s => TIER_LIMITS[$s.tier]);
+// Friends-App ohne Paywall (v1.4.17): alles freigeschaltet. Reversibel — alte Logik via git.
+export const isPro = derived(proStore, () => true);
+export const limits = derived(proStore, () => TIER_LIMITS.pro);
 export const isTrialing = derived(proStore, $s =>
 	$s.trial_ends_at !== null && new Date($s.trial_ends_at) > new Date()
 );

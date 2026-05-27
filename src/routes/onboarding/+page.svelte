@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { onboardingStore } from '$lib/stores/onboarding';
-	import { proStore } from '$lib/stores/pro';
 	import { authStore } from '$lib/stores/auth';
 	import { toastStore } from '$lib/stores/toast';
 	import { t } from '$lib/i18n';
@@ -148,11 +147,6 @@
 		goto('/', { replaceState: true });
 	}
 
-	function startTrial() {
-		proStore.startTrial();
-		goToCloud();
-	}
-
 	function continueFree() {
 		goToCloud();
 	}
@@ -253,16 +247,6 @@
 
 			{#if goal}
 				<div class="space-y-3 pt-2">
-					<!-- Pro Trial CTA -->
-					<div class="bg-gb-accent/10 border border-gb-accent/20 rounded-xl p-4 text-center">
-						<p class="font-semibold text-sm">{tr('onboarding.trial_cta')}</p>
-						<p class="text-xs text-gb-text-muted mt-1">{tr('onboarding.trial_desc')}</p>
-						<button onclick={startTrial}
-							class="mt-3 bg-gb-accent text-white font-semibold text-sm px-6 py-2.5 rounded-lg hover:bg-gb-accent/80 transition-colors">
-							{tr('onboarding.trial_btn')}
-						</button>
-					</div>
-
 					<button onclick={continueFree}
 						class="w-full bg-gb-green text-gb-bg font-semibold py-3.5 rounded-xl text-sm hover:bg-gb-green/80 transition-colors">
 						{tr('onboarding.free_btn')}
