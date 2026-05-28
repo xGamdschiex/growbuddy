@@ -4,7 +4,6 @@
 	import type { Locale } from '$lib/i18n';
 	import { downloadBackup, importBackup, readFileAsText } from '$lib/utils/backup';
 	import { toastStore } from '$lib/stores/toast';
-	import { isPro } from '$lib/stores/pro';
 	import { authStore, isLoggedIn } from '$lib/stores/auth';
 	import { xpStore } from '$lib/stores/xp';
 	import { streakStore } from '$lib/stores/streak';
@@ -20,7 +19,6 @@
 	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
 	let reminder = $state<any>({ enabled: false, time: '19:00', permission: 'default', streak_alerts: true });
 	let currentLocale = $state<Locale>('de');
-	let userIsPro = $state(false);
 	let loggedIn = $state(false);
 	let auth = $state<any>({ user: null });
 	let household = $state<{ adults: number }>({ adults: 1 });
@@ -36,7 +34,6 @@
 		const subs = [
 			reminderStore.subscribe(v => reminder = v),
 			locale.subscribe(v => currentLocale = v),
-			isPro.subscribe(v => userIsPro = v),
 			isLoggedIn.subscribe(v => loggedIn = v),
 			authStore.subscribe(v => auth = v),
 			householdStore.subscribe(v => household = v),
@@ -318,20 +315,6 @@
 			</p>
 			<a href="/legal?tab=cannabis" class="block text-xs text-gb-green font-medium">Mehr zum Cannabis-Recht →</a>
 		</div>
-	</div>
-
-	<!-- Pro -->
-	<div class="space-y-3">
-		<h2 class="text-sm font-semibold text-gb-text-muted uppercase tracking-wide">Abo</h2>
-		<a href="/pro" class="block bg-gb-surface rounded-xl p-4 hover:bg-gb-surface-2 transition-colors">
-			<div class="flex items-center justify-between">
-				<div>
-					<p class="font-medium text-sm">{userIsPro ? '👑 Pro aktiv' : 'GrowBuddy Pro'}</p>
-					<p class="text-xs text-gb-text-muted">{userIsPro ? 'Abo verwalten' : 'Alle Features freischalten'}</p>
-				</div>
-				<span class="text-gb-text-muted text-sm">→</span>
-			</div>
-		</a>
 	</div>
 
 	<!-- Cloud & Privatsphäre -->
