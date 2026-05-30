@@ -7,7 +7,7 @@
 
 	let tr: (key: string, params?: Record<string, string | number>) => string = $state((k: string) => k);
 	let growState: GrowState = $state({ grows: [], checkins: [] });
-	let userIsPro = $state(false);
+	let userIsPro = $state(true);
 
 	onMount(() => {
 		const subs = [

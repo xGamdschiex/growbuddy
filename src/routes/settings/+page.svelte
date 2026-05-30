@@ -16,7 +16,7 @@
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 
-	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
+	let tr = $state<(key: string, params?: Record<string, string | number>) => string>((k) => k);
 	let reminder = $state<any>({ enabled: false, time: '19:00', permission: 'default', streak_alerts: true });
 	let currentLocale = $state<Locale>('de');
 	let loggedIn = $state(false);
@@ -32,6 +32,7 @@
 
 	onMount(() => {
 		const subs = [
+			t.subscribe(v => tr = v),
 			reminderStore.subscribe(v => reminder = v),
 			locale.subscribe(v => currentLocale = v),
 			isLoggedIn.subscribe(v => loggedIn = v),

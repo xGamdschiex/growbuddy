@@ -21,7 +21,7 @@
 	import { onMount } from 'svelte';
 
 	let tr = $state<(k: string) => string>((k) => k);
-	let userIsPro = $state(false);
+	let userIsPro = $state(true);
 	let lim = $state<any>({});
 
 	onMount(() => {

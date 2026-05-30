@@ -7,7 +7,7 @@
 	import { phaseStyle } from '$lib/utils/phase-colors';
 	import { summarizeStrains, totalPlantCount } from '$lib/utils/grow-strains';
 
-	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
+	let tr = $state<(key: string, params?: Record<string, string | number>) => string>((k) => k);
 	let active: Grow[] = $state([]);
 	let harvested: Grow[] = $state([]);
 	let allCheckins: CheckIn[] = $state([]);
@@ -15,6 +15,7 @@
 
 	onMount(() => {
 		const subs = [
+			t.subscribe(v => tr = v),
 			activeGrows.subscribe(v => active = v),
 			harvestedGrows.subscribe(v => harvested = v),
 			growStore.subscribe(v => allCheckins = v.checkins),

@@ -7,7 +7,7 @@
 	import { onMount } from 'svelte';
 	import { logger } from '$lib/utils/logger';
 
-	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
+	let tr = $state<(key: string, params?: Record<string, string | number>) => string>((k) => k);
 	let step = $state(0);
 	let experience = $state<'beginner' | 'intermediate' | 'advanced' | null>(null);
 	let goal = $state<'first_grow' | 'improve' | 'document' | null>(null);
@@ -19,7 +19,10 @@
 	// Reaktive Auth-Subscription
 	let auth = $state<any>({ user: null, loading: true });
 	let preLoginUserId = $state<string | null>(null);
-	onMount(() => authStore.subscribe(v => auth = v));
+	onMount(() => {
+		const subs = [authStore.subscribe(v => auth = v), t.subscribe(v => tr = v)];
+		return () => subs.forEach((u) => u());
+	});
 
 	const CLOUD_STEP = 6; // nach slides(4) + exp(1) + goal(1)
 

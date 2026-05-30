@@ -58,7 +58,7 @@
 	let editingCi: CheckIn | null = $state(null);
 
 	// Pro-Status
-	let userIsPro = $state(false);
+	let userIsPro = $state(true);
 
 
 	// Chart-Daten (chronologisch sortiert)

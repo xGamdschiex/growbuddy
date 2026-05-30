@@ -489,7 +489,7 @@
 						<a href="/calc" class="ci-fp-link">zu Calc →</a>
 					</div>
 				{/if}
-				{#if ciWatered || (ciNutrients && !ciWatered)}
+				{#if ciWatered || ciNutrients}
 					<div class="ci-grid2 ci-mt10">
 						{#if ciWatered}
 							<label class="ci-field">
@@ -497,7 +497,7 @@
 								<input class="ci-input" type="number" min="0" step="100" placeholder="1000" bind:value={ciWaterMl} />
 							</label>
 						{/if}
-						{#if ciNutrients && !ciWatered}
+						{#if ciNutrients}
 							<label class="ci-field">
 								<span class="ci-field-label">Dünger (mL)</span>
 								<input class="ci-input" type="number" min="0" step="1" placeholder="10" bind:value={ciNutrientMl} />

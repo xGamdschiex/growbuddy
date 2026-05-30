@@ -11,13 +11,14 @@
 	import { totalGrowDays } from '$lib/utils/phase';
 	import { onMount } from 'svelte';
 
-	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
-	let userIsPro = $state(false);
+	let tr = $state<(key: string, params?: Record<string, string | number>) => string>((k) => k);
+	let userIsPro = $state(true);
 	let growState: GrowState = $state({ grows: [], checkins: [] });
 	let active: Grow[] = $state([]);
 
 	onMount(() => {
 		const subs = [
+			t.subscribe(v => tr = v),
 			isPro.subscribe(v => userIsPro = v),
 			growStore.subscribe(v => growState = v),
 			activeGrows.subscribe(v => active = v),

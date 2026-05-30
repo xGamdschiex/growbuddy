@@ -16,17 +16,18 @@
 	import SpacePicker from '$lib/components/SpacePicker.svelte';
 	import { joinedStrainName, totalPlantCount, validateStrains } from '$lib/utils/grow-strains';
 
-	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
+	let tr = $state<(key: string, params?: Record<string, string | number>) => string>((k) => k);
 	const feedlines = getAllFeedLines();
 	let activeCount = $state(0);
 	let activePlants = $state(0);
 	let adults = $state(1);
 	let lim = $state<any>({});
-	let userIsPro = $state(false);
+	let userIsPro = $state(true);
 	let atLimit = $derived(activeCount >= (lim.max_active_grows ?? 1));
 
 	onMount(() => {
 		const subs = [
+			t.subscribe(v => tr = v),
 			activeGrows.subscribe(v => { activeCount = v.length; activePlants = v.reduce((s, g) => s + (g.plant_count || 0), 0); }),
 			limits.subscribe(v => lim = v),
 			isPro.subscribe(v => userIsPro = v),

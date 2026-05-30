@@ -12,7 +12,7 @@
 	import { phaseStyle } from '$lib/utils/phase-colors';
 	import { summarizeStrains } from '$lib/utils/grow-strains';
 
-	let tr = $derived.by(() => { let v: any = (k: string) => k; t.subscribe(x => v = x)(); return v; });
+	let tr = $state<(key: string, params?: Record<string, string | number>) => string>((k) => k);
 	let storeVal: any = $state({ grows: [] });
 	let active = $state<Grow[]>([]);
 	let harvested = $state<Grow[]>([]);
@@ -28,6 +28,7 @@
 
 	onMount(() => {
 		const subs = [
+			t.subscribe(v => tr = v),
 			growStore.subscribe(v => storeVal = v),
 			activeGrows.subscribe(v => active = v),
 			harvestedGrows.subscribe(v => harvested = v),

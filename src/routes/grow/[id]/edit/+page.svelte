@@ -30,7 +30,7 @@
 
 	let growId = $derived($page.params.id);
 	let growState: any = $state({ grows: [], checkins: [] });
-	let userIsPro = $state(false);
+	let userIsPro = $state(true);
 	let adults = $state(1);
 
 	let grow = $derived<Grow | undefined>(growState?.grows?.find((g: Grow) => g.id === growId));
