@@ -154,9 +154,12 @@ export interface PhaseConfig {
    * Stretch-Strategie: Was passiert bei Wochen > schema_wochen?
    * - 'repeat_last': Letzte Schema-Woche wiederholen
    * - 'repeat_peak': Vorletzte Woche wiederholen (letzte = Flush/Fade)
-   * - 'hold_ec': EC halten, Dosierung der Peak-Woche
+   *
+   * Hinweis: Mit `kind: 'fade'`-Markierung wird die moderne `total_weeks`-Skalierung
+   * verwendet (Peak halten + Fade ans Ende verschieben). Stretch ist nur noch Fallback
+   * für Lines ohne Fade-Markierung.
    */
-  stretch: 'repeat_last' | 'repeat_peak' | 'hold_ec';
+  stretch: 'repeat_last' | 'repeat_peak';
 }
 
 // ─── CALC I/O (generisch) ────────────────────────────────────────────────
@@ -254,8 +257,6 @@ export function getSchemaForWeek(
       case 'repeat_peak':
         // Vorletzte Woche (Peak), falls > 1 Woche existiert
         return rows.length > 1 ? rows[rows.length - 2] : rows[rows.length - 1];
-      case 'hold_ec':
-        return rows[rows.length - 1];
       default:
         return rows[rows.length - 1];
     }

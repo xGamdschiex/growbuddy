@@ -147,4 +147,27 @@ describe('feedlineOverrides — Export/Import', () => {
 		const ok = feedlineOverrides.importJson('not json');
 		expect(ok).toBe(false);
 	});
+
+	it('importJson versionierter Export rundtrip', () => {
+		feedlineOverrides.setRow('athena-pro', 'Bloom', 4, { ec_ziel: 3.5 });
+		const json = feedlineOverrides.exportJson();
+		const parsed = JSON.parse(json);
+		expect(parsed.version).toBe(1);
+		expect(parsed.exported_at).toBeTruthy();
+		feedlineOverrides.reset();
+		const ok = feedlineOverrides.importJson(json);
+		expect(ok).toBe(true);
+	});
+
+	it('importJson akzeptiert legacy-Format ohne version-Key', () => {
+		const legacy = JSON.stringify({ 'athena-pro': { 'Bloom': { '4': { ec_ziel: 3.7 } } } });
+		const ok = feedlineOverrides.importJson(legacy);
+		expect(ok).toBe(true);
+	});
+
+	it('importJson lehnt fehlerhafte Struktur ab (lineId-Wert kein Object)', () => {
+		const bad = JSON.stringify({ version: 1, overrides: { 'athena-pro': 'not-an-object' } });
+		const ok = feedlineOverrides.importJson(bad);
+		expect(ok).toBe(false);
+	});
 });

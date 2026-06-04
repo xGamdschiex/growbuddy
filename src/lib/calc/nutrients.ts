@@ -127,7 +127,7 @@ export interface StretchInfo {
   requested_woche: number;
   /** Tatsächlich verwendete Schema-Woche */
   used_woche: number;
-  /** Stretch-Strategie ('repeat_last' | 'repeat_peak' | 'hold_ec') */
+  /** Stretch-Strategie ('repeat_last' | 'repeat_peak' | 'peak_held' | 'fade_shifted') */
   strategy: string;
 }
 

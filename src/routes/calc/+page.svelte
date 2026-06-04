@@ -248,7 +248,8 @@
 	function stretchLabel(strategy: string): string {
 		if (strategy === 'repeat_last') return tr('calc.stretch_repeat_last');
 		if (strategy === 'repeat_peak') return tr('calc.stretch_repeat_peak');
-		if (strategy === 'hold_ec') return tr('calc.stretch_hold_ec');
+		// Legacy 'hold_ec' wurde in v1.4.22 entfernt — Fallback fängt es trotzdem ab
+		if (strategy === 'hold_ec') return tr('calc.stretch_repeat_last');
 		if (strategy === 'peak_held') return tr('calc.stretch_peak_held');
 		if (strategy === 'fade_shifted') return tr('calc.stretch_fade_shifted');
 		return strategy;

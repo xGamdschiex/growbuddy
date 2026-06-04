@@ -34,8 +34,33 @@ export type OverridesState = Record<string, Record<string, Record<number, Schema
 // {lineId → {phase → {woche → patch}}}
 
 const STORAGE_KEY = 'growbuddy_feedline_overrides';
+/** Aktuelle Format-Version. Bei Schema-Änderungen erhöhen + Migration in `migrate()` ergänzen. */
+const CURRENT_VERSION = 1;
 
 const EMPTY: OverridesState = {};
+
+/**
+ * Migriert importierten State auf das aktuelle Format.
+ * - Akzeptiert: `{version, overrides}` (v1+), oder raw `{lineId: {...}}` (legacy/inline)
+ * - Returns null bei invalidem Format.
+ *
+ * Wenn künftig FeedSchemaRow ein Feld bekommt, hier per version-Switch migrieren:
+ *   if (version < 2) { for (lineId in overrides) for (phase in ...) ... rename/add fields }
+ */
+function migrate(parsed: any): OverridesState | null {
+	if (typeof parsed !== 'object' || parsed === null) return null;
+	// v1+ Format: hat `version` + `overrides`
+	const version: number = typeof parsed.version === 'number' ? parsed.version : 1;
+	const incoming: any = parsed.overrides ?? parsed;
+	if (typeof incoming !== 'object' || incoming === null) return null;
+	// Sanity-Validate: jeder lineId-Wert muss ein Object sein
+	for (const lineId of Object.keys(incoming)) {
+		if (typeof incoming[lineId] !== 'object' || incoming[lineId] === null) return null;
+	}
+	// Aktuell keine Migration nötig — Future-proof: hier per `if (version < 2)` ergänzen
+	void version;
+	return incoming as OverridesState;
+}
 
 function loadState(): OverridesState {
 	if (typeof window === 'undefined' || typeof localStorage === 'undefined') return EMPTY;
@@ -121,14 +146,14 @@ function createOverridesStore() {
 			let snapshot: OverridesState = EMPTY;
 			const unsub = subscribe(s => { snapshot = s; });
 			unsub();
-			return JSON.stringify({ version: '1.0', overrides: snapshot }, null, 2);
+			return JSON.stringify({ version: CURRENT_VERSION, overrides: snapshot, exported_at: new Date().toISOString() }, null, 2);
 		},
-		/** JSON importieren (mergen statt überschreiben). */
+		/** JSON importieren (mergen statt überschreiben). Unterstützt Migrations. */
 		importJson(json: string): boolean {
 			try {
 				const parsed = JSON.parse(json);
-				const incoming: OverridesState = parsed.overrides ?? parsed;
-				if (typeof incoming !== 'object' || incoming === null) return false;
+				const incoming = migrate(parsed);
+				if (incoming === null) return false;
 				update(s => ({ ...s, ...incoming }));
 				return true;
 			} catch {

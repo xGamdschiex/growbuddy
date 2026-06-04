@@ -43,10 +43,15 @@
 
 	type DisplayRow = {
 		woche: number;          // Display-Woche (scaled)
-		schema: FeedSchemaRow;  // Tatsächliche Schema-Zeile
+		schema: FeedSchemaRow;  // Tatsächliche Schema-Zeile (mit Overrides angewendet)
 		isScaled: boolean;       // Wurde aus Stretch erzeugt?
 		kindLabel: string;       // 'Peak gehalten' / 'Fade verschoben' / leer
+		hasOverride: boolean;    // Hat die Zeile User-Overrides?
 	};
+
+	function rowHasOverride(lineId: string, schemaWoche: number, phase: string): boolean {
+		return overridesState[lineId]?.[phase]?.[schemaWoche] !== undefined;
+	}
 
 	function rowsForPhase(line: FeedLine, phase: string, totalWeeks: number | undefined): DisplayRow[] {
 		void overridesState; // Re-Compute bei Override-Änderung
@@ -67,7 +72,7 @@
 			if (isScaled) {
 				kindLabel = r.kind === 'fade' ? tr('calc.stretch_fade_shifted') : tr('calc.stretch_peak_held');
 			}
-			out.push({ woche: w, schema: r, isScaled, kindLabel });
+			out.push({ woche: w, schema: r, isScaled, kindLabel, hasOverride: rowHasOverride(line.id, raw.woche, raw.phase) });
 		}
 		return out;
 	}
@@ -154,7 +159,7 @@
 			{@const products = productsInPhase(line, phaseConf.name)}
 			{@const rows = phaseConf.name === 'Bloom'
 				? bloomDisplayRows
-				: line.schema.filter(r => r.phase === phaseConf.name).map(s => ({ woche: s.woche, schema: applyRowOverride(line.id, s), isScaled: false, kindLabel: '' }))}
+				: line.schema.filter(r => r.phase === phaseConf.name).map(s => ({ woche: s.woche, schema: applyRowOverride(line.id, s), isScaled: false, kindLabel: '', hasOverride: rowHasOverride(line.id, s.woche, s.phase) }))}
 			{#if rows.length > 0}
 				<div class="space-y-2">
 					<h2 class="text-sm font-bold uppercase tracking-wide text-gb-text-muted">
@@ -188,9 +193,13 @@
 								{#each rows as row}
 									<tr class="border-b border-gb-border/40 last:border-b-0
 										{row.isScaled ? 'bg-gb-accent/5' : ''}
+										{row.hasOverride ? 'ring-1 ring-inset ring-gb-accent/30' : ''}
 										{row.schema.kind === 'fade' ? 'opacity-90' : ''}">
 										<td class="px-2 py-2 font-semibold">
 											{row.woche}
+											{#if row.hasOverride}
+												<span class="block text-[9px] text-gb-accent leading-tight" title={tr('schema.row_overridden')}>✏️</span>
+											{/if}
 											{#if row.isScaled}
 												<span class="block text-[9px] text-gb-accent leading-tight" title={row.kindLabel}>
 													{row.schema.kind === 'fade' ? '↓ Fade' : '↻ Peak'}
@@ -242,10 +251,13 @@
 		{/if}
 
 		<!-- Legende -->
-		<div class="bg-gb-bg/60 border border-gb-border rounded-lg p-2 text-[11px] text-gb-text-muted leading-relaxed">
-			<b class="text-gb-text">Legende:</b>
-			<span class="inline-flex items-center gap-1 ml-2"><span class="inline-block w-3 h-3 rounded bg-gb-accent/20 border border-gb-accent/40"></span> Skalierte Woche (Peak gehalten oder Fade verschoben)</span>
-			<span class="inline-block ml-2">EC in mS/cm, Dosierungen pro angegebener Bezugsgröße (z.B. g/10L oder mL/L).</span>
+		<div class="bg-gb-bg/60 border border-gb-border rounded-lg p-2 text-[11px] text-gb-text-muted leading-relaxed space-y-1">
+			<div>
+				<b class="text-gb-text">Legende:</b>
+				<span class="inline-flex items-center gap-1 ml-2"><span class="inline-block w-3 h-3 rounded bg-gb-accent/20 border border-gb-accent/40"></span> Skalierte Woche</span>
+				<span class="inline-flex items-center gap-1 ml-2"><span class="inline-block w-3 h-3 rounded ring-1 ring-gb-accent/40"></span> ✏️ Eigene Anpassung</span>
+			</div>
+			<div>EC in mS/cm, Dosierungen pro angegebener Bezugsgröße (z.B. g/10L oder mL/L).</div>
 		</div>
 	{/if}
 </div>
