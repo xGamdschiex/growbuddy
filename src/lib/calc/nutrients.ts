@@ -22,6 +22,7 @@ import type { ECEinheit } from './units';
 import { unitFactor } from './units';
 import { calcAutoFaktor, calcFaktor, type FaktorModus } from './factor';
 import { calcCalMag, calcHahnPct, type CalMagResult, type CalMagInput } from './calmag';
+import { applyRowOverride } from '$lib/stores/feedline-overrides';
 
 import type { CalMagTyp } from './schema';
 
@@ -143,10 +144,12 @@ export function calculate(input: CalcInput): CalcResult {
   }
 
   // Schema-Lookup (mit Stretch-Support + total_weeks Skalierung)
-  const schema = getSchemaForWeek(feedline, input.phase, input.woche, input.total_weeks);
-  if (!schema) {
+  const schemaRaw = getSchemaForWeek(feedline, input.phase, input.woche, input.total_weeks);
+  if (!schemaRaw) {
     throw new Error(`Schema not found: ${feedline_id} ${input.phase}|W${input.woche}`);
   }
+  // User-Overrides aus Editor-Screen (v1.4.21+) on-the-fly mergen
+  const schema = applyRowOverride(feedline_id, schemaRaw);
 
   // Stretch-Info ermitteln: Liegt die angeforderte Woche außerhalb des Schemas
   // oder wird durch total_weeks ein verschobenes Schema verwendet?
@@ -184,7 +187,8 @@ export function calculate(input: CalcInput): CalcResult {
     // Vorwoche nachschlagen für glatte Übergänge (kein Rücksprung an Wochengrenzen)
     let prevWeekFmax: number | undefined;
     if (input.woche > 1) {
-      const prevSchema = getSchemaForWeek(feedline, input.phase, input.woche - 1, input.total_weeks);
+      const prevSchemaRaw = getSchemaForWeek(feedline, input.phase, input.woche - 1, input.total_weeks);
+      const prevSchema = prevSchemaRaw ? applyRowOverride(feedline_id, prevSchemaRaw) : undefined;
       if (prevSchema?.fmax !== undefined) {
         prevWeekFmax = prevSchema.fmax;
       }

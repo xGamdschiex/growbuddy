@@ -200,6 +200,11 @@ export interface DosierungResult {
  * - Ohne `total_weeks` Fallback auf schema_wochen → Schema unverändert.
  * - Ohne `kind`-Markierungen Fallback auf alte Stretch-Strategie (repeat_last / repeat_peak / hold_ec).
  *
+ * User-Overrides (v1.4.21+):
+ * - Nach Schema-Lookup werden User-Overrides aus `feedlineOverrides`-Store
+ *   on-the-fly über die Original-Zeile gemergt (siehe `applyRowOverride`).
+ *   Wenn keine Overrides gesetzt sind → no-op.
+ *
  * Beispiel Athena Pro Bloom (Schema 9W, W1-W7 Aufbau/Peak, W8+W9 Fade):
  *   total_weeks=12 → W1-W7=Schema, W8-W10=Schema-W7 (Peak halten), W11=Schema-W8, W12=Schema-W9.
  */

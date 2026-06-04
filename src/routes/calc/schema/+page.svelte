@@ -5,12 +5,18 @@
 	import { getAllFeedLines, getFeedLine } from '$lib/calc/feedlines/registry';
 	import { getSchemaForWeek } from '$lib/calc/feedlines/types';
 	import type { FeedLine, FeedSchemaRow } from '$lib/calc/feedlines/types';
+	import { applyRowOverride, feedlineOverrides } from '$lib/stores/feedline-overrides';
+	import type { OverridesState } from '$lib/stores/feedline-overrides';
 
 	let tr = $state<(k: string) => string>((k) => k);
+	let overridesState = $state<OverridesState>({});
 
 	onMount(() => {
-		const unsub = t.subscribe(v => tr = v);
-		return unsub;
+		const subs = [
+			t.subscribe(v => tr = v),
+			feedlineOverrides.subscribe(s => overridesState = s),
+		];
+		return () => subs.forEach(u => u());
 	});
 
 	const allLines = getAllFeedLines();
@@ -43,6 +49,7 @@
 	};
 
 	function rowsForPhase(line: FeedLine, phase: string, totalWeeks: number | undefined): DisplayRow[] {
+		void overridesState; // Re-Compute bei Override-Änderung
 		const config = line.phasen.find(p => p.name === phase);
 		if (!config) return [];
 		const max = phase === 'Bloom' && totalWeeks && totalWeeks > 0
@@ -51,8 +58,10 @@
 		const out: DisplayRow[] = [];
 		for (let w = 1; w <= max; w++) {
 			const tw = phase === 'Bloom' ? totalWeeks : undefined;
-			const r = getSchemaForWeek(line, phase, w, tw);
-			if (!r) continue;
+			const raw = getSchemaForWeek(line, phase, w, tw);
+			if (!raw) continue;
+			// User-Overrides anwenden (effektive Werte werden angezeigt)
+			const r = applyRowOverride(line.id, raw);
 			const isScaled = w !== r.woche;
 			let kindLabel = '';
 			if (isScaled) {
@@ -86,10 +95,17 @@
 <svelte:head><title>Düngerschema — GrowBuddy</title></svelte:head>
 
 <div class="px-4 pt-6 max-w-3xl mx-auto pb-24 space-y-5">
-	<div>
-		<a href="/calc" class="text-gb-text-muted text-sm hover:text-gb-text">&larr; Rechner</a>
-		<h1 class="text-2xl font-bold mt-1">📋 Düngerschema</h1>
-		<p class="text-sm text-gb-text-muted mt-1">Alle Werte pro Phase und Woche im Überblick.</p>
+	<div class="flex items-start justify-between">
+		<div>
+			<a href="/calc" class="text-gb-text-muted text-sm hover:text-gb-text">&larr; Rechner</a>
+			<h1 class="text-2xl font-bold mt-1">📋 Düngerschema</h1>
+			<p class="text-sm text-gb-text-muted mt-1">Alle Werte pro Phase und Woche im Überblick.</p>
+		</div>
+		<a href="/calc/schema/edit?line={selectedId}"
+			class="text-xs bg-gb-accent/15 border border-gb-accent/30 text-gb-accent font-semibold rounded-lg px-3 py-2 hover:bg-gb-accent/25 mt-1 whitespace-nowrap"
+			style="min-height:36px; display:inline-flex; align-items:center;">
+			✏️ Bearbeiten
+		</a>
 	</div>
 
 	<!-- Line-Auswahl -->
@@ -138,7 +154,7 @@
 			{@const products = productsInPhase(line, phaseConf.name)}
 			{@const rows = phaseConf.name === 'Bloom'
 				? bloomDisplayRows
-				: line.schema.filter(r => r.phase === phaseConf.name).map(s => ({ woche: s.woche, schema: s, isScaled: false, kindLabel: '' }))}
+				: line.schema.filter(r => r.phase === phaseConf.name).map(s => ({ woche: s.woche, schema: applyRowOverride(line.id, s), isScaled: false, kindLabel: '' }))}
 			{#if rows.length > 0}
 				<div class="space-y-2">
 					<h2 class="text-sm font-bold uppercase tracking-wide text-gb-text-muted">

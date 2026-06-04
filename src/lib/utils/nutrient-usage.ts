@@ -20,6 +20,7 @@
 
 import type { CheckIn, Grow } from '$lib/stores/grow';
 import { getFeedLine } from '$lib/calc/feedlines/registry';
+import { applyRowOverride } from '$lib/stores/feedline-overrides';
 import {
 	getSchemaForWeek,
 	calcProductDosierung,
@@ -185,12 +186,13 @@ export function calcNutrientUsage(grow: Grow, allCheckins: CheckIn[]): NutrientU
 		if (!ci.watered || !ci.nutrients_given || !hasWaterMl) continue;
 		n_fertigated++;
 
-		const schema = getSchemaForWeek(feedline, ci.phase, ci.week, ci.phase === 'Bloom' ? totalBloomWeeks : undefined);
-		if (!schema) {
+		const schemaRaw = getSchemaForWeek(feedline, ci.phase, ci.week, ci.phase === 'Bloom' ? totalBloomWeeks : undefined);
+		if (!schemaRaw) {
 			n_skipped++;
 			stats.n_skipped++;
 			continue;
 		}
+		const schema = applyRowOverride(feedline.id, schemaRaw);
 		stats.n_fertigated++;
 
 		// EC-basierter Faktor: wenn gemessen < Ziel → User dosiert schwächer
