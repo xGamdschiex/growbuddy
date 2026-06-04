@@ -28,6 +28,11 @@ export interface CalcState {
 	einfach_modus: boolean;
 	/** Ob User schon mal den Rechner benutzt hat */
 	ever_used: boolean;
+	/**
+	 * Geplante Bloom-Dauer in Wochen (Sativa/Haze brauchen 10-13W).
+	 * 0 = Auto: aus aktivem Grow/Strain oder Schema-Default.
+	 */
+	bloom_weeks?: number;
 }
 
 const STORAGE_KEY = 'growbuddy_calc';
@@ -52,6 +57,7 @@ const DEFAULT: CalcState = {
 	faktor_manuell: 100,
 	einfach_modus: true,
 	ever_used: false,
+	bloom_weeks: 0,
 };
 
 function loadState(): CalcState {

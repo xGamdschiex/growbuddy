@@ -144,8 +144,8 @@ export const cannaTerra: FeedLine = {
     { phase: 'Bloom', woche: 4, ec_ziel: 1.7, ph_min: 6.0, ph_max: 6.5, fmin: 75, fmax: 95, dosierungen: { terra_flores: 4.0, cannazym: 2.5, boost: 4.0, pk1314: 0.5 } },
     { phase: 'Bloom', woche: 5, ec_ziel: 1.8, ph_min: 6.0, ph_max: 6.5, fmin: 80, fmax: 100, dosierungen: { terra_flores: 4.0, cannazym: 2.5, boost: 4.0, pk1314: 1.0 } },
     { phase: 'Bloom', woche: 6, ec_ziel: 1.7, ph_min: 6.0, ph_max: 6.5, fmin: 75, fmax: 95, dosierungen: { terra_flores: 4.0, cannazym: 2.5, boost: 3.0, pk1314: 0.75 } },
-    { phase: 'Bloom', woche: 7, ec_ziel: 1.4, ph_min: 6.0, ph_max: 6.5, fmin: 60, fmax: 80, dosierungen: { terra_flores: 3.0, cannazym: 2.5, boost: 2.0 } },
-    { phase: 'Bloom', woche: 8, ec_ziel: 1.0, ph_min: 6.0, ph_max: 6.5, fmin: 40, fmax: 60, dosierungen: { terra_flores: 2.0, cannazym: 2.5 } },
+    { phase: 'Bloom', woche: 7, ec_ziel: 1.4, ph_min: 6.0, ph_max: 6.5, fmin: 60, fmax: 80, dosierungen: { terra_flores: 3.0, cannazym: 2.5, boost: 2.0 }, kind: 'fade' },
+    { phase: 'Bloom', woche: 8, ec_ziel: 1.0, ph_min: 6.0, ph_max: 6.5, fmin: 40, fmax: 60, dosierungen: { terra_flores: 2.0, cannazym: 2.5 }, kind: 'fade' },
     // Flush
     { phase: 'Flush', woche: 1, ec_ziel: 0.0, ph_min: 6.0, ph_max: 6.5, fmin: 0, fmax: 0, dosierungen: {} },
   ],
@@ -200,8 +200,8 @@ export const cannaCoco: FeedLine = {
     { phase: 'Bloom', woche: 4, ec_ziel: 1.8, ph_min: 5.5, ph_max: 6.2, fmin: 75, fmax: 95, dosierungen: { coco_a: 4.0, coco_b: 4.0, cannazym: 2.5, boost: 4.0, pk1314: 0.5 } },
     { phase: 'Bloom', woche: 5, ec_ziel: 1.9, ph_min: 5.5, ph_max: 6.2, fmin: 80, fmax: 100, dosierungen: { coco_a: 4.0, coco_b: 4.0, cannazym: 2.5, boost: 4.0, pk1314: 1.0 } },
     { phase: 'Bloom', woche: 6, ec_ziel: 1.7, ph_min: 5.5, ph_max: 6.2, fmin: 75, fmax: 95, dosierungen: { coco_a: 3.5, coco_b: 3.5, cannazym: 2.5, boost: 3.0, pk1314: 0.75 } },
-    { phase: 'Bloom', woche: 7, ec_ziel: 1.4, ph_min: 5.5, ph_max: 6.2, fmin: 60, fmax: 80, dosierungen: { coco_a: 3.0, coco_b: 3.0, cannazym: 2.5, boost: 2.0 } },
-    { phase: 'Bloom', woche: 8, ec_ziel: 1.0, ph_min: 5.5, ph_max: 6.2, fmin: 40, fmax: 60, dosierungen: { coco_a: 2.0, coco_b: 2.0, cannazym: 2.5 } },
+    { phase: 'Bloom', woche: 7, ec_ziel: 1.4, ph_min: 5.5, ph_max: 6.2, fmin: 60, fmax: 80, dosierungen: { coco_a: 3.0, coco_b: 3.0, cannazym: 2.5, boost: 2.0 }, kind: 'fade' },
+    { phase: 'Bloom', woche: 8, ec_ziel: 1.0, ph_min: 5.5, ph_max: 6.2, fmin: 40, fmax: 60, dosierungen: { coco_a: 2.0, coco_b: 2.0, cannazym: 2.5 }, kind: 'fade' },
     { phase: 'Flush', woche: 1, ec_ziel: 0.0, ph_min: 5.5, ph_max: 6.2, fmin: 0, fmax: 0, dosierungen: {} },
   ],
 

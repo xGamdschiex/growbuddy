@@ -217,6 +217,7 @@ export const hesi: FeedLine = {
         boost: 2, power_zyme: 5, super_vit: 0.08, phos_plus: 0,
       },
       hinweis: 'Reifung — Nährstoffe reduzieren',
+      kind: 'fade',
     },
     {
       phase: 'Bloom', woche: 8, ec_ziel: 1.2, ph_min: 6.0, ph_max: 6.5,
@@ -226,6 +227,7 @@ export const hesi: FeedLine = {
         boost: 0, power_zyme: 5, super_vit: 0, phos_plus: 0,
       },
       hinweis: 'Letzte Bloom-Woche — Übergang zu Flush',
+      kind: 'fade',
     },
 
     // ─── Flush ───────────────────────────────────────────────

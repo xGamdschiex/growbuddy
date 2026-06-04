@@ -251,6 +251,7 @@ export const ghHybrids: FeedLine = {
       fmin: 40, fmax: 55,
       dosierungen: { hybrids: 0.40, calcium: 0.79, booster: 0, enhancer: 0 },
       hinweis: 'Ripen — minimale Düngung, Reifung',
+      kind: 'fade',
     },
 
     // ─── Flush ───────────────────────────────────────────────
@@ -357,6 +358,7 @@ export const ghShortFlowering: FeedLine = {
       fmin: 40, fmax: 55,
       dosierungen: { short_fl: 0.50, calcium: 0.79, booster: 0, enhancer: 0 },
       hinweis: 'Ripen — minimale Düngung',
+      kind: 'fade',
     },
 
     // ─── Flush ───────────────────────────────────────────────

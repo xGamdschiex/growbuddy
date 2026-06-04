@@ -132,6 +132,14 @@ export interface FeedSchemaRow {
   cleanse_t1?: number;
   cleanse_t7?: number;
   hinweis?: string;
+  /**
+   * Klassifikation für Skalierungs-Logik bei langen Strains.
+   * - 'build' / undefined: Aufbau-Woche
+   * - 'peak': Voll-Peak-Woche (wird wiederholt bei langen Strains)
+   * - 'fade': Fade/Taper/Ripen-Woche (wird auf Ende verschoben bei langen Strains)
+   * Lines ohne markierte Fade-Wochen fallen auf alte Logik zurück.
+   */
+  kind?: 'build' | 'peak' | 'fade';
 }
 
 // ─── PHASE CONFIG ────────────────────────────────────────────────────────
@@ -184,26 +192,57 @@ export interface DosierungResult {
 
 /**
  * Findet die Schema-Zeile für Phase+Woche.
- * Bei Wochen > schema_wochen wird die Stretch-Strategie angewandt.
+ *
+ * Skalierungs-Logik (v1.4.20+):
+ * - Wenn die Line Fade-Wochen (`kind: 'fade'`) markiert hat, wird bei langen Strains
+ *   die Peak-Woche gehalten und die Fade-Wochen auf das Ende der Total-Bloom verschoben.
+ * - `total_weeks` ist die User-konfigurierte Bloom-Gesamtdauer (z.B. Sativa 12W).
+ * - Ohne `total_weeks` Fallback auf schema_wochen → Schema unverändert.
+ * - Ohne `kind`-Markierungen Fallback auf alte Stretch-Strategie (repeat_last / repeat_peak / hold_ec).
+ *
+ * Beispiel Athena Pro Bloom (Schema 9W, W1-W7 Aufbau/Peak, W8+W9 Fade):
+ *   total_weeks=12 → W1-W7=Schema, W8-W10=Schema-W7 (Peak halten), W11=Schema-W8, W12=Schema-W9.
  */
 export function getSchemaForWeek(
   line: FeedLine,
   phase: string,
-  woche: number
+  woche: number,
+  total_weeks?: number
 ): FeedSchemaRow | undefined {
-  // Direkte Suche
-  const direct = line.schema.find(r => r.phase === phase && r.woche === woche);
+  const phaseConfig = line.phasen.find(p => p.name === phase);
+  if (!phaseConfig) {
+    // Phase nicht definiert → nur direkter Match
+    return line.schema.find(r => r.phase === phase && r.woche === woche);
+  }
+
+  const rows = line.schema.filter(r => r.phase === phase);
+  if (rows.length === 0) return undefined;
+
+  const fadeRows = rows.filter(r => r.kind === 'fade');
+  const peakRows = rows.filter(r => r.kind !== 'fade');
+
+  // ── Neue Logik: Fade-Wochen markiert + total_weeks gesetzt ──
+  if (fadeRows.length > 0 && total_weeks !== undefined && total_weeks > 0) {
+    const total = Math.max(total_weeks, 1);
+    const fadeStart = total - fadeRows.length + 1; // erste Fade-Woche im finalen Schedule
+
+    if (woche < fadeStart) {
+      // Aufbau/Peak: nehme peakRows direkt, sonst halte letzte Peak-Woche
+      const idx = Math.min(woche - 1, peakRows.length - 1);
+      return peakRows[Math.max(0, idx)];
+    } else {
+      // Fade: mappe auf entsprechende Fade-Woche
+      const fadeIdx = woche - fadeStart;
+      return fadeRows[Math.max(0, Math.min(fadeIdx, fadeRows.length - 1))];
+    }
+  }
+
+  // ── Direkte Suche (kein Stretch nötig) ──
+  const direct = rows.find(r => r.woche === woche);
   if (direct) return direct;
 
-  // Phase-Config finden
-  const phaseConfig = line.phasen.find(p => p.name === phase);
-  if (!phaseConfig) return undefined;
-
-  // Woche liegt außerhalb des Schemas → Stretch
+  // ── Fallback: alte Stretch-Strategie (für Lines ohne kind-Markierung) ──
   if (woche > phaseConfig.schema_wochen && woche <= phaseConfig.max_wochen) {
-    const rows = line.schema.filter(r => r.phase === phase);
-    if (rows.length === 0) return undefined;
-
     switch (phaseConfig.stretch) {
       case 'repeat_last':
         return rows[rows.length - 1];

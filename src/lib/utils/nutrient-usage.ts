@@ -141,6 +141,17 @@ export function calcNutrientUsage(grow: Grow, allCheckins: CheckIn[]): NutrientU
 	const feedline = getFeedLine(grow.feedline_id);
 	if (!feedline) return EMPTY;
 
+	// Bloom-Wochen für total_weeks-Skalierung: gewichteter Durchschnitt aus strains[].flowering_weeks
+	let totalBloomWeeks: number | undefined;
+	const strains = grow.strains ?? [];
+	if (strains.length > 0) {
+		const total = strains.reduce((s, e) => s + (e.plant_count || 0), 0);
+		if (total > 0) {
+			const wAvg = strains.reduce((s, e) => s + (e.flowering_weeks ?? 0) * (e.plant_count || 0), 0) / total;
+			if (wAvg > 0) totalBloomWeeks = Math.round(wAvg);
+		}
+	}
+
 	const checkins = allCheckins
 		.filter((c) => c.grow_id === grow.id)
 		.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
@@ -174,7 +185,7 @@ export function calcNutrientUsage(grow: Grow, allCheckins: CheckIn[]): NutrientU
 		if (!ci.watered || !ci.nutrients_given || !hasWaterMl) continue;
 		n_fertigated++;
 
-		const schema = getSchemaForWeek(feedline, ci.phase, ci.week);
+		const schema = getSchemaForWeek(feedline, ci.phase, ci.week, ci.phase === 'Bloom' ? totalBloomWeeks : undefined);
 		if (!schema) {
 			n_skipped++;
 			stats.n_skipped++;

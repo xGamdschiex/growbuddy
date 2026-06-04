@@ -196,12 +196,14 @@ export const athenaBlended: FeedLine = {
       fmin: 48, fmax: 60, ca_ziel: 100, mg_ziel: 45,
       dosierungen: { bl_grow_a: 0, bl_grow_b: 0, bl_bloom_a: 1.8, bl_bloom_b: 1.8, bl_stack: 0, bl_fade: 2.2 },
       cleanse_t1: 0.8, cleanse_t7: 1.4, hinweis: 'Fade startet — Nährstoffe abbauen',
+      kind: 'fade',
     },
     {
       phase: 'Bloom', woche: 9, ec_ziel: 1.5, ph_min: 6.0, ph_max: 6.4,
       fmin: 28, fmax: 40, ca_ziel: 65, mg_ziel: 28,
       dosierungen: { bl_grow_a: 0, bl_grow_b: 0, bl_bloom_a: 1.8, bl_bloom_b: 1.8, bl_stack: 0, bl_fade: 3.0 },
       cleanse_t1: 1.3, cleanse_t7: 2.6, hinweis: 'Finish — Fade maximal',
+      kind: 'fade',
     },
   ],
 

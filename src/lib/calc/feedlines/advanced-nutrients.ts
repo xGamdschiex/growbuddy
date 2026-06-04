@@ -112,8 +112,8 @@ export const advancedSensi: FeedLine = {
     { phase: 'Bloom', woche: 4, ec_ziel: 1.9, ph_min: 5.5, ph_max: 6.3, fmin: 80, fmax: 100, dosierungen: { sensi_bloom_a: 4.0, sensi_bloom_b: 4.0, big_bud: 2.0, bud_candy: 2.0 } },
     { phase: 'Bloom', woche: 5, ec_ziel: 2.0, ph_min: 5.5, ph_max: 6.3, fmin: 80, fmax: 100, dosierungen: { sensi_bloom_a: 4.0, sensi_bloom_b: 4.0, big_bud: 2.0, bud_candy: 2.0 } },
     { phase: 'Bloom', woche: 6, ec_ziel: 1.8, ph_min: 5.5, ph_max: 6.3, fmin: 75, fmax: 95,  dosierungen: { sensi_bloom_a: 3.0, sensi_bloom_b: 3.0, overdrive: 2.0, bud_candy: 2.0 } },
-    { phase: 'Bloom', woche: 7, ec_ziel: 1.5, ph_min: 5.5, ph_max: 6.3, fmin: 60, fmax: 80,  dosierungen: { sensi_bloom_a: 2.0, sensi_bloom_b: 2.0, overdrive: 2.0 } },
-    { phase: 'Bloom', woche: 8, ec_ziel: 1.0, ph_min: 5.5, ph_max: 6.3, fmin: 40, fmax: 60,  dosierungen: { sensi_bloom_a: 1.0, sensi_bloom_b: 1.0 } },
+    { phase: 'Bloom', woche: 7, ec_ziel: 1.5, ph_min: 5.5, ph_max: 6.3, fmin: 60, fmax: 80,  dosierungen: { sensi_bloom_a: 2.0, sensi_bloom_b: 2.0, overdrive: 2.0 }, kind: 'fade' },
+    { phase: 'Bloom', woche: 8, ec_ziel: 1.0, ph_min: 5.5, ph_max: 6.3, fmin: 40, fmax: 60,  dosierungen: { sensi_bloom_a: 1.0, sensi_bloom_b: 1.0 }, kind: 'fade' },
     // Flush
     { phase: 'Flush', woche: 1, ec_ziel: 0.0, ph_min: 5.5, ph_max: 6.3, fmin: 0, fmax: 0, dosierungen: {} },
   ],

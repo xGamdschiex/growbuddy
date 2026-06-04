@@ -166,6 +166,7 @@ export const athenaPro: FeedLine = {
       fmin: 60, fmax: 48, ca_ziel: 100, mg_ziel: 45,
       dosierungen: { grow: 0, bloom: 9.4, core: 5.7, fade: 22 },
       cleanse_t1: 8, cleanse_t7: 14, hinweis: '',
+      kind: 'fade',
     },
     {
       // Flush-Taper (Lauri 2026-05-07 Option B): jeden Tag weniger
@@ -173,6 +174,7 @@ export const athenaPro: FeedLine = {
       fmin: 40, fmax: 28, ca_ziel: 65, mg_ziel: 28,
       dosierungen: { grow: 0, bloom: 9.4, core: 5.7, fade: 30 },
       cleanse_t1: 13, cleanse_t7: 26, hinweis: '',
+      kind: 'fade',
     },
   ],
 

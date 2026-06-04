@@ -176,6 +176,7 @@ export const biobizz: FeedLine = {
         root_juice: 0, bio_grow: 4, bio_bloom: 4, top_max: 4,
         bio_heaven: 5, alg_a_mic: 4, acti_vera: 5, microbes: 0.2,
       },
+      kind: 'fade',
     },
     {
       phase: 'Bloom', woche: 8, ec_ziel: 1.6, ph_min: 6.2, ph_max: 6.5,
@@ -185,6 +186,7 @@ export const biobizz: FeedLine = {
         bio_heaven: 5, alg_a_mic: 4, acti_vera: 5, microbes: 0.2,
       },
       hinweis: 'Letzte Bloom-Woche',
+      kind: 'fade',
     },
 
     // ─── Flush ───────────────────────────────────────────────

@@ -173,6 +173,7 @@ export const atamiBcuzz: FeedLine = {
         booster_uni: 0, bloom_stim: 0.75, rootbastic: 0, silic_boost: 0, atazyme: 1,
       },
       hinweis: 'Ripening — Dosierung reduzieren',
+      kind: 'fade',
     },
     {
       phase: 'Bloom', woche: 6, ec_ziel: 0.8, ph_min: 5.5, ph_max: 6.0,
@@ -183,6 +184,7 @@ export const atamiBcuzz: FeedLine = {
         booster_uni: 0, bloom_stim: 0, rootbastic: 0, silic_boost: 0, atazyme: 0.5,
       },
       hinweis: 'Spät-Ripening — nur Base minimal',
+      kind: 'fade',
     },
 
     // ─── Flush ───────────────────────────────────────────────

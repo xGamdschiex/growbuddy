@@ -46,6 +46,12 @@ export interface CalcInput {
   custom_wasser?: { ca: number; mg: number; ec: number; ph: number };
   /** Anbausystem — beeinflusst EC-Dosierung */
   system?: 'topf' | 'autopot' | 'dwc' | 'rdwc';
+  /**
+   * Geplante Gesamtdauer der aktuellen Phase in Wochen (z.B. Bloom 12W bei Sativa).
+   * Bei `total_weeks > schema_wochen` wird die Peak-Woche gehalten und die Fade-Wochen
+   * (kind: 'fade') auf das Ende der Phase verschoben. Standard: schema_wochen der Line.
+   */
+  total_weeks?: number;
 }
 
 /** System-Multiplikator auf Dosierfaktor. Hydro-Systeme brauchen niedrigere EC. */
@@ -136,20 +142,29 @@ export function calculate(input: CalcInput): CalcResult {
     throw new Error(`FeedLine not found: ${feedline_id}`);
   }
 
-  // Schema-Lookup (mit Stretch-Support)
-  const schema = getSchemaForWeek(feedline, input.phase, input.woche);
+  // Schema-Lookup (mit Stretch-Support + total_weeks Skalierung)
+  const schema = getSchemaForWeek(feedline, input.phase, input.woche, input.total_weeks);
   if (!schema) {
     throw new Error(`Schema not found: ${feedline_id} ${input.phase}|W${input.woche}`);
   }
 
-  // Stretch-Info ermitteln: Liegt die angeforderte Woche außerhalb des Schemas?
+  // Stretch-Info ermitteln: Liegt die angeforderte Woche außerhalb des Schemas
+  // oder wird durch total_weeks ein verschobenes Schema verwendet?
   let stretch_info: StretchInfo | null = null;
   const phaseConfig = feedline.phasen.find(p => p.name === input.phase);
-  if (phaseConfig && input.woche > phaseConfig.schema_wochen) {
+  const wocheAbweicht = input.woche !== schema.woche;
+  const totalScalingAktiv = phaseConfig && input.total_weeks !== undefined &&
+    input.total_weeks > phaseConfig.schema_wochen;
+  if (phaseConfig && (wocheAbweicht || totalScalingAktiv)) {
+    // Erkenne Skalierungs-Typ: Peak gehalten oder Fade verschoben
+    let strategy: string = phaseConfig.stretch;
+    if (totalScalingAktiv) {
+      strategy = schema.kind === 'fade' ? 'fade_shifted' : 'peak_held';
+    }
     stretch_info = {
       requested_woche: input.woche,
       used_woche: schema.woche,
-      strategy: phaseConfig.stretch,
+      strategy,
     };
   }
 
@@ -169,7 +184,7 @@ export function calculate(input: CalcInput): CalcResult {
     // Vorwoche nachschlagen für glatte Übergänge (kein Rücksprung an Wochengrenzen)
     let prevWeekFmax: number | undefined;
     if (input.woche > 1) {
-      const prevSchema = getSchemaForWeek(feedline, input.phase, input.woche - 1);
+      const prevSchema = getSchemaForWeek(feedline, input.phase, input.woche - 1, input.total_weeks);
       if (prevSchema?.fmax !== undefined) {
         prevWeekFmax = prevSchema.fmax;
       }

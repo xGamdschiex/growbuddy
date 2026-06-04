@@ -193,6 +193,26 @@
 		setTimeout(() => goto(`/grow/${grow.id}`), 400);
 	}
 
+	// Effective total_weeks: User-Override > aktiver Grow Strain (flowering_weeks) > undefined (Schema-Default)
+	let effectiveTotalWeeks = $derived.by(() => {
+		// 1. Wenn User im Calc explizit eine Bloom-Dauer setzt → verwenden
+		if (calcState.bloom_weeks && calcState.bloom_weeks > 0) return calcState.bloom_weeks;
+		// 2. Wenn Auto-Fill vom aktiven Grow + Bloom-Phase → flowering_weeks vom ersten Strain holen
+		if (autoFillFromGrow && calcState.phase === 'Bloom') {
+			const grow = activeGrows[0];
+			const entries = (grow?.strains ?? []) as Array<{ flowering_weeks?: number; plant_count?: number }>;
+			if (entries.length > 0) {
+				// Gewichteter Durchschnitt der flowering_weeks (Multi-Strain) — gerundet
+				const total = entries.reduce((s, e) => s + (e.plant_count || 0), 0);
+				if (total > 0) {
+					const wAvg = entries.reduce((s, e) => s + (e.flowering_weeks ?? 0) * (e.plant_count || 0), 0) / total;
+					if (wAvg > 0) return Math.round(wAvg);
+				}
+			}
+		}
+		return undefined; // Schema-Default verwenden
+	});
+
 	$effect(() => {
 		try {
 			result = calculate({
@@ -210,6 +230,7 @@
 				medium: calcState.medium,
 				system: calcState.system,
 				hat_ro: calcState.hat_ro,
+				total_weeks: effectiveTotalWeeks,
 				custom_wasser: isCustomWater
 					? { ca: calcState.custom_ca, mg: calcState.custom_mg, ec: calcState.custom_ec, ph: calcState.custom_ph }
 					: undefined,
@@ -228,6 +249,8 @@
 		if (strategy === 'repeat_last') return tr('calc.stretch_repeat_last');
 		if (strategy === 'repeat_peak') return tr('calc.stretch_repeat_peak');
 		if (strategy === 'hold_ec') return tr('calc.stretch_hold_ec');
+		if (strategy === 'peak_held') return tr('calc.stretch_peak_held');
+		if (strategy === 'fade_shifted') return tr('calc.stretch_fade_shifted');
 		return strategy;
 	}
 </script>
@@ -259,7 +282,10 @@
 
 	<!-- Feedline -->
 	<div>
-		<label for="calc-feedline" class="block text-xs text-gb-text-muted mb-1">{tr('calc.feedline')}</label>
+		<div class="flex items-baseline justify-between mb-1">
+			<label for="calc-feedline" class="text-xs text-gb-text-muted">{tr('calc.feedline')}</label>
+			<a href="/calc/schema?line={calcState.feedline_id}" class="text-[11px] text-gb-info hover:underline">📋 Schema-Tabelle</a>
+		</div>
 		<select id="calc-feedline" value={calcState.feedline_id} onchange={(e) => switchFeedline(e.currentTarget.value)} class="w-full bg-gb-surface border border-gb-border rounded-lg px-3 py-3 text-sm">
 			{#each feedlines as fl}
 				<option value={fl.id}>{fl.name} ({fl.hersteller})</option>
@@ -303,6 +329,37 @@
 		<button onclick={() => { autoFillFromGrow = true; }} class="text-[11px] text-gb-info hover:underline -mt-2 mb-1">
 			↻ Wieder mit Grow synchronisieren
 		</button>
+	{/if}
+
+	<!-- Bloom-Dauer (für Sativas/Hazes mit 10–13W Blüte) — nur in Bloom-Phase relevant -->
+	{#if calcState.phase === 'Bloom' && feedline}
+		{@const schemaWochen = feedline.phasen.find(p => p.name === 'Bloom')?.schema_wochen ?? 9}
+		{@const maxWochen = feedline.phasen.find(p => p.name === 'Bloom')?.max_wochen ?? 12}
+		<div class="bg-gb-surface rounded-lg p-3">
+			<div class="flex items-baseline justify-between mb-1">
+				<label for="calc-bloom-weeks" class="text-xs text-gb-text-muted">{tr('calc.total_weeks_label')}</label>
+				<span class="text-[11px] text-gb-text-muted">Schema: {schemaWochen}W · Max: {maxWochen}W</span>
+			</div>
+			<div class="flex items-center gap-2">
+				<input
+					id="calc-bloom-weeks"
+					type="range"
+					min={schemaWochen}
+					max={maxWochen}
+					step="1"
+					value={calcState.bloom_weeks || effectiveTotalWeeks || schemaWochen}
+					oninput={(e) => updateState({ bloom_weeks: Number(e.currentTarget.value) })}
+					class="flex-1 accent-gb-accent"
+				/>
+				<span class="text-sm font-semibold w-12 text-right">{calcState.bloom_weeks || effectiveTotalWeeks || schemaWochen}W</span>
+			</div>
+			<p class="text-[11px] text-gb-text-muted mt-1 leading-snug">{tr('calc.total_weeks_hint')}</p>
+			{#if calcState.bloom_weeks && calcState.bloom_weeks > 0}
+				<button onclick={() => updateState({ bloom_weeks: 0 })} class="text-[11px] text-gb-info hover:underline mt-1">
+					↻ Auto (aus Grow/Schema)
+				</button>
+			{/if}
+		</div>
 	{/if}
 
 	<!-- Reservoir + Medium -->
