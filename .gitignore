@@ -28,3 +28,7 @@ dist/*.apk
 
 # Claude Code temp files
 .claude-tmp-*
+
+# Python (bridge/)
+__pycache__/
+*.pyc
