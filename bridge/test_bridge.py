@@ -398,6 +398,20 @@ class BridgeTest(unittest.IsolatedAsyncioTestCase):
         ])
         self.assertEqual(self.bridge.acks, [])
 
+    async def test_only_the_last_value_per_device_is_executed(self):
+        await self.connect_all()
+        self.cloud.replies = [
+            {"claimed": True, "now": T0, "fast": True, "pause_s": 0, "commands": [
+                {"id": "a", "device_key": FAN_ID, "action": "level", "value": 43},
+                {"id": "b", "device_key": FAN_ID, "action": "level", "value": 44},
+                {"id": "c", "device_key": FAN_ID, "action": "level", "value": 45},
+            ]}
+        ]
+        await self.bridge.sync_once()
+        self.assertEqual(self.backend.conns[FAN].written, [f"2|0|32527|{FAN_ID}|45".encode()])
+        self.assertEqual([(a["id"], a["ok"], a["error"]) for a in self.bridge.acks],
+                         [("a", False, "superseded"), ("b", False, "superseded"), ("c", True, None)])
+
     async def test_unknown_bridge_registers_and_unclaimed_keeps_data(self):
         self.cloud.fail = br.CloudError("unknown bridge")
         with self.assertRaises(br.CloudError):  # Registrieren scheitert hier ebenfalls → wird weitergereicht

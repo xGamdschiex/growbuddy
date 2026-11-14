@@ -593,7 +593,11 @@ class Bridge:
         return resp
 
     async def run_commands(self, commands: list[dict]) -> None:
+        last = {(str(c.get("device_key")), str(c.get("action"))): c.get("id") for c in commands}
         for cmd in commands:
+            if last[(str(cmd.get("device_key")), str(cmd.get("action")))] != cmd.get("id"):
+                self.acks.append({"id": cmd.get("id"), "ok": False, "error": "superseded"})  # neuerer Wert folgt
+                continue
             link = self.links.get(str(cmd.get("device_key")))
             if link is None:
                 ok, err = False, "unknown device"

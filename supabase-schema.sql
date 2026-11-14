@@ -568,6 +568,15 @@ begin
        set status = 'failed', error = 'paused', done_at = now()
      where c.bridge_id = v_b.id and c.status = 'pending';
   else
+    -- Je Gerät und Aktion zählt nur der neueste offene Befehl.
+    update public.device_commands c
+       set status = 'failed', error = 'superseded', done_at = now()
+     where c.bridge_id = v_b.id and c.status = 'pending'
+       and exists (
+         select 1 from public.device_commands n
+          where n.bridge_id = c.bridge_id and n.device_key = c.device_key and n.action = c.action
+            and n.status = 'pending' and (n.created_at, n.id) > (c.created_at, c.id)
+       );
     with picked as (
       update public.device_commands c
          set status = 'sent'
@@ -576,7 +585,7 @@ begin
     )
     select coalesce(jsonb_agg(jsonb_build_object(
              'id', p.id, 'device_key', p.device_key, 'action', p.action, 'value', p.value
-           ) order by p.created_at), '[]'::jsonb)
+           ) order by p.created_at, p.id), '[]'::jsonb)
       into v_cmds
       from picked p;
   end if;
@@ -686,14 +695,16 @@ begin
     v_value := greatest(case v_kind when 'lamp' then 10 else 25 end, least(100, p_value));
   end if;
 
-  -- Offenen Befehl gleicher Art ersetzen (Regler wird schnell bewegt)
+  -- Regler wird schnell bewegt: gleichzeitige Aufrufe nacheinander abarbeiten, damit nur der
+  -- zuletzt gesetzte Wert offen bleibt. created_at = Zeitpunkt nach der Sperre (nicht Transaktionsbeginn).
+  perform pg_advisory_xact_lock(hashtextextended(p_bridge::text || '|' || p_device_key || '|' || p_action, 0));
   update public.device_commands c
      set status = 'failed', error = 'superseded', done_at = now()
    where c.bridge_id = p_bridge and c.device_key = p_device_key
      and c.action = p_action and c.status = 'pending';
 
-  insert into public.device_commands (bridge_id, device_key, action, value)
-  values (p_bridge, p_device_key, p_action, v_value)
+  insert into public.device_commands (bridge_id, device_key, action, value, created_at)
+  values (p_bridge, p_device_key, p_action, v_value, clock_timestamp())
   returning id into v_id;
 
   update public.device_bridges
