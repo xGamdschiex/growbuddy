@@ -67,6 +67,7 @@
 			<li>E-Mail-Adresse (Account-ID)</li>
 			<li>Grows + Check-ins — <strong>nur Text & Messwerte, KEINE Fotos</strong></li>
 			<li>Sync-Metadaten (<code class="text-xs">updated_at</code>, Konflikt-Auflösung)</li>
+			<li>Geräte (nur mit gekoppelter Bridge): Klima-Messwerte, Status von Lampe/Abluft, Schaltbefehle</li>
 		</ul>
 		<p class="text-xs text-gb-text-muted">
 			<strong>Fotos werden nicht hochgeladen</strong> und bleiben rein lokal.<br />

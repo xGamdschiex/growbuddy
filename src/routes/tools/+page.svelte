@@ -9,6 +9,12 @@
 	type Tool = { href: string; icon: string; key: string; descKey: string; pro?: boolean };
 	const groups: { title: string; tools: Tool[] }[] = [
 		{
+			title: 'Zelt',
+			tools: [
+				{ href: '/tools/devices', icon: '📡', key: 'tools.devices', descKey: 'tools.devices_desc' },
+			],
+		},
+		{
 			title: 'Rechner',
 			tools: [
 				{ href: '/calc', icon: '🧪', key: 'tools.calc', descKey: 'tools.calc_desc' },
